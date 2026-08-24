@@ -15,6 +15,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../context/AuthContext';
+import { router } from 'expo-router';
 import { validatePassword, validatePasswordMatch, isDisposableEmail } from '../utils/validation';
 
 
@@ -263,9 +264,9 @@ export default function AuthScreen() {
                         <Text style={styles.rememberText}>Recordar mis datos</Text>
                       </TouchableOpacity>
 
-                      <TouchableOpacity activeOpacity={0.7}>
-                        <Text style={styles.forgotText}>¿Olvidaste tu contraseña?</Text>
-                      </TouchableOpacity>
+                     <TouchableOpacity activeOpacity={0.7} onPress={() => router.push('../forgot-password')}>
+  <Text style={styles.forgotText}>¿Olvidaste tu contraseña?</Text>
+</TouchableOpacity>
                     </View>
 
                     {/* Submit Login Button */}
@@ -554,9 +555,9 @@ export default function AuthScreen() {
                     <Text style={styles.rememberText}>Recordar mis datos</Text>
                   </TouchableOpacity>
 
-                  <TouchableOpacity activeOpacity={0.7}>
-                    <Text style={styles.forgotText}>¿Olvidaste tu contraseña?</Text>
-                  </TouchableOpacity>
+                 <TouchableOpacity activeOpacity={0.7} onPress={() => router.push('../forgot-password')}>
+  <Text style={styles.forgotText}>¿Olvidaste tu contraseña?</Text>
+</TouchableOpacity>
                 </View>
 
                 {/* Submit Login Button */}
