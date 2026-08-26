@@ -2,6 +2,7 @@ import { Slot, useRouter, usePathname } from 'expo-router';
 import { View, Text, StyleSheet, Pressable, Image, useWindowDimensions, ScrollView } from 'react-native';
 import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../../context/AuthContext';
 
 const NAVY = '#12103C';
 const GOLD = '#cfa235';
@@ -12,6 +13,7 @@ export default function AprendizLayout() {
   const pathname = usePathname();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 1024;
+  const { logout } = useAuth();
 
   const [logoutHover, setLogoutHover] = useState(false);
 
@@ -125,6 +127,7 @@ export default function AprendizLayout() {
           <View style={styles.divider} />
           <Pressable
             style={[styles.logoutBtn, logoutHover && styles.logoutBtnHover]}
+            onPress={logout}
             onHoverIn={() => setLogoutHover(true)}
             onHoverOut={() => setLogoutHover(false)}
           >
