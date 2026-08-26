@@ -1,95 +1,77 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { authService, User, AuthResponse } from '../services/authService';
+import { router } from 'expo-router';
+import { authService, User } from '../services/authService';
 
-interface AuthContextData {
+type AuthContextType = {
   user: User | null;
-  token: string | null;
   isLoading: boolean;
-  login: (correo: string, pass: string) => Promise<AuthResponse>;
-  register: (nombre: string, correo: string, pass: string, confirmPass: string) => Promise<AuthResponse>;
+  login: (correo: string, contrasenia: string) => Promise<{ success: boolean; message?: string }>;
+   setSession: (user: User) => void;
+  register: (nombre: string, correo: string, contrasenia: string, confirmContrasenia: string) => Promise<{ success: boolean; message?: string }>;
   logout: () => Promise<void>;
-}
+};
 
-const AuthContext = createContext<AuthContextData>({} as AuthContextData);
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const ROLE_ROUTES: Record<User['role'], string> = {
+  ADMIN: '/admin',
+  INSTRUCTOR: '/(tabs)',
+  APRENDIZ: '/(tabs)',
+};
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Al montar el proveedor, verificar si hay un JWT y sesión previa en SecureStore
+  // Al abrir la app, revisa si ya había sesión guardada
   useEffect(() => {
-    async function loadStoredSession() {
-      try {
-        const session = await authService.checkSession();
-        if (session.token && session.user) {
-          setToken(session.token);
-          setUser(session.user);
-        }
-      } catch (e) {
-        console.error('Error cargando sesión almacenada:', e);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    loadStoredSession();
+    (async () => {
+      const { user: storedUser } = await authService.checkSession();
+      if (storedUser) setUser(storedUser);
+      setIsLoading(false);
+    })();
   }, []);
 
-  const login = async (correo: string, pass: string): Promise<AuthResponse> => {
-    setIsLoading(true);
-    const res = await authService.login(correo, pass);
-    if (res.success && res.token && res.user) {
-      setToken(res.token);
-      setUser(res.user);
+  const login = async (correo: string, contrasenia: string) => {
+    const result = await authService.login(correo, contrasenia);
+
+    if (!result.success || !result.user) {
+      return { success: false, message: result.message };
     }
-    setIsLoading(false);
-    return res;
+
+    setUser(result.user);
+
+    const destination = ROLE_ROUTES[result.user.role] ?? '/(tabs)';
+    router.replace(destination as any);
+
+    return { success: true };
   };
 
-  const register = async (
-    nombre: string,
-    correo: string,
-    pass: string,
-    confirmPass: string
-  ): Promise<AuthResponse> => {
-    setIsLoading(true);
-    const res = await authService.register(nombre, correo, pass, confirmPass);
-    if (res.success && res.token && res.user) {
-      setToken(res.token);
-      setUser(res.user);
-    }
-    setIsLoading(false);
-    return res;
+  const register = async (nombre: string, correo: string, contrasenia: string, confirmContrasenia: string) => {
+    return authService.register(nombre, correo, contrasenia, confirmContrasenia);
   };
 
   const logout = async () => {
-    setIsLoading(true);
     await authService.logout();
-    setToken(null);
     setUser(null);
-    setIsLoading(false);
+    router.replace('/');
   };
 
+  const setSession = (loggedUser: User) => {
+  setUser(loggedUser);
+  const destination = ROLE_ROUTES[loggedUser.role] ?? '/(tabs)';
+  router.replace(destination as any);
+};
+
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        token,
-        isLoading,
-        login,
-        register,
-        logout,
-      }}
-    >
+   <AuthContext.Provider value={{ user, isLoading, login, setSession, register, logout }}>
       {children}
     </AuthContext.Provider>
   );
-};
+}
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth debe ser usado dentro de un AuthProvider');
-  }
-  return context;
-};
+export function useAuth() {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth debe usarse dentro de AuthProvider');
+  return ctx;
+}
