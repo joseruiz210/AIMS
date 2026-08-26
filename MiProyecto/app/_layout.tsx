@@ -8,6 +8,7 @@ export default function RootLayout() {
         {/* Definimos nuestra pantalla principal (index.tsx) y le ocultamos la barra superior para que se vea el fondo oscuro completo */}
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="aprendiz" options={{ headerShown: false }} />
+        <Stack.Screen name="instructor" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
       </Stack>

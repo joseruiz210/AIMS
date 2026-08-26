@@ -1,0 +1,130 @@
+import React from 'react';
+import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+
+const GOLD = '#D4AF37';
+const BG_PAGE = '#F8FAFC';
+
+export default function ReportesScreenPremium() {
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+      <Text style={styles.pageTitle}>Reportes</Text>
+      
+      {/* Quick Export Grid */}
+      <View style={styles.grid}>
+        <View style={styles.reportCard}>
+          <View style={[styles.iconWrap, { backgroundColor: '#FEF3C7' }]}>
+            <Ionicons name="document-text-outline" size={24} color={GOLD} />
+          </View>
+          <Text style={styles.cardTitle}>Consolidado de Asistencia</Text>
+          <Text style={styles.cardText}>
+            Exporta el registro completo de asistencias e inasistencias en PDF o Excel.
+          </Text>
+          <Pressable style={styles.btnDownload}>
+            <Ionicons name="download-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+            <Text style={styles.btnDownloadText}>Descargar PDF</Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.reportCard}>
+          <View style={[styles.iconWrap, { backgroundColor: '#E0E7FF' }]}>
+            <Ionicons name="analytics-outline" size={24} color="#6366F1" />
+          </View>
+          <Text style={styles.cardTitle}>Reporte Académico</Text>
+          <Text style={styles.cardText}>
+            Resumen comparativo de promedios por competencia y aprendices destacados.
+          </Text>
+          <Pressable style={styles.btnDownload}>
+            <Ionicons name="download-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+            <Text style={styles.btnDownloadText}>Generar Reporte</Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.reportCard}>
+          <View style={[styles.iconWrap, { backgroundColor: '#FEE2E2' }]}>
+            <Ionicons name="alert-circle-outline" size={24} color="#EF4444" />
+          </View>
+          <Text style={styles.cardTitle}>Casos en Seguimiento</Text>
+          <Text style={styles.cardText}>
+            Fichas de alerta temprana para coordinación sobre aprendices en riesgo.
+          </Text>
+          <Pressable style={styles.btnDownload}>
+            <Ionicons name="share-social-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+            <Text style={styles.btnDownloadText}>Enviar a Coordinación</Text>
+          </Pressable>
+        </View>
+      </View>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: BG_PAGE,
+  },
+  contentContainer: {
+    paddingHorizontal: 28,
+    paddingVertical: 24,
+    paddingBottom: 40,
+  },
+  pageTitle: {
+    fontSize: 26,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 20,
+  },
+  grid: {
+    flexDirection: 'row',
+    gap: 18,
+    flexWrap: 'wrap',
+  },
+  reportCard: {
+    flex: 1,
+    minWidth: 260,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  iconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 6,
+  },
+  cardText: {
+    fontSize: 13,
+    color: '#64748B',
+    lineHeight: 18,
+    marginBottom: 20,
+  },
+  btnDownload: {
+    backgroundColor: GOLD,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+  },
+  btnDownloadText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+});
