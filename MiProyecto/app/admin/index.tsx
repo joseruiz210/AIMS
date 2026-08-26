@@ -1,5 +1,7 @@
 import { View, Text, StyleSheet, ScrollView, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useEffect, useState } from 'react';
+import { adminService } from '../../services/adminService';
 
 const NAVY = '#12103C';
 const GOLD = '#cfa235';
@@ -8,13 +10,32 @@ export default function AdminDashboard() {
   const { width } = useWindowDimensions();
   const isDesktop = width >= 1024;
 
+  const [counts, setCounts] = useState({ aprendices: 0, instructores: 0 });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadCounts = async () => {
+      try {
+        const [aprendices, instructores] = await Promise.all([
+          adminService.countByRole('APRENDIZ'),
+          adminService.countByRole('INSTRUCTOR'),
+        ]);
+        setCounts({ aprendices, instructores });
+      } catch (error) {
+        console.error('Error al cargar estadísticas:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadCounts();
+  }, []);
+
   const statCards = [
-    { title: 'Total aprendices', value: '0', icon: 'school-outline' as const, highlight: true },
-    { title: 'Instructores', value: '0', icon: 'person-outline' as const, highlight: false },
+    { title: 'Total aprendices', value: loading ? '...' : String(counts.aprendices), icon: 'school-outline' as const, highlight: true },
+    { title: 'Instructores', value: loading ? '...' : String(counts.instructores), icon: 'person-outline' as const, highlight: false },
     { title: 'Programas', value: '0', icon: 'book-outline' as const, highlight: true },
     { title: 'Fichas activas', value: '0', icon: 'document-text-outline' as const, highlight: false },
   ];
-
   const quickActions = [
     { title: 'Registrar usuario', icon: 'person-add-outline' as const },
     { title: 'Nueva ficha', icon: 'add-circle-outline' as const },

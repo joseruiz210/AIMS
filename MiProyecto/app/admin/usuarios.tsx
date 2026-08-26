@@ -1,5 +1,7 @@
 import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useEffect, useState, useCallback } from 'react';
+import { adminService, AdminUser } from '../../services/adminService';
 
 const NAVY = '#12103C';
 const GOLD = '#cfa235';
@@ -8,10 +10,38 @@ export default function UsuariosAdmin() {
   const { width } = useWindowDimensions();
   const isDesktop = width >= 1024;
 
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [counts, setCounts] = useState({ admin: 0, instructor: 0, aprendiz: 0 });
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [list, admins, instructores, aprendices] = await Promise.all([
+        adminService.getUsers({ search }),
+        adminService.countByRole('ADMIN'),
+        adminService.countByRole('INSTRUCTOR'),
+        adminService.countByRole('APRENDIZ'),
+      ]);
+      setUsers(list.users);
+      setCounts({ admin: admins, instructor: instructores, aprendiz: aprendices });
+    } catch (error) {
+      console.error('Error al cargar usuarios:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [search]);
+
+  useEffect(() => {
+    const timeout = setTimeout(loadData, 400); // debounce del buscador
+    return () => clearTimeout(timeout);
+  }, [loadData]);
+
   const statCards = [
-    { title: 'ADMINISTRADORES', value: '0', subtitle: 'ACTIVOS', icon: 'shield-outline' as const },
-    { title: 'INSTRUCTORES', value: '0', subtitle: 'ACTIVOS', icon: 'person-outline' as const },
-    { title: 'APRENDICES', value: '0', subtitle: 'MATRICULADOS', icon: 'school-outline' as const },
+    { title: 'ADMINISTRADORES', value: String(counts.admin), subtitle: 'ACTIVOS', icon: 'shield-outline' as const },
+    { title: 'INSTRUCTORES', value: String(counts.instructor), subtitle: 'ACTIVOS', icon: 'person-outline' as const },
+    { title: 'APRENDICES', value: String(counts.aprendiz), subtitle: 'MATRICULADOS', icon: 'school-outline' as const },
   ];
 
   return (
@@ -54,11 +84,9 @@ export default function UsuariosAdmin() {
               style={[styles.searchInput, !isDesktop && styles.mobileSearchInput]}
               placeholder="Buscar por nombre, correo o rol"
               placeholderTextColor="#999"
+              value={search}
+              onChangeText={setSearch}
             />
-          </View>
-          <View style={[styles.dropdown, !isDesktop && styles.mobileDropdown]}>
-            <Text style={styles.dropdownText}>Todos los roles</Text>
-            <Ionicons name="chevron-down" size={16} color="#999" />
           </View>
         </View>
 
@@ -68,15 +96,30 @@ export default function UsuariosAdmin() {
             <Text style={[styles.tableHeaderText, { flex: 2 }]}>ROL</Text>
             <Text style={[styles.tableHeaderText, { flex: 3 }]}>CORREO</Text>
             <Text style={[styles.tableHeaderText, { flex: 1.5 }]}>ESTADO</Text>
-            <Text style={[styles.tableHeaderText, { flex: 1 }]}>ACCIONES</Text>
           </View>
 
-          {/* Empty state */}
-          <View style={styles.emptyState}>
-            <Ionicons name="people-outline" size={44} color="#D0D0D0" />
-            <Text style={styles.emptyTitle}>No hay usuarios registrados</Text>
-            <Text style={styles.emptySubtext}>Presiona + Nuevo para agregar el primer usuario</Text>
-          </View>
+          {loading ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyTitle}>Cargando...</Text>
+            </View>
+          ) : users.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="people-outline" size={44} color="#D0D0D0" />
+              <Text style={styles.emptyTitle}>No hay usuarios registrados</Text>
+              <Text style={styles.emptySubtext}>Presiona + Nuevo para agregar el primer usuario</Text>
+            </View>
+          ) : (
+            users.map((u) => (
+              <View key={u.id} style={styles.tableRow}>
+                <Text style={[styles.tableCell, { flex: 2 }]}>{u.firstName} {u.lastName}</Text>
+                <Text style={[styles.tableCell, { flex: 2 }]}>{u.role}</Text>
+                <Text style={[styles.tableCell, { flex: 3 }]}>{u.email}</Text>
+                <Text style={[styles.tableCell, { flex: 1.5, color: u.isActive ? '#22C55E' : '#EF4444' }]}>
+                  {u.isActive ? 'Activo' : 'Inactivo'}
+                </Text>
+              </View>
+            ))
+          )}
         </View>
       </View>
     </ScrollView>
@@ -253,6 +296,16 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     fontWeight: '600',
+  },
+  tableRow: {
+    flexDirection: 'row',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  tableCell: {
+    fontSize: 13,
+    color: '#333',
   },
   emptyState: {
     paddingVertical: 50,
