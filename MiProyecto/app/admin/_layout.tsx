@@ -23,7 +23,7 @@ export default function AdminLayout() {
   ];
 
   useEffect(() => {
-    if (!isLoading && (!user || user.role !== 'ADMIN')) {
+    if (!isLoading && user && user.role !== 'ADMIN') {
       router.replace('/');
     }
   }, [isLoading, router, user]);
@@ -62,7 +62,7 @@ export default function AdminLayout() {
     );
   };
 
-  if (isLoading || !user || user.role !== 'ADMIN') {
+  if (isLoading || (user && user.role !== 'ADMIN')) {
     return <View style={styles.container} />;
   }
 

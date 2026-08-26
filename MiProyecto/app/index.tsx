@@ -57,7 +57,7 @@ export default function AuthScreen() {
   
 
  const [request, response, promptAsync] = Google.useAuthRequest({
-  webClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
+  webClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || 'mock-google-client-id.apps.googleusercontent.com',
   responseType: 'id_token',
   scopes: ['openid', 'profile', 'email'],
 });
