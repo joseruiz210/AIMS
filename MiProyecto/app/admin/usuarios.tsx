@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, useWindowDime
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState, useCallback } from 'react';
 import { adminService, AdminUser } from '../../services/adminService';
+import ActionModal from '../../components/ActionModal';
 
 const NAVY = '#12103C';
 const GOLD = '#cfa235';
@@ -14,6 +15,7 @@ export default function UsuariosAdmin() {
   const [counts, setCounts] = useState({ admin: 0, instructor: 0, aprendiz: 0 });
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [modalVisible, setModalVisible] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -51,7 +53,7 @@ export default function UsuariosAdmin() {
           <Text style={styles.subtitle}>Gestión de</Text>
           <Text style={styles.title}>Usuarios</Text>
         </View>
-        <Pressable style={styles.newButton}>
+        <Pressable style={styles.newButton} onPress={() => setModalVisible(true)}>
           <Ionicons name="add" size={18} color="#FFF" />
           <Text style={styles.newButtonText}>Nuevo</Text>
         </Pressable>
@@ -122,6 +124,21 @@ export default function UsuariosAdmin() {
           )}
         </View>
       </View>
+
+      <ActionModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        title="Crear Nuevo Usuario"
+        subtitle="Gestión de Accesos a la Plataforma AIMS"
+        iconName="person-add-outline"
+        confirmText="Registrar Usuario"
+        fields={[
+          { label: 'Nombre Completo', placeholder: 'Ej: Valentina Torres' },
+          { label: 'Correo Institucional', placeholder: 'Ej: v.torres@sena.edu.co' },
+          { label: 'Rol del Usuario', placeholder: 'APRENDIZ / INSTRUCTOR / ADMIN' },
+          { label: 'Ficha o Área Asignada', placeholder: 'Ej: 2845671 o Coordinación Académica' },
+        ]}
+      />
     </ScrollView>
   );
 }

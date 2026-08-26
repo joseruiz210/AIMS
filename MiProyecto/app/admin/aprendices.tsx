@@ -9,6 +9,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import ActionModal from '../../components/ActionModal';
 
 const NAVY = '#12103C';
 const GOLD = '#cfa235';
@@ -40,6 +41,7 @@ export default function AprendicesScreen() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'Todos' | 'Activo' | 'En Riesgo' | 'Critico'>('Todos');
   const [aprendices] = useState<AprendizRow[]>(INITIAL_APRENDICES);
+  const [modalVisible, setModalVisible] = useState(false);
 
   const filteredAprendices = aprendices.filter((a) => {
     const matchesSearch =
@@ -57,7 +59,10 @@ export default function AprendicesScreen() {
       {/* Top Header */}
       <View style={styles.topHeader}>
         <Text style={styles.pageTitle}>Aprendices</Text>
-        <Pressable style={({ hovered }: any) => [styles.exportBtn, hovered && styles.exportBtnHover]}>
+        <Pressable 
+          style={({ hovered }: any) => [styles.exportBtn, hovered && styles.exportBtnHover]}
+          onPress={() => setModalVisible(true)}
+        >
           <Ionicons name="download-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
           <Text style={styles.exportBtnText}>Exportar</Text>
         </Pressable>
@@ -199,6 +204,20 @@ export default function AprendicesScreen() {
           </View>
         ))}
       </View>
+
+      <ActionModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        title="Exportar Listado de Aprendices"
+        subtitle="Generación de reporte Excel / CSV"
+        iconName="download-outline"
+        confirmText="Generar y Exportar"
+        fields={[
+          { label: 'Formato de Salida', placeholder: 'Excel (.xlsx) / CSV' },
+          { label: 'Filtrar por Ficha', placeholder: 'Todas las fichas' },
+          { label: 'Incluir Historial de Notas', placeholder: 'Sí' },
+        ]}
+      />
     </ScrollView>
   );
 }

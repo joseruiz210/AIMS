@@ -9,6 +9,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import ActionModal from '../../components/ActionModal';
 
 const NAVY = '#12103C';
 const GOLD = '#cfa235';
@@ -38,6 +39,7 @@ export default function MatriculasScreen() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'Todos' | 'Activo' | 'Pendiente' | 'Retirado'>('Todos');
   const [matriculas] = useState<MatriculaRow[]>(INITIAL_MATRICULAS);
+  const [modalVisible, setModalVisible] = useState(false);
 
   const filteredMatriculas = matriculas.filter((m) => {
     const matchesSearch =
@@ -58,7 +60,10 @@ export default function MatriculasScreen() {
       {/* Top Header */}
       <View style={styles.topHeader}>
         <Text style={styles.pageTitle}>Matriculas</Text>
-        <Pressable style={({ hovered }: any) => [styles.newBtn, hovered && styles.newBtnHover]}>
+        <Pressable 
+          style={({ hovered }: any) => [styles.newBtn, hovered && styles.newBtnHover]}
+          onPress={() => setModalVisible(true)}
+        >
           <Ionicons name="add-circle-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
           <Text style={styles.newBtnText}>+ Nueva Matricula</Text>
         </Pressable>
@@ -186,6 +191,21 @@ export default function MatriculasScreen() {
           </View>
         ))}
       </View>
+
+      <ActionModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        title="Crear Nueva Matrícula"
+        subtitle="Registro Académico del Aprendiz"
+        iconName="document-text-outline"
+        confirmText="Registrar Matrícula"
+        fields={[
+          { label: 'Nombre del Aprendiz', placeholder: 'Ej: Valentina Torres' },
+          { label: 'Número de Ficha', placeholder: 'Ej: 2845671' },
+          { label: 'Programa de Formación', placeholder: 'Ej: ADSO' },
+          { label: 'Fecha de Registro', placeholder: 'Ej: 2026-08-26' },
+        ]}
+      />
     </ScrollView>
   );
 }

@@ -9,6 +9,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import ActionModal from '../../components/ActionModal';
 
 const NAVY = '#12103C';
 const GOLD = '#cfa235';
@@ -108,6 +109,7 @@ export default function ProgramasScreen() {
 
   const [search, setSearch] = useState('');
   const [programas] = useState<ProgramItem[]>(INITIAL_PROGRAMAS);
+  const [modalVisible, setModalVisible] = useState(false);
 
   const filteredProgramas = programas.filter(
     (p) =>
@@ -127,7 +129,10 @@ export default function ProgramasScreen() {
       {/* Top Action Bar */}
       <View style={styles.topHeader}>
         <Text style={styles.pageTitle}>Programas</Text>
-        <Pressable style={({ hovered }: any) => [styles.newBtn, hovered && styles.newBtnHover]}>
+        <Pressable 
+          style={({ hovered }: any) => [styles.newBtn, hovered && styles.newBtnHover]}
+          onPress={() => setModalVisible(true)}
+        >
           <Ionicons name="add-circle-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
           <Text style={styles.newBtnText}>+ Nuevo programa</Text>
         </Pressable>
@@ -233,6 +238,21 @@ export default function ProgramasScreen() {
           </View>
         ))}
       </View>
+
+      <ActionModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        title="Crear Nuevo Programa"
+        subtitle="Módulo de Formación Académica SENA"
+        iconName="book-outline"
+        confirmText="Guardar Programa"
+        fields={[
+          { label: 'Nombre del Programa', placeholder: 'Ej: Análisis y Desarrollo de Software' },
+          { label: 'Código de Insignia', placeholder: 'Ej: ADSO, DG, AE...' },
+          { label: 'Nivel y Duración', placeholder: 'Ej: Tecnólogo - 24 meses' },
+          { label: 'Número de Competencias', placeholder: 'Ej: 15' },
+        ]}
+      />
     </ScrollView>
   );
 }

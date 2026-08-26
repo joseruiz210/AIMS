@@ -9,6 +9,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import ActionModal from '../../components/ActionModal';
 
 const NAVY = '#12103C';
 const GOLD = '#cfa235';
@@ -73,6 +74,8 @@ export default function FichasScreen() {
 
   const [search, setSearch] = useState('');
   const [fichas] = useState<FichaItem[]>(INITIAL_FICHAS);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedFicha, setSelectedFicha] = useState<FichaItem | null>(null);
 
   const filteredFichas = fichas.filter(
     (f) =>
@@ -82,12 +85,22 @@ export default function FichasScreen() {
       f.instructor.toLowerCase().includes(search.toLowerCase())
   );
 
+  const handleOpenDetail = (item: FichaItem) => {
+    setSelectedFicha(item);
+  };
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       {/* Top Header */}
       <View style={styles.topHeader}>
         <Text style={styles.pageTitle}>Fichas</Text>
-        <Pressable style={({ hovered }: any) => [styles.newBtn, hovered && styles.newBtnHover]}>
+        <Pressable 
+          style={({ hovered }: any) => [styles.newBtn, hovered && styles.newBtnHover]}
+          onPress={() => {
+            setSelectedFicha(null);
+            setModalVisible(true);
+          }}
+        >
           <Ionicons name="add-circle-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
           <Text style={styles.newBtnText}>+ Nueva ficha</Text>
         </Pressable>
@@ -147,6 +160,7 @@ export default function FichasScreen() {
 
               <Pressable
                 style={({ hovered }: any) => [styles.detailBtn, hovered && styles.detailBtnHover]}
+                onPress={() => handleOpenDetail(item)}
               >
                 <Text style={styles.detailBtnText}>Ver detalle</Text>
               </Pressable>
@@ -154,6 +168,41 @@ export default function FichasScreen() {
           </View>
         ))}
       </View>
+
+      {/* New Ficha Modal */}
+      <ActionModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        title="Crear Nueva Ficha Académica"
+        subtitle="Registro de Grupo de Formación SENA"
+        iconName="folder-open-outline"
+        confirmText="Crear Ficha"
+        fields={[
+          { label: 'Número de Ficha', placeholder: 'Ej: 2845699' },
+          { label: 'Programa de Formación', placeholder: 'Ej: Análisis y Desarrollo de Software' },
+          { label: 'Instructor Líder', placeholder: 'Ej: Roberto Vargas' },
+          { label: 'Jornada', placeholder: 'Ej: Jornada Mañana / Tarde / Noche' },
+        ]}
+      />
+
+      {/* View Detail Modal */}
+      {selectedFicha && (
+        <ActionModal
+          visible={!!selectedFicha}
+          onClose={() => setSelectedFicha(null)}
+          title={`Ficha: ${selectedFicha.fichaNumber}`}
+          subtitle={selectedFicha.programTitle}
+          iconName="information-circle-outline"
+          confirmText="Cerrar Detalle"
+          fields={[
+            { label: 'Código de Insignia', placeholder: selectedFicha.badgeCode },
+            { label: 'Instructor Asignado', placeholder: selectedFicha.instructor },
+            { label: 'Jornada y Horario', placeholder: selectedFicha.shift },
+            { label: 'Total de Aprendices Enrolados', placeholder: `${selectedFicha.aprendicesCount} Aprendices` },
+            { label: 'Estado del Grupo', placeholder: selectedFicha.status },
+          ]}
+        />
+      )}
     </ScrollView>
   );
 }

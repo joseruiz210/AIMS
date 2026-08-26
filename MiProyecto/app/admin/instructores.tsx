@@ -9,6 +9,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import ActionModal from '../../components/ActionModal';
 
 const NAVY = '#12103C';
 const GOLD = '#cfa235';
@@ -73,6 +74,7 @@ export default function InstructoresScreen() {
 
   const [search, setSearch] = useState('');
   const [instructores] = useState<InstructorItem[]>(INITIAL_INSTRUCTORES);
+  const [modalVisible, setModalVisible] = useState(false);
 
   const filteredInstructores = instructores.filter(
     (ins) =>
@@ -86,7 +88,10 @@ export default function InstructoresScreen() {
       {/* Top Header */}
       <View style={styles.topHeader}>
         <Text style={styles.pageTitle}>Instructores</Text>
-        <Pressable style={({ hovered }: any) => [styles.newBtn, hovered && styles.newBtnHover]}>
+        <Pressable 
+          style={({ hovered }: any) => [styles.newBtn, hovered && styles.newBtnHover]}
+          onPress={() => setModalVisible(true)}
+        >
           <Ionicons name="person-add-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
           <Text style={styles.newBtnText}>+ Nuevo Instructor</Text>
         </Pressable>
@@ -160,6 +165,21 @@ export default function InstructoresScreen() {
           </View>
         ))}
       </View>
+
+      <ActionModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        title="Registrar Nuevo Instructor"
+        subtitle="Módulo de Gestión Docente SENA"
+        iconName="briefcase-outline"
+        confirmText="Registrar Instructor"
+        fields={[
+          { label: 'Nombre Completo', placeholder: 'Ej: Roberto Vargas' },
+          { label: 'Especialidad / Área', placeholder: 'Ej: Desarrollo de Software' },
+          { label: 'Correo Institucional SENA', placeholder: 'Ej: r.vargas@sena.edu.co' },
+          { label: 'Fichas Asignadas Iniciales', placeholder: 'Ej: 2' },
+        ]}
+      />
     </ScrollView>
   );
 }
