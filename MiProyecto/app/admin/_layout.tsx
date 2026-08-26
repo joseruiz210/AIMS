@@ -27,6 +27,7 @@ export default function AdminLayout() {
     { name: 'Matrículas', path: '/admin/matriculas', icon: 'document-text-outline' as const },
     { name: 'Asistencia', path: '/admin/asistencia', icon: 'checkmark-circle-outline' as const },
     { name: 'Calificación', path: '/admin/calificaciones', icon: 'star-outline' as const },
+    { name: 'Comunicación', path: '/admin/comunicacion', icon: 'chatbubbles-outline' as const },
     { name: 'Reportes', path: '/admin/reportes', icon: 'stats-chart-outline' as const },
     { name: 'Configuración', path: '/admin/configuracion', icon: 'settings-outline' as const },
   ];
