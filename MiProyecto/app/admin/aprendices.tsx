@@ -1,0 +1,423 @@
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Pressable,
+  TextInput,
+  useWindowDimensions,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+
+const NAVY = '#12103C';
+const GOLD = '#cfa235';
+
+interface AprendizRow {
+  id: string;
+  nombre: string;
+  ficha: string;
+  programa: string;
+  nota: number;
+  estado: 'Activo' | 'En Riesgo' | 'Critico';
+}
+
+const INITIAL_APRENDICES: AprendizRow[] = [
+  { id: '1', nombre: 'Maria Torres', ficha: '2845671', programa: 'ADSO', nota: 4.6, estado: 'Activo' },
+  { id: '2', nombre: 'Laura Lopez', ficha: '2845671', programa: 'ADSO', nota: 4.8, estado: 'Activo' },
+  { id: '3', nombre: 'Carlos Gomez', ficha: '2845671', programa: 'ADSO', nota: 2.9, estado: 'Critico' },
+  { id: '4', nombre: 'Andres Reyes', ficha: '2845671', programa: 'ADSO', nota: 3.9, estado: 'Activo' },
+  { id: '5', nombre: 'Valentina Ruiz', ficha: '2845680', programa: 'AE', nota: 4.2, estado: 'Activo' },
+  { id: '6', nombre: 'Mateo Fernandez', ficha: '2845700', programa: 'DG', nota: 3.1, estado: 'En Riesgo' },
+  { id: '7', nombre: 'Santiago Castro', ficha: '2845690', programa: 'CF', nota: 2.7, estado: 'Critico' },
+  { id: '8', nombre: 'Camila Morales', ficha: '2845671', programa: 'ADSO', nota: 4.5, estado: 'Activo' },
+];
+
+export default function AprendicesScreen() {
+  const { width } = useWindowDimensions();
+  const isDesktop = width >= 768;
+
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'Todos' | 'Activo' | 'En Riesgo' | 'Critico'>('Todos');
+  const [aprendices] = useState<AprendizRow[]>(INITIAL_APRENDICES);
+
+  const filteredAprendices = aprendices.filter((a) => {
+    const matchesSearch =
+      a.nombre.toLowerCase().includes(search.toLowerCase()) ||
+      a.ficha.includes(search) ||
+      a.programa.toLowerCase().includes(search.toLowerCase());
+
+    const matchesStatus = statusFilter === 'Todos' || a.estado === statusFilter;
+
+    return matchesSearch && matchesStatus;
+  });
+
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+      {/* Top Header */}
+      <View style={styles.topHeader}>
+        <Text style={styles.pageTitle}>Aprendices</Text>
+        <Pressable style={({ hovered }: any) => [styles.exportBtn, hovered && styles.exportBtnHover]}>
+          <Ionicons name="download-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+          <Text style={styles.exportBtnText}>Exportar</Text>
+        </Pressable>
+      </View>
+
+      {/* Metrics Row */}
+      <View style={styles.metricsGrid}>
+        <View style={styles.metricCard}>
+          <Text style={styles.metricLabel}>TOTAL</Text>
+          <Text style={styles.metricValueGold}>799</Text>
+        </View>
+        <View style={styles.metricCard}>
+          <Text style={styles.metricLabel}>ACTIVOS</Text>
+          <Text style={styles.metricValueDark}>546</Text>
+        </View>
+        <View style={styles.metricCard}>
+          <Text style={styles.metricLabel}>EN RIESGO</Text>
+          <Text style={styles.metricValueGold}>50</Text>
+        </View>
+        <View style={styles.metricCard}>
+          <Text style={styles.metricLabel}>CRÍTICOS</Text>
+          <Text style={styles.metricValueDark}>34</Text>
+        </View>
+      </View>
+
+      {/* Main Table / Container Box */}
+      <View style={styles.tableBox}>
+        {/* Search and Filters Bar */}
+        <View style={styles.filterRow}>
+          <View style={styles.searchWrapper}>
+            <Ionicons name="search-outline" size={18} color="#64748B" style={{ marginRight: 8 }} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Buscar por nombre o ficha..."
+              placeholderTextColor="#94A3B8"
+              value={search}
+              onChangeText={setSearch}
+            />
+          </View>
+
+          {/* Filter Pills */}
+          <View style={styles.filterPillsGroup}>
+            {(['Todos', 'Activo', 'En Riesgo', 'Critico'] as const).map((st) => (
+              <Pressable
+                key={st}
+                onPress={() => setStatusFilter(st)}
+                style={[
+                  styles.filterPill,
+                  statusFilter === st && styles.filterPillActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.filterPillText,
+                    statusFilter === st && styles.filterPillTextActive,
+                  ]}
+                >
+                  {st === 'Critico' ? 'Críticos' : st === 'Todos' ? 'Todos los estados' : st}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+
+        {/* Table Header */}
+        <View style={styles.tableHeader}>
+          <Text style={[styles.thText, { flex: 2 }]}>NOMBRE</Text>
+          <Text style={[styles.thText, { flex: 1 }]}>FICHA</Text>
+          <Text style={[styles.thText, { flex: 1 }]}>PROGRAMA</Text>
+          <Text style={[styles.thText, { flex: 1, textAlign: 'center' }]}>NOTA</Text>
+          <Text style={[styles.thText, { flex: 1, textAlign: 'right' }]}>ESTADO</Text>
+        </View>
+
+        {/* Table Body */}
+        {filteredAprendices.map((row, idx) => (
+          <View
+            key={row.id}
+            style={[
+              styles.tableRow,
+              idx % 2 === 0 ? styles.tableRowEven : styles.tableRowOdd,
+            ]}
+          >
+            <View style={{ flex: 2, flexDirection: 'row', alignItems: 'center' }}>
+              <View style={styles.avatarMini}>
+                <Text style={styles.avatarMiniText}>
+                  {row.nombre
+                    .split(' ')
+                    .map((n) => n[0])
+                    .join('')
+                    .substring(0, 2)}
+                </Text>
+              </View>
+              <Text style={styles.tdName}>{row.nombre}</Text>
+            </View>
+
+            <Text style={[styles.tdText, { flex: 1 }]}>{row.ficha}</Text>
+            <Text style={[styles.tdText, { flex: 1, fontWeight: '600' }]}>{row.programa}</Text>
+
+            <View style={{ flex: 1, alignItems: 'center' }}>
+              <Text
+                style={[
+                  styles.tdGrade,
+                  row.nota >= 4.0
+                    ? styles.gradeHigh
+                    : row.nota >= 3.0
+                    ? styles.gradeMid
+                    : styles.gradeLow,
+                ]}
+              >
+                {row.nota.toFixed(1)}
+              </Text>
+            </View>
+
+            <View style={{ flex: 1, alignItems: 'flex-end' }}>
+              <View
+                style={[
+                  styles.statusTag,
+                  row.estado === 'Activo'
+                    ? styles.tagActivo
+                    : row.estado === 'En Riesgo'
+                    ? styles.tagRiesgo
+                    : styles.tagCritico,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.tagText,
+                    row.estado === 'Activo'
+                      ? styles.tagTextActivo
+                      : row.estado === 'En Riesgo'
+                      ? styles.tagTextRiesgo
+                      : styles.tagTextCritico,
+                  ]}
+                >
+                  {row.estado}
+                </Text>
+              </View>
+            </View>
+          </View>
+        ))}
+      </View>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F4F6F9',
+  },
+  contentContainer: {
+    padding: 24,
+    paddingBottom: 40,
+  },
+  topHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  pageTitle: {
+    fontSize: 26,
+    fontWeight: '700',
+    color: NAVY,
+  },
+  exportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: GOLD,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    shadowColor: GOLD,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  exportBtnHover: {
+    backgroundColor: '#b88d2a',
+  },
+  exportBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 15,
+  },
+  metricsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 14,
+    marginBottom: 22,
+  },
+  metricCard: {
+    flex: 1,
+    minWidth: 150,
+    backgroundColor: '#E5E7EB',
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  metricLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#4B5563',
+    letterSpacing: 0.8,
+    marginBottom: 6,
+  },
+  metricValueGold: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: GOLD,
+  },
+  metricValueDark: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: NAVY,
+  },
+  tableBox: {
+    backgroundColor: '#D9D9D9',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#CCCCCC',
+  },
+  filterRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 16,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  searchWrapper: {
+    flex: 1,
+    minWidth: 240,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: NAVY,
+  },
+  filterPillsGroup: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  filterPill: {
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+  },
+  filterPillActive: {
+    backgroundColor: GOLD,
+  },
+  filterPillText: {
+    fontSize: 13,
+    color: '#475569',
+    fontWeight: '500',
+  },
+  filterPillTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  tableHeader: {
+    flexDirection: 'row',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#C0C0C0',
+  },
+  thText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#4B5563',
+    letterSpacing: 0.5,
+  },
+  tableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginVertical: 2,
+  },
+  tableRowEven: {
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+  },
+  tableRowOdd: {
+    backgroundColor: 'transparent',
+  },
+  avatarMini: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: NAVY,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  avatarMiniText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  tdName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: NAVY,
+  },
+  tdText: {
+    fontSize: 14,
+    color: '#334155',
+  },
+  tdGrade: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  gradeHigh: {
+    color: '#10B981',
+  },
+  gradeMid: {
+    color: GOLD,
+  },
+  gradeLow: {
+    color: '#EF4444',
+  },
+  statusTag: {
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+  },
+  tagActivo: {
+    backgroundColor: '#DEF7EC',
+  },
+  tagRiesgo: {
+    backgroundColor: '#FEF3C7',
+  },
+  tagCritico: {
+    backgroundColor: '#FDE8E8',
+  },
+  tagText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  tagTextActivo: {
+    color: '#03543F',
+  },
+  tagTextRiesgo: {
+    color: '#92400E',
+  },
+  tagTextCritico: {
+    color: '#9B1C1C',
+  },
+});
