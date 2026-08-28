@@ -36,6 +36,7 @@ export const authService = {
     try {
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: correo, password: contrasenia }),
       });
@@ -104,27 +105,31 @@ export const authService = {
   },
 
   /**
-   * Obtener sesión activa al cargar la aplicación
+   * Obtener sesión activa al cargar la aplicación desde el almacenamiento seguro/cifrado
    */
   async checkSession(): Promise<{ token: string | null; user: User | null }> {
     const token = await getToken();
     const user = await getUserData();
-    return { token, user };
+    if (token && user) {
+      return { token, user };
+    }
+    return { token: null, user: null };
   },
 
   /**
-   * Helper para realizar peticiones HTTP autenticadas con el JWT Bearer
+   * Helper para realizar peticiones HTTP autenticadas con JWT Bearer y/o Cookie HttpOnly
    */
   async fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
     const token = await getToken();
     const headers = {
       'Content-Type': 'application/json',
       ...(options.headers || {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(token && token !== 'cookie_session' ? { Authorization: `Bearer ${token}` } : {}),
     };
 
     return fetch(url, {
       ...options,
+      credentials: 'include',
       headers,
     });
   },
@@ -240,6 +245,7 @@ async googleLogin(idToken: string): Promise<AuthResponse> {
   try {
     const response = await fetch(`${API_BASE_URL}/auth/google`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ idToken }),
     });
@@ -250,6 +256,26 @@ async googleLogin(idToken: string): Promise<AuthResponse> {
     await saveToken(data.data.accessToken);
     await saveUserData(data.data.user);
     return { success: true, token: data.data.accessToken, user: data.data.user, message: data.message };
+  } catch (error: any) {
+    return { success: false, message: error.message || 'Error de conexión con el servidor.' };
+  }
+},
+
+/**
+ * Reenviar correo de verificación
+ */
+async resendVerification(correo: string): Promise<AuthResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/resend-verification`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: correo }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      return { success: false, message: data.message || 'Error al reenviar correo de verificación.' };
+    }
+    return { success: true, message: data.message };
   } catch (error: any) {
     return { success: false, message: error.message || 'Error de conexión con el servidor.' };
   }

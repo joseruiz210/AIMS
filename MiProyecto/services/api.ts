@@ -7,44 +7,15 @@ const API_BASE_URL = Platform.OS === 'web'
 
 export const getApiBaseUrl = () => API_BASE_URL;
 
-// Almacenamiento simple y seguro del token de sesión para Web y Móvil
-const TOKEN_KEY = 'aims_jwt_token';
-const USER_KEY = 'aims_user_data';
+import { saveToken, getToken, removeToken, saveUserData, getUserData, removeUserData } from '../utils/storage';
 
 export const storage = {
-  getToken: async (): Promise<string | null> => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      return localStorage.getItem(TOKEN_KEY);
-    }
-    return null;
-  },
-  setToken: async (token: string): Promise<void> => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      localStorage.setItem(TOKEN_KEY, token);
-    }
-  },
-  removeToken: async (): Promise<void> => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      localStorage.removeItem(TOKEN_KEY);
-    }
-  },
-  getUser: async (): Promise<any | null> => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      const data = localStorage.getItem(USER_KEY);
-      return data ? JSON.parse(data) : null;
-    }
-    return null;
-  },
-  setUser: async (user: any): Promise<void> => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      localStorage.setItem(USER_KEY, JSON.stringify(user));
-    }
-  },
-  removeUser: async (): Promise<void> => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      localStorage.removeItem(USER_KEY);
-    }
-  }
+  getToken,
+  setToken: saveToken,
+  removeToken,
+  getUser: getUserData,
+  setUser: saveUserData,
+  removeUser: removeUserData,
 };
 
 // Cliente genérico de peticiones HTTP
@@ -66,6 +37,7 @@ export async function apiFetch<T = any>(
     const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
     const response = await fetch(`${API_BASE_URL}${cleanEndpoint}`, {
       ...options,
+      credentials: 'include',
       headers,
     });
 
