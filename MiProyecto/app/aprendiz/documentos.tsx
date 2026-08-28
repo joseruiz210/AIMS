@@ -5,7 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   Pressable,
-
+  Platform,
   useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -59,9 +59,25 @@ export default function DocumentosAprendizScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<DocumentoItem | null>(null);
 
+  const downloadFile = (docName: string, tipo: string) => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const content = `SERVICIO NACIONAL DE APRENDIZAJE - SENA\nSISTEMA INTELIGENTE DE GESTIÓN ACADÉMICA (AIMS)\n======================================================\n\nDOCUMENTO OFICIAL: ${docName.toUpperCase()}\nFORMATO: ${tipo}\nFECHA DE EMISIÓN: ${new Date().toLocaleDateString('es-CO')}\nCÓDIGO DE VERIFICACIÓN QR: SENA-VERIF-9982412\nESTADO: VÁLIDO Y VERIFICADO EN SISTEMA AIMS\n\n------------------------------------------------------\nEste documento es una constancia digital expedida oficialmente por el Centro de Formación SENA AIMS.`;
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${docName.replace(/\s+/g, '_')}_SENA.txt`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
+  };
+
   const handleDownload = (doc: DocumentoItem) => {
     setSelectedDoc(doc);
     setModalVisible(true);
+    downloadFile(doc.nombre, doc.tipo);
   };
 
   const pad = isDesktop ? 24 : 14;

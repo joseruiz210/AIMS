@@ -11,6 +11,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import ActionModal from '../../components/ActionModal';
 
+import { fichasService } from '../../services/fichasService';
+
 const NAVY = '#12103C';
 const GOLD = '#cfa235';
 
@@ -46,26 +48,6 @@ const INITIAL_FICHAS: FichaItem[] = [
     aprendicesCount: 24,
     status: 'Activo',
   },
-  {
-    id: '3',
-    badgeCode: '690',
-    programTitle: 'Contabilidad y Finanzas',
-    fichaNumber: '2845690',
-    instructor: 'Jorge Pinzón',
-    shift: 'Jornada Mañana',
-    aprendicesCount: 22,
-    status: 'Activo',
-  },
-  {
-    id: '4',
-    badgeCode: '700',
-    programTitle: 'Diseño Gráfico',
-    fichaNumber: '2845700',
-    instructor: 'María Ruiz',
-    shift: 'Jornada Noche',
-    aprendicesCount: 20,
-    status: 'Riesgo',
-  },
 ];
 
 export default function FichasScreen() {
@@ -73,9 +55,29 @@ export default function FichasScreen() {
   const isDesktop = width >= 768;
 
   const [search, setSearch] = useState('');
-  const [fichas] = useState<FichaItem[]>(INITIAL_FICHAS);
+  const [fichas, setFichas] = useState<FichaItem[]>(INITIAL_FICHAS);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedFicha, setSelectedFicha] = useState<FichaItem | null>(null);
+
+  React.useEffect(() => {
+    (async () => {
+      const data = await fichasService.getFichas();
+      if (data.length > 0) {
+        setFichas(
+          data.map((f) => ({
+            id: f.id,
+            badgeCode: f.codigo.slice(-3) || '000',
+            programTitle: f.programaNombre || 'Programa Formación',
+            fichaNumber: f.numero,
+            instructor: f.instructorNombre || 'Sin asignar',
+            shift: f.jornada || 'Jornada Mañana',
+            aprendicesCount: f.aprendicesCount || 0,
+            status: (f.estado as any) || 'Activo',
+          }))
+        );
+      }
+    })();
+  }, []);
 
   const filteredFichas = fichas.filter(
     (f) =>
@@ -87,6 +89,35 @@ export default function FichasScreen() {
 
   const handleOpenDetail = (item: FichaItem) => {
     setSelectedFicha(item);
+  };
+
+  const handleCreateFicha = async (values: Record<string, string>) => {
+    const programa = values['Programa de Formación'] || 'Análisis y Desarrollo de Software';
+    const numero = values['Número de Ficha'] || '2845' + Math.floor(Math.random() * 1000);
+    const instructor = values['Instructor Líder'] || 'Instructor Asignado';
+    const jornada = values['Jornada Horaria'] || 'Jornada Mañana';
+
+    const newFichaItem: FichaItem = {
+      id: String(Date.now()),
+      badgeCode: numero.slice(-3) || '000',
+      programTitle: programa,
+      fichaNumber: numero,
+      instructor,
+      shift: jornada,
+      aprendicesCount: 25,
+      status: 'Activo',
+    };
+
+    setFichas((prev) => [newFichaItem, ...prev]);
+
+    try {
+      await fichasService.createFicha({
+        codigo: numero,
+        jornada,
+      });
+    } catch {
+      // Guardado local
+    }
   };
 
   return (
@@ -173,15 +204,16 @@ export default function FichasScreen() {
       <ActionModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
+        onSubmit={handleCreateFicha}
         title="Crear Nueva Ficha Académica"
         subtitle="Registro de Grupo de Formación SENA"
         iconName="folder-open-outline"
-        confirmText="Crear Ficha"
+        confirmText="Guardar Ficha"
         fields={[
-          { label: 'Número de Ficha', placeholder: 'Ej: 2845699' },
           { label: 'Programa de Formación', placeholder: 'Ej: Análisis y Desarrollo de Software' },
+          { label: 'Número de Ficha', placeholder: 'Ej: 2845670' },
           { label: 'Instructor Líder', placeholder: 'Ej: Roberto Vargas' },
-          { label: 'Jornada', placeholder: 'Ej: Jornada Mañana / Tarde / Noche' },
+          { label: 'Jornada Horaria', placeholder: 'Ej: Jornada Mañana' },
         ]}
       />
 

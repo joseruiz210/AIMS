@@ -3,6 +3,8 @@ import { View, Text, StyleSheet, ScrollView, Pressable, useWindowDimensions } fr
 import { Ionicons } from '@expo/vector-icons';
 import ActionModal from '../../components/ActionModal';
 
+import { calificacionesService } from '../../services/calificacionesService';
+
 const NAVY = '#12103C';
 const GOLD = '#cfa235';
 
@@ -14,20 +16,37 @@ interface GradeItem {
   estado: 'Aprobado' | 'En proceso' | 'Por mejorar';
 }
 
-const gradesData: GradeItem[] = [
+const INITIAL_GRADES: GradeItem[] = [
   { subject: 'Analisis de Datos', grade: 4.5, periodo: 'Trimestre I - 2026', instructor: 'Roberto Vargas', estado: 'Aprobado' },
   { subject: 'POO', grade: 4.0, periodo: 'Trimestre I - 2026', instructor: 'Carmen López', estado: 'Aprobado' },
   { subject: 'Requisitos', grade: 3.8, periodo: 'Trimestre I - 2026', instructor: 'Juan Pérez', estado: 'Aprobado' },
   { subject: 'Programación BD', grade: 4.2, periodo: 'Trimestre I - 2026', instructor: 'Ana Martínez', estado: 'Aprobado' },
-  { subject: 'Seguridad Informática', grade: 3.5, periodo: 'Trimestre I - 2026', instructor: 'Luis Gómez', estado: 'Por mejorar' },
 ];
 
 export default function CalificacionesAprendiz() {
   const { width } = useWindowDimensions();
   const isDesktop = width >= 1024;
 
+  const [items, setItems] = useState<GradeItem[]>(INITIAL_GRADES);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState<GradeItem | null>(null);
+
+  React.useEffect(() => {
+    (async () => {
+      const records = await calificacionesService.getMisCalificaciones();
+      if (records.length > 0) {
+        setItems(
+          records.map((r) => ({
+            subject: r.actividad || r.moduloNombre || 'Evaluación',
+            grade: r.nota,
+            periodo: 'Trimestre Actual',
+            instructor: r.aprendizNombre || 'Instructor',
+            estado: r.esAprobado ? 'Aprobado' : 'Por mejorar',
+          }))
+        );
+      }
+    })();
+  }, []);
 
   const getGradeColor = (grade: number) => {
     if (grade >= 4.0) return '#4CAF50';
@@ -40,9 +59,9 @@ export default function CalificacionesAprendiz() {
     setModalVisible(true);
   };
 
-  const promedio = (gradesData.reduce((s, g) => s + g.grade, 0) / gradesData.length).toFixed(1);
-  const masAlta = Math.max(...gradesData.map((g) => g.grade)).toFixed(1);
-  const masAltaSubject = gradesData.find((g) => g.grade === Math.max(...gradesData.map((g2) => g2.grade)))?.subject ?? '';
+  const promedio = (items.reduce((s, g) => s + g.grade, 0) / items.length).toFixed(1);
+  const masAlta = Math.max(...items.map((g) => g.grade)).toFixed(1);
+  const masAltaSubject = items.find((g) => g.grade === Math.max(...items.map((g2) => g2.grade)))?.subject ?? '';
 
   const pad = isDesktop ? 24 : 14;
 
@@ -65,7 +84,7 @@ export default function CalificacionesAprendiz() {
         </View>
         <View style={styles.summaryCard}>
           <Text style={styles.summaryLabel}>COMPETENCIAS</Text>
-          <Text style={styles.summaryValue}>{gradesData.length}</Text>
+          <Text style={styles.summaryValue}>{items.length}</Text>
           <Text style={styles.summarySubtext}>En evaluación</Text>
         </View>
       </View>
@@ -73,7 +92,7 @@ export default function CalificacionesAprendiz() {
       {/* Grade Detail List */}
       <Text style={styles.sectionTitle}>MIS COMPETENCIAS</Text>
       <View style={styles.listContainer}>
-        {gradesData.map((item, index) => (
+        {items.map((item, index) => (
           <Pressable
             key={index}
             style={({ hovered }: any) => [styles.gradeCard, hovered && styles.gradeCardHover]}

@@ -280,7 +280,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   gridLineContainer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: 'space-between',
     paddingBottom: 24,
   },

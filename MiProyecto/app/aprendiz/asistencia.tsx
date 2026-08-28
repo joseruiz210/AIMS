@@ -3,6 +3,8 @@ import { View, Text, StyleSheet, ScrollView, Pressable, useWindowDimensions } fr
 import { Ionicons } from '@expo/vector-icons';
 import ActionModal from '../../components/ActionModal';
 
+import { asistenciaService } from '../../services/asistenciaService';
+
 const NAVY = '#12103C';
 const GOLD = '#cfa235';
 
@@ -15,7 +17,7 @@ interface AsistenciaItem {
   faltas: number;
 }
 
-const asistenciaData: AsistenciaItem[] = [
+const INITIAL_ASISTENCIA: AsistenciaItem[] = [
   { subject: 'Analisis de Datos', totalClasses: 20, attended: 18, percentage: 90, instructor: 'Roberto Vargas', faltas: 2 },
   { subject: 'POO', totalClasses: 25, attended: 20, percentage: 80, instructor: 'Carmen López', faltas: 5 },
   { subject: 'Requisitos', totalClasses: 15, attended: 15, percentage: 100, instructor: 'Juan Pérez', faltas: 0 },
@@ -26,8 +28,30 @@ export default function AsistenciaAprendiz() {
   const { width } = useWindowDimensions();
   const isDesktop = width >= 1024;
 
+  const [items, setItems] = useState<AsistenciaItem[]>(INITIAL_ASISTENCIA);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState<AsistenciaItem | null>(null);
+
+  React.useEffect(() => {
+    (async () => {
+      const records = await asistenciaService.getMisAsistencias();
+      if (records.length > 0) {
+        const total = records.length;
+        const attended = records.filter(r => r.estado === 'PRESENTE').length;
+        const percentage = Math.round((attended / total) * 100);
+        setItems([
+          {
+            subject: 'Asistencia General AIMS',
+            totalClasses: total,
+            attended,
+            percentage,
+            instructor: 'Instructor Lider',
+            faltas: total - attended,
+          }
+        ]);
+      }
+    })();
+  }, []);
 
   const getStatusColor = (percentage: number) => {
     if (percentage >= 90) return '#4CAF50';
@@ -67,7 +91,7 @@ export default function AsistenciaAprendiz() {
         </View>
         <View style={styles.summaryCard}>
           <Text style={styles.summaryLabel}>MATERIAS</Text>
-          <Text style={styles.summaryValue}>{asistenciaData.length}</Text>
+          <Text style={styles.summaryValue}>{items.length}</Text>
           <Text style={styles.summarySubtext}>En seguimiento</Text>
         </View>
       </View>
@@ -76,7 +100,7 @@ export default function AsistenciaAprendiz() {
       <View style={styles.detailContainer}>
         <Text style={styles.sectionTitle}>DETALLE POR COMPETENCIA</Text>
 
-        {asistenciaData.map((item, index) => (
+        {items.map((item, index) => (
           <Pressable
             key={index}
             style={({ hovered }: any) => [styles.rowCard, hovered && styles.rowCardHover]}

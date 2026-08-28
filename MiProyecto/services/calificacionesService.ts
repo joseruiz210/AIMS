@@ -1,0 +1,52 @@
+import { authService } from './authService';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+
+export interface Calificacion {
+  id: string;
+  actividad: string;
+  moduloNombre?: string;
+  aprendizId: string;
+  aprendizNombre?: string;
+  nota: number;
+  esAprobado: boolean;
+  comentario?: string;
+  fecha: string;
+}
+
+export const calificacionesService = {
+  async getMisCalificaciones(): Promise<Calificacion[]> {
+    try {
+      const response = await authService.fetchWithAuth(`${API_BASE_URL}/calificaciones/mis-calificaciones`);
+      const data = await response.json();
+      if (!response.ok || !data.data) return [];
+      
+      const rawList = Array.isArray(data.data) 
+        ? data.data 
+        : (data.data.gradesData || []);
+
+      return rawList.map((item: any, index: number) => ({
+        id: item.id || String(index + 1),
+        actividad: item.subject || item.actividad || item.evaluacion || 'Evaluación',
+        moduloNombre: item.subject || item.modulo?.nombre || 'Módulo Principal',
+        aprendizId: item.aprendizId || '',
+        nota: item.grade ?? item.valor ?? item.nota ?? 0,
+        esAprobado: (item.grade ?? item.valor ?? item.nota ?? 0) >= 3.5,
+        comentario: item.comentario,
+        fecha: item.createdAt || new Date().toISOString(),
+      }));
+    } catch {
+      return [];
+    }
+  },
+
+  async registrarCalificacion(payload: { aprendizId: string; moduloId?: string; actividad: string; valor: number; comentario?: string }) {
+    const response = await authService.fetchWithAuth(`${API_BASE_URL}/calificaciones`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Error al registrar calificación');
+    return data.data;
+  }
+};

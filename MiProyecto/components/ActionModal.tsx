@@ -19,6 +19,7 @@ interface ActionModalProps {
   fields?: ActionModalField[];
   confirmText?: string;
   onClose: () => void;
+  onSubmit?: (values: Record<string, string>) => void;
 }
 
 export default function ActionModal({
@@ -32,13 +33,19 @@ export default function ActionModal({
   ],
   confirmText = 'Guardar / Procesar',
   onClose,
+  onSubmit,
 }: ActionModalProps) {
   const [successMsg, setSuccessMsg] = React.useState(false);
+  const [formValues, setFormValues] = React.useState<Record<string, string>>({});
 
-  const handleAction = () => {
+  const handleAction = async () => {
+    if (onSubmit) {
+      onSubmit(formValues);
+    }
     setSuccessMsg(true);
     setTimeout(() => {
       setSuccessMsg(false);
+      setFormValues({});
       onClose();
     }, 1200);
   };
@@ -97,6 +104,8 @@ export default function ActionModal({
                         placeholder={field.placeholder || 'Ingrese valor...'}
                         placeholderTextColor="#94A3B8"
                         multiline={field.type === 'multiline'}
+                        value={formValues[field.label] || ''}
+                        onChangeText={(val) => setFormValues(prev => ({ ...prev, [field.label]: val }))}
                       />
                     </View>
                   </View>

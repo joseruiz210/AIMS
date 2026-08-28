@@ -15,8 +15,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const ROLE_ROUTES: Record<User['role'], string> = {
   ADMIN: '/admin',
-  INSTRUCTOR: '/(tabs)',
-  APRENDIZ: '/(tabs)',
+  INSTRUCTOR: '/instructor/inicio',
+  APRENDIZ: '/aprendiz',
 };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {

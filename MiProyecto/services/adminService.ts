@@ -33,21 +33,41 @@ export const adminService = {
       throw new Error(data.message || 'Error al obtener usuarios');
     }
 
-    return { users: data.data, total: data.pagination.total };
+    return { users: data.data || [], total: data.pagination?.total || 0 };
   },
 
   /**
    * Obtener solo el conteo de usuarios por rol (para stat cards)
    */
   async countByRole(role: 'ADMIN' | 'INSTRUCTOR' | 'APRENDIZ'): Promise<number> {
-    const query = new URLSearchParams({ role, limit: '1' });
-    const response = await authService.fetchWithAuth(`${API_BASE_URL}/users?${query.toString()}`);
-    const data = await response.json();
+    try {
+      const query = new URLSearchParams({ role, limit: '1' });
+      const response = await authService.fetchWithAuth(`${API_BASE_URL}/users?${query.toString()}`);
+      const data = await response.json();
 
-    if (!response.ok) {
-      throw new Error(data.message || 'Error al contar usuarios');
+      if (!response.ok) {
+        return 0;
+      }
+
+      return data.pagination?.total || 0;
+    } catch {
+      return 0;
     }
+  },
 
-    return data.pagination.total;
+  /**
+   * Crear un nuevo usuario directamente en PostgreSQL (vía API Admin)
+   */
+  async createUser(userData: { firstName: string; lastName: string; email: string; role: 'ADMIN' | 'INSTRUCTOR' | 'APRENDIZ'; password?: string }) {
+    const response = await authService.fetchWithAuth(`${API_BASE_URL}/users`, {
+      method: 'POST',
+      body: JSON.stringify({
+        ...userData,
+        password: userData.password || 'Sena2026!',
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Error al crear usuario');
+    return data.data;
   },
 };

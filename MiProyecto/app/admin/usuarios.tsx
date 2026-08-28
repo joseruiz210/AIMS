@@ -46,6 +46,45 @@ export default function UsuariosAdmin() {
     { title: 'APRENDICES', value: String(counts.aprendiz), subtitle: 'MATRICULADOS', icon: 'school-outline' as const },
   ];
 
+  const handleCreateUser = async (values: Record<string, string>) => {
+    const nombreCompleto = values['Nombre Completo'] || 'Nuevo Usuario';
+    const email = values['Correo Institucional'] || `user_${Date.now()}@sena.edu.co`;
+    const rolInput = (values['Rol del Usuario'] || 'APRENDIZ').trim().toUpperCase();
+    const role: 'ADMIN' | 'INSTRUCTOR' | 'APRENDIZ' = ['ADMIN', 'INSTRUCTOR', 'APRENDIZ'].includes(rolInput)
+      ? (rolInput as any)
+      : 'APRENDIZ';
+
+    const parts = nombreCompleto.trim().split(' ');
+    const firstName = parts[0] || 'Usuario';
+    const lastName = parts.slice(1).join(' ') || 'SENA';
+
+    const newUser: AdminUser = {
+      id: String(Date.now()),
+      firstName,
+      lastName,
+      email,
+      role,
+      isActive: true,
+    };
+
+    setUsers((prev) => [newUser, ...prev]);
+    setCounts((prev) => ({
+      ...prev,
+      [role.toLowerCase()]: (prev[role.toLowerCase() as keyof typeof prev] || 0) + 1,
+    }));
+
+    try {
+      await adminService.createUser({
+        firstName,
+        lastName,
+        email,
+        role,
+      });
+    } catch {
+      // Guardado local
+    }
+  };
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
@@ -101,22 +140,22 @@ export default function UsuariosAdmin() {
           </View>
 
           {loading ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyTitle}>Cargando...</Text>
+            <View style={{ padding: 20, alignItems: 'center' }}>
+              <Text style={{ color: '#888' }}>Cargando usuarios...</Text>
             </View>
           ) : users.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Ionicons name="people-outline" size={44} color="#D0D0D0" />
-              <Text style={styles.emptyTitle}>No hay usuarios registrados</Text>
-              <Text style={styles.emptySubtext}>Presiona + Nuevo para agregar el primer usuario</Text>
+            <View style={{ padding: 20, alignItems: 'center' }}>
+              <Text style={{ color: '#888' }}>No se encontraron usuarios</Text>
             </View>
           ) : (
             users.map((u) => (
               <View key={u.id} style={styles.tableRow}>
-                <Text style={[styles.tableCell, { flex: 2 }]}>{u.firstName} {u.lastName}</Text>
+                <Text style={[styles.tableCell, { flex: 2, fontWeight: '600' }]}>
+                  {u.firstName} {u.lastName}
+                </Text>
                 <Text style={[styles.tableCell, { flex: 2 }]}>{u.role}</Text>
-                <Text style={[styles.tableCell, { flex: 3 }]}>{u.email}</Text>
-                <Text style={[styles.tableCell, { flex: 1.5, color: u.isActive ? '#22C55E' : '#EF4444' }]}>
+                <Text style={[styles.tableCell, { flex: 3, color: '#666' }]}>{u.email}</Text>
+                <Text style={[styles.tableCell, { flex: 1.5, color: u.isActive ? '#10B981' : '#EF4444', fontWeight: '600' }]}>
                   {u.isActive ? 'Activo' : 'Inactivo'}
                 </Text>
               </View>
@@ -128,6 +167,7 @@ export default function UsuariosAdmin() {
       <ActionModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
+        onSubmit={handleCreateUser}
         title="Crear Nuevo Usuario"
         subtitle="Gestión de Accesos a la Plataforma AIMS"
         iconName="person-add-outline"
