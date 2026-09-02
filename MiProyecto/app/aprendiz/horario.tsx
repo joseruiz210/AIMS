@@ -1,15 +1,93 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, useWindowDimensions } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Pressable,
+  useWindowDimensions,
+  Modal,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import ActionModal from '../../components/ActionModal';
 
 const NAVY = '#12103C';
 const GOLD = '#cfa235';
 
 type DiaKey = 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes';
 
+interface ClassDetail {
+  subject: string;
+  code: string;
+  instructor: string;
+  aula: string;
+  sede: string;
+  color: string;
+  bg: string;
+  textColor: string;
+  icon: any;
+}
+
+const SUBJECT_DETAILS: Record<string, ClassDetail> = {
+  'Analisis de Datos': {
+    subject: 'Analisis de Datos',
+    code: 'COMP-220501096',
+    instructor: 'Roberto Vargas',
+    aula: 'Aula 201 • Piso 2',
+    sede: 'Sede Central',
+    color: '#3B82F6',
+    bg: '#EFF6FF',
+    textColor: '#1D4ED8',
+    icon: 'bar-chart-outline',
+  },
+  'Programación BD': {
+    subject: 'Programación BD',
+    code: 'COMP-220501097',
+    instructor: 'Ana Martínez',
+    aula: 'Lab. Base de Datos • Aula 305',
+    sede: 'Sede Central',
+    color: '#10B981',
+    bg: '#ECFDF5',
+    textColor: '#047857',
+    icon: 'server-outline',
+  },
+  'POO': {
+    subject: 'POO',
+    code: 'COMP-220501098',
+    instructor: 'Carmen López',
+    aula: 'Aula 102 • Piso 1',
+    sede: 'Sede Central',
+    color: '#F59E0B',
+    bg: '#FFFBEB',
+    textColor: '#B45309',
+    icon: 'code-slash-outline',
+  },
+  'Requisitos': {
+    subject: 'Requisitos',
+    code: 'COMP-220501099',
+    instructor: 'Juan Pérez',
+    aula: 'Aula 204 • Piso 2',
+    sede: 'Sede Central',
+    color: '#8B5CF6',
+    bg: '#F5F3FF',
+    textColor: '#6D28D9',
+    icon: 'document-text-outline',
+  },
+  'Seguridad Informática': {
+    subject: 'Seguridad Informática',
+    code: 'COMP-220501100',
+    instructor: 'Luis Gómez',
+    aula: 'Laboratorio de Redes',
+    sede: 'Edificio Tecnológico',
+    color: '#F43F5E',
+    bg: '#FFF1F2',
+    textColor: '#BE123C',
+    icon: 'shield-checkmark-outline',
+  },
+};
+
 interface ScheduleRow {
   time: string;
+  block: string;
   lunes: string;
   martes: string;
   miercoles: string;
@@ -20,6 +98,7 @@ interface ScheduleRow {
 const scheduleData: ScheduleRow[] = [
   {
     time: '07:00 - 09:00',
+    block: 'Bloque 1',
     lunes: 'Analisis de Datos',
     martes: 'Programación BD',
     miercoles: 'POO',
@@ -28,6 +107,7 @@ const scheduleData: ScheduleRow[] = [
   },
   {
     time: '09:00 - 11:00',
+    block: 'Bloque 2',
     lunes: 'Seguridad Informática',
     martes: 'Analisis de Datos',
     miercoles: 'Programación BD',
@@ -36,36 +116,21 @@ const scheduleData: ScheduleRow[] = [
   },
   {
     time: '11:00 - 01:00',
+    block: 'Bloque 3',
     lunes: 'Programación BD',
     martes: 'Requisitos',
     miercoles: 'Analisis de Datos',
     jueves: 'Programación BD',
     viernes: 'Requisitos',
   },
-  {
-    time: '01:00 - 04:00',
-    lunes: '',
-    martes: '',
-    miercoles: '',
-    jueves: '',
-    viernes: '',
-  },
 ];
 
-const instructores: Record<string, string> = {
-  'Analisis de Datos': 'Roberto Vargas — Aula 201',
-  'Programación BD': 'Ana Martínez — Aula 305',
-  'POO': 'Carmen López — Aula 102',
-  'Requisitos': 'Juan Pérez — Aula 204',
-  'Seguridad Informática': 'Luis Gómez — Lab. Sistemas',
-};
-
-const DAYS: { key: DiaKey; label: string }[] = [
-  { key: 'lunes', label: 'Lunes' },
-  { key: 'martes', label: 'Martes' },
-  { key: 'miercoles', label: 'Miércoles' },
-  { key: 'jueves', label: 'Jueves' },
-  { key: 'viernes', label: 'Viernes' },
+const DAYS: { key: DiaKey; label: string; short: string }[] = [
+  { key: 'lunes', label: 'Lunes', short: 'LUN' },
+  { key: 'martes', label: 'Martes', short: 'MAR' },
+  { key: 'miercoles', label: 'Miércoles', short: 'MIÉ' },
+  { key: 'jueves', label: 'Jueves', short: 'JUE' },
+  { key: 'viernes', label: 'Viernes', short: 'VIE' },
 ];
 
 export default function HorarioAprendiz() {
@@ -73,104 +138,389 @@ export default function HorarioAprendiz() {
   const isDesktop = width >= 1024;
 
   const [modalVisible, setModalVisible] = useState(false);
-  const [selectedClass, setSelectedClass] = useState<{ time: string; subject: string } | null>(null);
+  const [selectedClass, setSelectedClass] = useState<{ time: string; subject: string; day: string } | null>(null);
 
-  const handleOpenClass = (time: string, subject: string) => {
+  // Estados interactivos
+  const [viewMode, setViewMode] = useState<'grid' | 'agenda'>(isDesktop ? 'grid' : 'agenda');
+  const [activeDay, setActiveDay] = useState<DiaKey>('miercoles'); // Por defecto día actual
+  const [selectedFilterSubject, setSelectedFilterSubject] = useState<string>('Todas');
+
+  const handleOpenClass = (time: string, subject: string, day: string) => {
     if (!subject) return;
-    setSelectedClass({ time, subject });
+    setSelectedClass({ time, subject, day });
     setModalVisible(true);
   };
 
-  const renderDesktopView = () => (
-    <View style={styles.desktopContainer}>
-      <View style={styles.tableHeader}>
-        <Text style={[styles.headerCell, { flex: 1 }]}>HORA</Text>
-        {DAYS.map((d) => (
-          <Text key={d.key} style={[styles.headerCell, { flex: 1 }]}>{d.label.toUpperCase()}</Text>
-        ))}
+  const pad = isDesktop ? 24 : 14;
+
+  // Clases filtradas para modo agenda
+  const agendaClasses = scheduleData
+    .map((row) => ({
+      time: row.time,
+      block: row.block,
+      subject: row[activeDay],
+    }))
+    .filter((c) => c.subject && (selectedFilterSubject === 'Todas' || c.subject === selectedFilterSubject));
+
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { padding: pad, paddingTop: isDesktop ? 32 : 20 }]}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.pageTitle}>Mi Horario de Formación</Text>
+          <Text style={styles.pageSubtitle}>
+            Jornada Diurna (07:00 AM - 01:00 PM) • Trimestre I - 2026 • ADSO
+          </Text>
+        </View>
+
+        {/* View mode toggle */}
+        <View style={styles.viewToggleWrap}>
+          <Pressable
+            style={[styles.toggleBtn, viewMode === 'grid' && styles.toggleBtnActive]}
+            onPress={() => setViewMode('grid')}
+          >
+            <Ionicons name="grid-outline" size={15} color={viewMode === 'grid' ? '#FFFFFF' : NAVY} style={{ marginRight: 6 }} />
+            <Text style={[styles.toggleBtnText, viewMode === 'grid' && styles.toggleBtnTextActive]}>Grilla</Text>
+          </Pressable>
+
+          <Pressable
+            style={[styles.toggleBtn, viewMode === 'agenda' && styles.toggleBtnActive]}
+            onPress={() => setViewMode('agenda')}
+          >
+            <Ionicons name="list-outline" size={15} color={viewMode === 'agenda' ? '#FFFFFF' : NAVY} style={{ marginRight: 6 }} />
+            <Text style={[styles.toggleBtnText, viewMode === 'agenda' && styles.toggleBtnTextActive]}>Agenda</Text>
+          </Pressable>
+        </View>
       </View>
 
-      {scheduleData.map((row, index) => (
-        <View key={index} style={styles.tableRow}>
-          <View style={styles.timeCell}>
-            <Text style={styles.timeText}>{row.time}</Text>
+      {/* Summary KPI Cards */}
+      <View style={[styles.summaryContainer, !isDesktop && styles.summaryContainerMobile]}>
+        <View style={styles.summaryCard}>
+          <View style={styles.summaryCardHeader}>
+            <Text style={styles.summaryLabel}>TOTAL SEMANAL</Text>
+            <Ionicons name="time-outline" size={16} color={GOLD} />
           </View>
-          {DAYS.map((d) => {
-            const subject = row[d.key];
+          <Text style={[styles.summaryValue, { color: NAVY }]}>30 Horas</Text>
+          <Text style={styles.summarySubtext}>6 horas diarias de formación</Text>
+        </View>
+
+        <View style={styles.summaryCard}>
+          <View style={styles.summaryCardHeader}>
+            <Text style={styles.summaryLabel}>MATERIAS ACTIVAS</Text>
+            <Ionicons name="book-outline" size={16} color="#3B82F6" />
+          </View>
+          <Text style={[styles.summaryValue, { color: '#2563EB' }]}>5</Text>
+          <Text style={styles.summarySubtext}>Competencias técnicas</Text>
+        </View>
+
+        <View style={styles.summaryCard}>
+          <View style={styles.summaryCardHeader}>
+            <Text style={styles.summaryLabel}>CLASES HOY (MIÉ)</Text>
+            <Ionicons name="calendar-outline" size={16} color="#059669" />
+          </View>
+          <Text style={[styles.summaryValue, { color: '#059669' }]}>3 Sesiones</Text>
+          <Text style={styles.summarySubtext}>POO • BD • Análisis Datos</Text>
+        </View>
+
+        <View style={styles.summaryCard}>
+          <View style={styles.summaryCardHeader}>
+            <Text style={styles.summaryLabel}>MODALIDAD</Text>
+            <Ionicons name="business-outline" size={16} color={GOLD} />
+          </View>
+          <Text style={[styles.summaryValue, { color: GOLD }]}>Presencial</Text>
+          <Text style={styles.summarySubtext}>Sede Central • Aulas 102 a 305</Text>
+        </View>
+      </View>
+
+      {/* Subject Filter Pills */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScrollView}>
+        <View style={styles.filterRow}>
+          <Text style={styles.filterLabel}>Filtrar Materia:</Text>
+          {['Todas', 'Analisis de Datos', 'Programación BD', 'POO', 'Requisitos', 'Seguridad Informática'].map((subj) => {
+            const isSelected = selectedFilterSubject === subj;
+            const detail = SUBJECT_DETAILS[subj];
             return (
-              <View key={d.key} style={styles.subjectCell}>
-                {subject ? (
-                  <Pressable
-                    style={({ hovered }: any) => [styles.subjectBlock, hovered && styles.subjectBlockHover]}
-                    onPress={() => handleOpenClass(row.time, subject)}
-                  >
-                    <Text style={styles.subjectText}>{subject}</Text>
-                    <Ionicons name="information-circle-outline" size={14} color={GOLD} style={{ marginTop: 6 }} />
-                  </Pressable>
-                ) : (
-                  <View style={styles.emptyBlock} />
-                )}
-              </View>
+              <Pressable
+                key={subj}
+                style={[
+                  styles.filterPill,
+                  isSelected && styles.filterPillActive,
+                  isSelected && detail && { backgroundColor: detail.color, borderColor: detail.color },
+                ]}
+                onPress={() => setSelectedFilterSubject(subj)}
+              >
+                {detail ? (
+                  <View style={[styles.filterDot, { backgroundColor: isSelected ? '#FFFFFF' : detail.color }]} />
+                ) : null}
+                <Text style={[styles.filterPillText, isSelected && styles.filterPillTextActive]}>
+                  {subj}
+                </Text>
+              </Pressable>
             );
           })}
         </View>
-      ))}
-    </View>
-  );
+      </ScrollView>
 
-  const renderMobileView = () => (
-    <View style={styles.mobileContainer}>
-      {DAYS.map((d) => {
-        const clases = scheduleData.filter((row) => row[d.key]);
-        if (clases.length === 0) return null;
-        return (
-          <View key={d.key} style={styles.mobileCard}>
-            <Text style={styles.mobileDayTitle}>{d.label}</Text>
-            {clases.map((row, idx) => {
-              const subject = row[d.key];
-              if (!subject) return null;
+      {/* View: Grid Mode */}
+      {viewMode === 'grid' ? (
+        <ScrollView horizontal={!isDesktop} showsHorizontalScrollIndicator={false}>
+          <View style={[styles.gridTable, !isDesktop && { minWidth: 780 }]}>
+            {/* Table Header */}
+            <View style={styles.tableHeader}>
+              <View style={styles.headerTimeCell}>
+                <Ionicons name="time" size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
+                <Text style={styles.headerCellText}>HORA</Text>
+              </View>
+
+              {DAYS.map((d) => {
+                const isToday = d.key === activeDay;
+                return (
+                  <View key={d.key} style={[styles.headerDayCell, isToday && styles.headerDayCellToday]}>
+                    <Text style={styles.headerCellText}>{d.label.toUpperCase()}</Text>
+                    {isToday && (
+                      <View style={styles.todayBadge}>
+                        <Text style={styles.todayBadgeText}>HOY</Text>
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+
+            {/* Table Rows */}
+            {scheduleData.map((row, index) => (
+              <View key={index} style={styles.tableRow}>
+                {/* Time block */}
+                <View style={styles.timeCell}>
+                  <Text style={styles.timeBlockTitle}>{row.block}</Text>
+                  <Text style={styles.timeText}>{row.time}</Text>
+                </View>
+
+                {/* Day columns */}
+                {DAYS.map((d) => {
+                  const subjectName = row[d.key];
+                  const detail = SUBJECT_DETAILS[subjectName];
+                  const isFiltered =
+                    selectedFilterSubject !== 'Todas' && subjectName !== selectedFilterSubject;
+                  const isToday = d.key === activeDay;
+
+                  return (
+                    <View
+                      key={d.key}
+                      style={[
+                        styles.subjectCell,
+                        isToday && styles.subjectCellToday,
+                        isFiltered && { opacity: 0.25 },
+                      ]}
+                    >
+                      {subjectName && detail ? (
+                        <Pressable
+                          style={({ hovered }: any) => [
+                            styles.subjectBlock,
+                            {
+                              backgroundColor: detail.bg,
+                              borderLeftColor: detail.color,
+                            },
+                            hovered && styles.subjectBlockHover,
+                          ]}
+                          onPress={() => handleOpenClass(row.time, subjectName, d.label)}
+                        >
+                          <View style={styles.cardTopRow}>
+                            <View style={[styles.iconCircle, { backgroundColor: detail.color + '22' }]}>
+                              <Ionicons name={detail.icon} size={14} color={detail.color} />
+                            </View>
+                            <Ionicons name="chevron-forward" size={14} color="#94A3B8" />
+                          </View>
+
+                          <Text style={[styles.subjectNameText, { color: NAVY }]} numberOfLines={2}>
+                            {detail.subject}
+                          </Text>
+
+                          <View style={styles.cardMetaRow}>
+                            <Ionicons name="location-outline" size={12} color="#64748B" style={{ marginRight: 3 }} />
+                            <Text style={styles.aulaShortText} numberOfLines={1}>
+                              {detail.aula.split('•')[0]}
+                            </Text>
+                          </View>
+
+                          <View style={styles.instructorTag}>
+                            <Text style={styles.instructorShortText} numberOfLines={1}>
+                              👤 {detail.instructor}
+                            </Text>
+                          </View>
+                        </Pressable>
+                      ) : (
+                        <View style={styles.emptyBlock}>
+                          <Text style={styles.emptyBlockText}>Libre</Text>
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            ))}
+          </View>
+        </ScrollView>
+      ) : (
+        /* View: Agenda / Day by Day */
+        <View style={styles.agendaContainer}>
+          {/* Day Selector Pills */}
+          <View style={styles.daySelectorRow}>
+            {DAYS.map((d) => {
+              const isActive = activeDay === d.key;
               return (
                 <Pressable
-                  key={idx}
-                  style={({ hovered }: any) => [styles.mobileRow, hovered && styles.mobileRowHover]}
-                  onPress={() => handleOpenClass(row.time, subject)}
+                  key={d.key}
+                  style={[styles.dayTab, isActive && styles.dayTabActive]}
+                  onPress={() => setActiveDay(d.key)}
                 >
-                  <Text style={styles.mobileTime}>{row.time}</Text>
-                  <View style={styles.mobileSubjectBtn}>
-                    <Text style={styles.mobileSubjectBtnText}>{subject}</Text>
-                  </View>
+                  <Text style={[styles.dayTabShort, isActive && styles.dayTabShortActive]}>{d.short}</Text>
+                  <Text style={[styles.dayTabName, isActive && styles.dayTabNameActive]}>{d.label}</Text>
                 </Pressable>
               );
             })}
           </View>
-        );
-      })}
-    </View>
-  );
 
-  const pad = isDesktop ? 24 : 14;
+          {/* Classes for the day */}
+          <Text style={styles.agendaDayHeading}>
+            Clases del {DAYS.find((d) => d.key === activeDay)?.label}
+          </Text>
 
-  return (
-    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { padding: pad, paddingTop: isDesktop ? 32 : 20 }]}>
-      <Text style={styles.pageTitle}>Mi Horario</Text>
-      <Text style={styles.pageSubtitle}>Consulta tus clases programadas. Toca una clase para ver los detalles.</Text>
+          {agendaClasses.length === 0 ? (
+            <View style={styles.emptyAgendaBox}>
+              <Ionicons name="sunny-outline" size={40} color={GOLD} />
+              <Text style={styles.emptyAgendaTitle}>Sin clases programadas</Text>
+              <Text style={styles.emptyAgendaSubtext}>No hay actividades registradas para este día.</Text>
+            </View>
+          ) : (
+            <View style={styles.agendaList}>
+              {agendaClasses.map((item, idx) => {
+                const detail = SUBJECT_DETAILS[item.subject];
+                if (!detail) return null;
 
-      {isDesktop ? renderDesktopView() : renderMobileView()}
+                return (
+                  <Pressable
+                    key={idx}
+                    style={({ hovered }: any) => [
+                      styles.agendaCard,
+                      { borderLeftColor: detail.color },
+                      hovered && styles.agendaCardHover,
+                    ]}
+                    onPress={() => handleOpenClass(item.time, item.subject, DAYS.find((d) => d.key === activeDay)?.label || '')}
+                  >
+                    <View style={styles.agendaTimeCol}>
+                      <Text style={styles.agendaBlockLabel}>{item.block}</Text>
+                      <Text style={styles.agendaTimeText}>{item.time}</Text>
+                    </View>
 
+                    <View style={styles.agendaContentCol}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <View style={[styles.iconCircle, { backgroundColor: detail.color + '22' }]}>
+                          <Ionicons name={detail.icon} size={14} color={detail.color} />
+                        </View>
+                        <Text style={styles.agendaSubjectTitle}>{detail.subject}</Text>
+                      </View>
+
+                      <View style={styles.agendaDetailsRow}>
+                        <View style={styles.agendaDetailItem}>
+                          <Ionicons name="location-outline" size={14} color="#64748B" style={{ marginRight: 4 }} />
+                          <Text style={styles.agendaDetailText}>{detail.aula}</Text>
+                        </View>
+
+                        <View style={styles.agendaDetailItem}>
+                          <Ionicons name="person-outline" size={14} color="#64748B" style={{ marginRight: 4 }} />
+                          <Text style={styles.agendaDetailText}>{detail.instructor}</Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    <Ionicons name="chevron-forward-outline" size={20} color="#94A3B8" />
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* Interactive Detail Modal */}
       {selectedClass && (
-        <ActionModal
-          visible={modalVisible}
-          onClose={() => setModalVisible(false)}
-          title="Detalle de Clase"
-          subtitle={`${selectedClass.subject} • ${selectedClass.time}`}
-          iconName="calendar-outline"
-          confirmText="Aceptar"
-          fields={[
-            { label: 'Competencia', placeholder: selectedClass.subject },
-            { label: 'Horario', placeholder: selectedClass.time },
-            { label: 'Instructor / Aula', placeholder: instructores[selectedClass.subject] ?? 'Por confirmar' },
-          ]}
-        />
+        <Modal visible={modalVisible} transparent animationType="fade" onRequestClose={() => setModalVisible(false)}>
+          <View style={styles.modalBackdrop}>
+            <View style={[styles.modalBox, !isDesktop && styles.modalBoxMobile]}>
+              {(() => {
+                const detail = SUBJECT_DETAILS[selectedClass.subject];
+                return (
+                  <>
+                    <View style={[styles.modalHeader, { backgroundColor: detail?.bg || '#F8FAFC' }]}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                        <View style={[styles.modalIconWrap, { backgroundColor: detail?.color || NAVY }]}>
+                          <Ionicons name={detail?.icon || 'calendar'} size={20} color="#FFFFFF" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.modalSubjectTitle}>{selectedClass.subject}</Text>
+                          <Text style={[styles.modalCodeText, { color: detail?.textColor || '#64748B' }]}>
+                            {detail?.code || 'Competencia Técnica'}
+                          </Text>
+                        </View>
+                      </View>
+                      <Pressable onPress={() => setModalVisible(false)} style={styles.closeBtn}>
+                        <Ionicons name="close" size={20} color="#64748B" />
+                      </Pressable>
+                    </View>
+
+                    <View style={styles.modalBody}>
+                      <View style={styles.detailRow}>
+                        <Ionicons name="calendar-outline" size={18} color={GOLD} style={{ marginRight: 10 }} />
+                        <View>
+                          <Text style={styles.detailLabel}>DÍA Y HORARIO</Text>
+                          <Text style={styles.detailValue}>
+                            {selectedClass.day} • {selectedClass.time}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.detailRow}>
+                        <Ionicons name="person-outline" size={18} color="#2563EB" style={{ marginRight: 10 }} />
+                        <View>
+                          <Text style={styles.detailLabel}>INSTRUCTOR A CARGO</Text>
+                          <Text style={styles.detailValue}>{detail?.instructor}</Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.detailRow}>
+                        <Ionicons name="location-outline" size={18} color="#059669" style={{ marginRight: 10 }} />
+                        <View>
+                          <Text style={styles.detailLabel}>AMBIENTE Y SEDE</Text>
+                          <Text style={styles.detailValue}>
+                            {detail?.aula} ({detail?.sede})
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.detailRow}>
+                        <Ionicons name="information-circle-outline" size={18} color="#8B5CF6" style={{ marginRight: 10 }} />
+                        <View>
+                          <Text style={styles.detailLabel}>MODALIDAD FORMATIVA</Text>
+                          <Text style={styles.detailValue}>Presencial • Asistencia Registrada en AIMS</Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    <View style={styles.modalFooter}>
+                      <Pressable
+                        style={({ hovered }: any) => [styles.modalActionBtn, hovered && styles.modalActionBtnHover]}
+                        onPress={() => setModalVisible(false)}
+                      >
+                        <Text style={styles.modalActionBtnText}>Entendido</Text>
+                      </Pressable>
+                    </View>
+                  </>
+                );
+              })()}
+            </View>
+          </View>
+        </Modal>
       )}
     </ScrollView>
   );
@@ -186,6 +536,14 @@ const styles = StyleSheet.create({
     paddingTop: 32,
     paddingBottom: 50,
   },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 20,
+    flexWrap: 'wrap',
+    gap: 14,
+  },
   pageTitle: {
     fontSize: 26,
     fontWeight: '700',
@@ -195,137 +553,503 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#64748B',
     marginTop: 4,
-    marginBottom: 28,
   },
-  // Desktop Styles
-  desktopContainer: {
-    marginTop: 4,
-  },
-  tableHeader: {
+  viewToggleWrap: {
     flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: '#D0D8E4',
+  },
+  toggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  toggleBtnActive: {
     backgroundColor: NAVY,
-    paddingVertical: 14,
-    borderRadius: 12,
-    marginBottom: 12,
-    shadowColor: NAVY,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
   },
-  headerCell: {
-    fontSize: 12,
-    fontWeight: '700',
+  toggleBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  toggleBtnTextActive: {
     color: '#FFFFFF',
-    textAlign: 'center',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
+    fontWeight: '700',
   },
-  tableRow: {
+  // Summary Metrics
+  summaryContainer: {
     flexDirection: 'row',
-    marginBottom: 10,
-    gap: 10,
+    gap: 12,
+    marginBottom: 20,
+    flexWrap: 'wrap',
   },
-  timeCell: {
+  summaryContainerMobile: {
+    flexDirection: 'column',
+  },
+  summaryCard: {
     flex: 1,
+    minWidth: 140,
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 20,
-    borderWidth: 1,
-    borderColor: '#D0D8E4',
-  },
-  timeText: {
-    fontSize: 13,
-    color: NAVY,
-    fontWeight: '600',
-  },
-  subjectCell: {
-    flex: 1,
-  },
-  subjectBlock: {
-    backgroundColor: 'rgba(207, 162, 53, 0.1)',
-    borderRadius: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: GOLD,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 10,
-    height: '100%',
-    minHeight: 90,
-  },
-  subjectBlockHover: {
-    backgroundColor: 'rgba(207, 162, 53, 0.22)',
-  },
-  emptyBlock: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    height: '100%',
-    minHeight: 90,
-    borderWidth: 1,
-    borderColor: '#D0D8E4',
-    borderStyle: 'dashed',
-  },
-  subjectText: {
-    fontSize: 13,
-    color: NAVY,
-    textAlign: 'center',
-    fontWeight: '600',
-  },
-  // Mobile Styles
-  mobileContainer: {
-    width: '100%',
-    gap: 16,
-  },
-  mobileCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: 14,
+    padding: 16,
     borderWidth: 1,
     borderColor: '#D0D8E4',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.10,
+    shadowOpacity: 0.08,
     shadowRadius: 8,
   },
-  mobileDayTitle: {
+  summaryCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  summaryLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+    letterSpacing: 0.8,
+  },
+  summaryValue: {
+    fontSize: 24,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  summarySubtext: {
+    fontSize: 12,
+    color: '#94A3B8',
+  },
+  // Filter row
+  filterScrollView: {
+    marginBottom: 20,
+  },
+  filterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  filterLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748B',
+    marginRight: 4,
+  },
+  filterPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D0D8E4',
+  },
+  filterPillActive: {
+    backgroundColor: NAVY,
+    borderColor: NAVY,
+  },
+  filterDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  filterPillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  filterPillTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  // Grid Mode Table
+  gridTable: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#D0D8E4',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+  },
+  tableHeader: {
+    flexDirection: 'row',
+    backgroundColor: NAVY,
+    borderRadius: 12,
+    paddingVertical: 12,
+    marginBottom: 10,
+  },
+  headerTimeCell: {
+    width: 120,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerDayCell: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 6,
+  },
+  headerDayCellToday: {
+    backgroundColor: 'rgba(207, 162, 53, 0.25)',
+    borderRadius: 8,
+    paddingVertical: 4,
+  },
+  headerCellText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.8,
+  },
+  todayBadge: {
+    backgroundColor: GOLD,
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 10,
+  },
+  todayBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  tableRow: {
+    flexDirection: 'row',
+    marginBottom: 10,
+    minHeight: 110,
+  },
+  timeCell: {
+    width: 120,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 8,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  timeBlockTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#94A3B8',
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  timeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: NAVY,
+    textAlign: 'center',
+  },
+  subjectCell: {
+    flex: 1,
+    marginHorizontal: 4,
+  },
+  subjectCellToday: {
+    backgroundColor: 'rgba(207, 162, 53, 0.04)',
+    borderRadius: 12,
+  },
+  subjectBlock: {
+    flex: 1,
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    padding: 10,
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  subjectBlockHover: {
+    transform: [{ translateY: -2 }],
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+  },
+  cardTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  iconCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  subjectNameText: {
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 17,
+  },
+  cardMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  aulaShortText: {
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  instructorTag: {
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    borderRadius: 6,
+    paddingVertical: 2,
+    paddingHorizontal: 5,
+    marginTop: 4,
+    alignSelf: 'flex-start',
+  },
+  instructorShortText: {
+    fontSize: 10,
+    color: '#475569',
+    fontWeight: '600',
+  },
+  emptyBlock: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyBlockText: {
+    fontSize: 11,
+    color: '#CBD5E1',
+    fontWeight: '600',
+  },
+  // Agenda Mode Styles
+  agendaContainer: {
+    gap: 16,
+  },
+  daySelectorRow: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  dayTab: {
+    flex: 1,
+    minWidth: 80,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#D0D8E4',
+  },
+  dayTabActive: {
+    backgroundColor: NAVY,
+    borderColor: NAVY,
+  },
+  dayTabShort: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#94A3B8',
+    textTransform: 'uppercase',
+  },
+  dayTabShortActive: {
+    color: GOLD,
+  },
+  dayTabName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: NAVY,
+    marginTop: 2,
+  },
+  dayTabNameActive: {
+    color: '#FFFFFF',
+  },
+  agendaDayHeading: {
     fontSize: 16,
     fontWeight: '700',
     color: NAVY,
-    marginBottom: 16,
+    marginTop: 8,
   },
-  mobileRow: {
+  agendaList: {
+    gap: 12,
+  },
+  agendaCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-    gap: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#D0D8E4',
+    borderLeftWidth: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    gap: 14,
   },
-  mobileRowHover: {
-    opacity: 0.85,
+  agendaCardHover: {
+    borderColor: GOLD,
   },
-  mobileTime: {
+  agendaTimeCol: {
+    width: 100,
+    borderRightWidth: 1,
+    borderRightColor: '#E2E8F0',
+    paddingRight: 10,
+  },
+  agendaBlockLabel: {
+    fontSize: 11,
+    color: '#94A3B8',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  agendaTimeText: {
     fontSize: 13,
-    color: '#64748B',
-    flex: 1,
-    fontWeight: '500',
+    fontWeight: '700',
+    color: NAVY,
+    marginTop: 2,
   },
-  mobileSubjectBtn: {
-    backgroundColor: GOLD,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-    flex: 1.5,
+  agendaContentCol: {
+    flex: 1,
+    gap: 6,
+  },
+  agendaSubjectTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: NAVY,
+  },
+  agendaDetailsRow: {
+    flexDirection: 'row',
+    gap: 14,
+    flexWrap: 'wrap',
+  },
+  agendaDetailItem: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
-  mobileSubjectBtnText: {
-    color: '#FFF',
+  agendaDetailText: {
+    fontSize: 12,
+    color: '#64748B',
+  },
+  emptyAgendaBox: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 36,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#D0D8E4',
+    gap: 8,
+  },
+  emptyAgendaTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: NAVY,
+    marginTop: 6,
+  },
+  emptyAgendaSubtext: {
     fontSize: 13,
+    color: '#64748B',
+  },
+  // Modal Styles
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  modalBox: {
+    width: '100%',
+    maxWidth: 520,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+  },
+  modalBoxMobile: {
+    maxWidth: '96%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  modalIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalSubjectTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: NAVY,
+  },
+  modalCodeText: {
+    fontSize: 12,
     fontWeight: '600',
-    textAlign: 'center',
+    marginTop: 2,
+  },
+  closeBtn: {
+    padding: 6,
+  },
+  modalBody: {
+    padding: 22,
+    gap: 16,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  detailLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#94A3B8',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  detailValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: NAVY,
+    marginTop: 2,
+  },
+  modalFooter: {
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+    alignItems: 'flex-end',
+  },
+  modalActionBtn: {
+    backgroundColor: NAVY,
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    borderRadius: 10,
+  },
+  modalActionBtnHover: {
+    backgroundColor: '#1E1B58',
+  },
+  modalActionBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
 });
-
-
-

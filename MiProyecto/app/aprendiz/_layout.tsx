@@ -21,6 +21,7 @@ const GOLD_LIGHT = 'rgba(207, 162, 53, 0.15)';
 
 const menuItems = [
   { name: 'Inicio', path: '/aprendiz', icon: 'home-outline' as const },
+  { name: 'Tareas', path: '/aprendiz/tareas', icon: 'clipboard-outline' as const },
   { name: 'Mi horario', path: '/aprendiz/horario', icon: 'calendar-outline' as const },
   { name: 'Asistencia', path: '/aprendiz/asistencia', icon: 'checkmark-circle-outline' as const },
   { name: 'Calificaciones', path: '/aprendiz/calificaciones', icon: 'star-outline' as const },
@@ -32,9 +33,9 @@ const menuItems = [
 
 const bottomNavItems = [
   { name: 'Inicio', path: '/aprendiz', icon: 'home-outline' as const },
-  { name: 'Horario', path: '/aprendiz/horario', icon: 'calendar-outline' as const },
+  { name: 'Tareas', path: '/aprendiz/tareas', icon: 'clipboard-outline' as const },
   { name: 'Notas', path: '/aprendiz/calificaciones', icon: 'star-outline' as const },
-  { name: 'Notifs', path: '/aprendiz/notificaciones', icon: 'notifications-outline' as const },
+  { name: 'Horario', path: '/aprendiz/horario', icon: 'calendar-outline' as const },
 ];
 
 function SidebarContent({

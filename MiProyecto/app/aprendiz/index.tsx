@@ -17,6 +17,7 @@ const competencias = [
 const statCards = [
   { label: 'PROMEDIO', value: '4.0', highlight: true, icon: 'star-outline', route: '/aprendiz/calificaciones' },
   { label: 'ASISTENCIA', value: '96%', highlight: true, icon: 'checkmark-circle-outline', route: '/aprendiz/asistencia' },
+  { label: 'TAREAS', value: '2', highlight: true, icon: 'clipboard-outline', route: '/aprendiz/tareas' },
   { label: 'MATERIAS', value: '6', highlight: false, icon: 'book-outline', route: '/aprendiz/horario' },
 ];
 
