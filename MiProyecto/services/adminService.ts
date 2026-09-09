@@ -16,9 +16,33 @@ export interface UsersListResult {
   total: number;
 }
 
+export interface DashboardStatsResult {
+  aprendicesCount: number;
+  instructoresCount: number;
+  programasCount: number;
+  fichasActivasCount: number;
+  aprendicesPorEstado?: Array<{ estado: string; count: number }>;
+}
+
 export const adminService = {
   /**
-   * Listar usuarios con filtros (rol, bÃºsqueda) - solo ADMIN
+   * Obtener métricas consolidadas del panel de administración en una sola consulta
+   */
+  async getDashboardStats(): Promise<DashboardStatsResult | null> {
+    try {
+      const response = await authService.fetchWithAuth(`${API_BASE_URL}/admin/stats`);
+      const data = await response.json();
+      if (!response.ok || !data.data) {
+        return null;
+      }
+      return data.data;
+    } catch {
+      return null;
+    }
+  },
+
+  /**
+   * Listar usuarios con filtros (rol, búsqueda) - solo ADMIN
    */
   async getUsers(params: { role?: string; search?: string; limit?: number } = {}): Promise<UsersListResult> {
     const query = new URLSearchParams();
@@ -56,7 +80,7 @@ export const adminService = {
   },
 
   /**
-   * Crear un nuevo usuario directamente en PostgreSQL (vÃ­a API Admin)
+   * Crear un nuevo usuario directamente en PostgreSQL (vía API Admin)
    */
   async createUser(userData: { firstName: string; lastName: string; email: string; role: 'ADMIN' | 'INSTRUCTOR' | 'APRENDIZ'; password?: string }) {
     const response = await authService.fetchWithAuth(`${API_BASE_URL}/users`, {
