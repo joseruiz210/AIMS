@@ -62,10 +62,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const setSession = (loggedUser: User) => {
-  setUser(loggedUser);
-  const destination = ROLE_ROUTES[loggedUser.role] ?? '/(tabs)';
-  router.replace(destination as any);
-};
+    setUser(loggedUser);
+    const destination = ROLE_ROUTES[loggedUser.role] ?? '/(tabs)';
+    router.replace(destination as any);
+  };
 
   return (
    <AuthContext.Provider value={{ user, isLoading, login, setSession, register, logout }}>

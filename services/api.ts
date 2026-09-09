@@ -1,13 +1,58 @@
 import { Platform } from 'react-native';
 
 // URL base de la API backend (puerto 3000)
-const API_BASE_URL = Platform.OS === 'web' 
+const API_BASE_URL = Platform.OS === 'web'
   ? (typeof window !== 'undefined' ? `http://${window.location.hostname}:3000/api/v1` : 'http://localhost:3000/api/v1')
   : 'http://10.0.2.2:3000/api/v1';
 
 export const getApiBaseUrl = () => API_BASE_URL;
 
-// Almacenamiento simple y seguro del token de sesión para Web y Móvil
+// ─── Cache en memoria con TTL ────────────────────────────────────────────────
+// Evita llamadas HTTP redundantes a la API para peticiones GET identicas.
+// El cache se invalida automaticamente despues de CACHE_TTL_MS milisegundos.
+// Las peticiones POST/PUT/DELETE nunca se cachean.
+const CACHE_TTL_MS = 30_000; // 30 segundos
+
+interface CacheEntry {
+  data: any;
+  expiresAt: number;
+}
+
+const requestCache = new Map<string, CacheEntry>();
+
+/**
+ * Obtiene una entrada valida del cache o null si expiró/no existe.
+ */
+function getCached(key: string): any | null {
+  const entry = requestCache.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) {
+    requestCache.delete(key);
+    return null;
+  }
+  return entry.data;
+}
+
+/**
+ * Guarda una respuesta en el cache con TTL.
+ */
+function setCached(key: string, data: any): void {
+  requestCache.set(key, { data, expiresAt: Date.now() + CACHE_TTL_MS });
+}
+
+/**
+ * Invalida todas las entradas del cache que contengan el prefijo dado.
+ * Util para invalidar tras un POST/PUT/DELETE.
+ */
+export function invalidateCache(prefix: string): void {
+  for (const key of requestCache.keys()) {
+    if (key.startsWith(prefix)) {
+      requestCache.delete(key);
+    }
+  }
+}
+
+// ─── Almacenamiento de sesion ─────────────────────────────────────────────────
 const TOKEN_KEY = 'aims_jwt_token';
 const USER_KEY = 'aims_user_data';
 
@@ -47,12 +92,32 @@ export const storage = {
   }
 };
 
-// Cliente genérico de peticiones HTTP
+// ─── Cliente HTTP con cache automatico para GET ───────────────────────────────
+/**
+ * Cliente generico de peticiones HTTP hacia la API de AIMS.
+ *
+ * - Las peticiones GET se cachean en memoria por CACHE_TTL_MS (30s).
+ * - Las peticiones POST/PUT/PATCH/DELETE nunca se cachean.
+ * - Si el metodo muta datos (no-GET), el cache del mismo endpoint se invalida.
+ */
 export async function apiFetch<T = any>(
-  endpoint: string, 
+  endpoint: string,
   options: RequestInit = {}
 ): Promise<{ success: boolean; data?: T; message?: string; error?: any }> {
   try {
+    const method = (options.method || 'GET').toUpperCase();
+    const isReadOnly = method === 'GET';
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    const cacheKey = `${API_BASE_URL}${cleanEndpoint}`;
+
+    // Servir desde cache si es GET y hay una entrada valida
+    if (isReadOnly) {
+      const cached = getCached(cacheKey);
+      if (cached !== null) {
+        return cached;
+      }
+    }
+
     const token = await storage.getToken();
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -63,7 +128,6 @@ export async function apiFetch<T = any>(
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
     const response = await fetch(`${API_BASE_URL}${cleanEndpoint}`, {
       ...options,
       headers,
@@ -72,6 +136,7 @@ export async function apiFetch<T = any>(
     const result = await response.json().catch(() => ({}));
 
     if (!response.ok) {
+      // En mutaciones fallidas no invalidamos cache
       return {
         success: false,
         message: result.message || result.error || `Error ${response.status}: No se pudo completar la petición`,
@@ -79,11 +144,21 @@ export async function apiFetch<T = any>(
       };
     }
 
-    return {
+    const resultObj = {
       success: true,
       data: result.data !== undefined ? result.data : result,
       message: result.message,
     };
+
+    // Guardar en cache solo si es GET exitoso
+    if (isReadOnly) {
+      setCached(cacheKey, resultObj);
+    } else {
+      // Invalidar entradas relacionadas al mismo endpoint tras una mutacion
+      invalidateCache(cacheKey);
+    }
+
+    return resultObj;
   } catch (error: any) {
     return {
       success: false,
