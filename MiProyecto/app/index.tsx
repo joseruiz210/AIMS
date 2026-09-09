@@ -1,5 +1,6 @@
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
+import * as AuthSession from 'expo-auth-session';
 
 import React, { useEffect, useState } from 'react';
 import { 
@@ -57,28 +58,47 @@ export default function AuthScreen() {
   
 
  const [request, response, promptAsync] = Google.useAuthRequest({
-  webClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || 'mock-google-client-id.apps.googleusercontent.com',
+  webClientId:
+    '801203695881-vjkbm79n28utn02fkiei3tmrieqmkd37.apps.googleusercontent.com',
   responseType: 'id_token',
   scopes: ['openid', 'profile', 'email'],
+  redirectUri: AuthSession.makeRedirectUri(),
 });
-  useEffect(() => {
+useEffect(() => {
   const handleGoogleResponse = async () => {
     if (response?.type === 'success') {
-      const idToken = response.authentication?.idToken ?? response.params?.id_token;
-      if (!idToken) {
-        setFeedback({ text: 'No se pudo obtener el token de Google.', type: 'error' });
+      const token =
+        response.authentication?.idToken ??
+        response.params?.id_token ??
+        response.authentication?.accessToken ??
+        response.params?.access_token;
+
+      if (!token) {
+        setFeedback({
+          text: 'No se pudo obtener el token de Google.',
+          type: 'error',
+        });
         return;
       }
-      const res = await authService.googleLogin(idToken);
+
+      const res = await authService.googleLogin(token);
+
       if (res.success && res.user) {
         setSession(res.user);
       } else {
-        setFeedback({ text: res.message || 'Error al iniciar sesión con Google.', type: 'error' });
+        setFeedback({
+          text: res.message || 'Error al iniciar sesión con Google.',
+          type: 'error',
+        });
       }
     } else if (response?.type === 'error') {
-      setFeedback({ text: 'Google canceló o rechazó la autenticación.', type: 'error' });
+      setFeedback({
+        text: 'Google canceló o rechazó la autenticación.',
+        type: 'error',
+      });
     }
   };
+
   handleGoogleResponse();
 }, [response, setSession]);
   
