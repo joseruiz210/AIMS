@@ -62,35 +62,50 @@ export default function TareasAprendizScreen() {
   const handleConfirmEntrega = async () => {
     if (!activeEvidencia) return;
     setSubmitting(true);
-    await evidenciasService.entregarEvidencia(activeEvidencia.id, {
-      archivoUrl,
-      comentario,
-    });
+    try {
+      const result = await evidenciasService.entregarEvidencia(activeEvidencia.id, {
+        archivoUrl,
+        comentario,
+      });
 
-    // Actualizar estado local
-    setEvidencias((prev) =>
-      prev.map((e) =>
-        e.id === activeEvidencia.id
-          ? {
-              ...e,
-              estado: 'Entregada',
-              entrega: {
-                id: 'new-e',
-                archivoUrl,
-                comentario,
-                fechaEntrega: 'Hoy',
-              },
-            }
-          : e
-      )
-    );
+      const entregaData = result?.data;
+      const notaObtenida = entregaData?.nota !== undefined ? Number(entregaData.nota) : undefined;
+      const feedbackObtenido =
+        entregaData?.feedback || entregaData?.evaluacionIa?.feedbackCompleto || entregaData?.comentario || undefined;
 
-    setSubmitting(false);
-    setSubmittedSuccess(true);
-    setTimeout(() => {
-      setModalVisible(false);
-      setSubmittedSuccess(false);
-    }, 1200);
+      // Recargar evidencias directamente desde PostgreSQL
+      await loadEvidencias();
+
+      // Actualizar estado local
+      setEvidencias((prev) =>
+        prev.map((e) =>
+          e.id === activeEvidencia.id
+            ? {
+                ...e,
+                estado: notaObtenida !== undefined ? 'Calificada' : 'Entregada',
+                entrega: {
+                  id: entregaData?.id || 'new-e',
+                  archivoUrl,
+                  comentario,
+                  fechaEntrega: 'Hoy',
+                  nota: notaObtenida,
+                  feedback: feedbackObtenido,
+                },
+              }
+            : e
+        )
+      );
+
+      setSubmitting(false);
+      setSubmittedSuccess(true);
+      setTimeout(() => {
+        setModalVisible(false);
+        setSubmittedSuccess(false);
+      }, 1200);
+    } catch (err: any) {
+      setSubmitting(false);
+      alert(err.message || 'Error al guardar la entrega en la base de datos');
+    }
   };
 
   // Métricas
@@ -338,8 +353,10 @@ export default function TareasAprendizScreen() {
                 {submittedSuccess ? (
                   <View style={styles.successBox}>
                     <Ionicons name="checkmark-circle" size={48} color="#059669" />
-                    <Text style={styles.successTitle}>¡Entrega enviada exitosamente!</Text>
-                    <Text style={styles.successSubtext}>Tu instructor podrá revisarla y asignarte calificación.</Text>
+                    <Text style={styles.successTitle}>¡Entrega registrada y calificada!</Text>
+                    <Text style={styles.successSubtext}>
+                      Tu evidencia ha sido calificada con retroalimentación y nota asignada.
+                    </Text>
                   </View>
                 ) : (
                   <>
@@ -388,7 +405,10 @@ export default function TareasAprendizScreen() {
                   disabled={submitting}
                 >
                   {submitting ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                      <Text style={styles.submitBtnText}>Enviando entrega...</Text>
+                    </View>
                   ) : (
                     <>
                       <Ionicons name="checkmark-circle-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
@@ -428,13 +448,34 @@ export default function TareasAprendizScreen() {
                 <Text style={styles.feedbackScoreLabel}>CALIFICACIÓN FINAL:</Text>
                 <Text style={styles.feedbackScoreValue}>{activeEvidencia?.entrega?.nota?.toFixed(1) || '4.6'} / 5.0</Text>
                 <Text style={styles.feedbackScoreStatus}>✓ Competencia Aprobada</Text>
+                <Text style={styles.feedbackScoreValue}>
+                  {activeEvidencia?.entrega?.nota !== undefined
+                    ? Number(activeEvidencia.entrega.nota).toFixed(1)
+                    : '4.5'}{' '}
+                  / 5.0
+                </Text>
+                {Number(activeEvidencia?.entrega?.nota ?? 4.5) >= 3.5 ? (
+                  <Text style={[styles.feedbackScoreStatus, { color: '#047857' }]}>
+                    ✓ Competencia Aprobada (SENA)
+                  </Text>
+                ) : (
+                  <Text style={[styles.feedbackScoreStatus, { color: '#B91C1C' }]}>
+                    ✗ No Aprobada - Requiere Corrección
+                  </Text>
+                )}
               </View>
 
               <View style={styles.feedbackTextBox}>
                 <Text style={styles.feedbackTextTitle}>Comentario del Instructor ({activeEvidencia?.instructor}):</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 6 }}>
+                  <Ionicons name="sparkles" size={16} color={GOLD} />
+                  <Text style={styles.feedbackTextTitle}>Evaluación y Retroalimentación Pedagógica:</Text>
+                </View>
                 <Text style={styles.feedbackTextBody}>
                   {activeEvidencia?.entrega?.feedback ||
                     'Excelente desarrollo de la evidencia. Se evidencia dominio conceptual, correcta aplicación de estándares de la industria y estructura técnica impecable.'}
+                    activeEvidencia?.entrega?.comentario ||
+                    'Excelente desarrollo de la evidencia. Se evidencia dominio conceptual, correcta aplicación de estándares y estructura técnica completa.'}
                 </Text>
               </View>
 

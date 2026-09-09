@@ -39,6 +39,17 @@ export const fichasService = {
     }
   },
 
+  async getFichaById(id: string): Promise<any> {
+    try {
+      const response = await authService.fetchWithAuth(`${API_BASE_URL}/fichas/${id}`);
+      const data = await response.json();
+      if (!response.ok || !data.data) return null;
+      return data.data;
+    } catch {
+      return null;
+    }
+  },
+
   async createFicha(fichaData: { codigo: string; programaId?: string; jornada?: string; instructorId?: string }) {
     const response = await authService.fetchWithAuth(`${API_BASE_URL}/fichas`, {
       method: 'POST',

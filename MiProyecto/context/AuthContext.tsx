@@ -27,7 +27,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     (async () => {
       const { user: storedUser } = await authService.checkSession();
-      if (storedUser) setUser(storedUser);
+      if (storedUser) {
+        setUser(storedUser);
+        const destination = ROLE_ROUTES[storedUser.role] ?? '/(tabs)';
+        router.replace(destination as any);
+      }
       setIsLoading(false);
     })();
   }, []);

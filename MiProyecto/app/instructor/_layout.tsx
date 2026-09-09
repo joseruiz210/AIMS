@@ -1,7 +1,8 @@
 import { Slot, useRouter, usePathname } from 'expo-router';
 import { View, Text, StyleSheet, Pressable, Image, useWindowDimensions, ScrollView } from 'react-native';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
+import { authService } from '../../services/authService';
 
 const NAVY_DARK = '#0F1026';
 const NAVY_LIGHT = '#1A183B';
@@ -23,10 +24,23 @@ export default function InstructorLayout() {
 
   const [logoutHover, setLogoutHover] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [userName, setUserName] = useState('Roberto Vargas');
+
+  useEffect(() => {
+    authService.checkSession().then(({ user }) => {
+      if (user) {
+        const nombre = (user as any).firstName
+          ? `${(user as any).firstName} ${(user as any).lastName || ''}`.trim()
+          : user.nombre || 'Roberto Vargas';
+        setUserName(nombre);
+      }
+    }).catch(() => {});
+  }, []);
 
   const menuItems: MenuItemType[] = [
     { name: 'Inicio', path: '/instructor/inicio', icon: 'home-outline' },
-    { name: 'Mis fichas', path: '/instructor/fichas', icon: 'grid-outline' },
+    { name: 'Mis Fichas', path: '/instructor/fichas', icon: 'grid-outline' },
+    { name: 'Actividades', path: '/instructor/actividades', icon: 'folder-open-outline' },
     { name: 'Aprendices', path: '/instructor/aprendices', icon: 'people-outline' },
     { name: 'Asistencia', path: '/instructor/asistencia', icon: 'checkbox-outline' },
     { name: 'Calificaciones', path: '/instructor/calificaciones', icon: 'bar-chart-outline' },
@@ -225,7 +239,7 @@ export default function InstructorLayout() {
             </Pressable>
             <View style={styles.userInfoGroup}>
               <Ionicons name="person-circle" size={32} color={NAVY_DARK} />
-              <Text style={styles.userName}>Roberto vargas</Text>
+              <Text style={styles.userName}>{userName}</Text>
             </View>
           </View>
         </View>

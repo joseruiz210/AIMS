@@ -73,6 +73,17 @@ export async function verifyEmailDomainExistence(email: string): Promise<EmailVe
 
   const domain = trimmed.split('@')[1];
 
+  // Dominios institucionales y oficiales permitidos de antemano
+  const trustedDomains = ['sena.edu.co', 'soy.sena.edu.co', 'misena.edu.co', 'gmail.com'];
+  if (trustedDomains.includes(domain)) {
+    return {
+      isValidFormat: true,
+      isNotDisposable: true,
+      domainExists: true,
+      message: `Dominio @${domain} verificado.`
+    };
+  }
+
   try {
     // Consulta DNS pública de Google sobre registros MX (Mail Exchange)
     const response = await fetch(`https://dns.google/resolve?name=${encodeURIComponent(domain)}&type=MX`, {

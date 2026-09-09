@@ -15,17 +15,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import LogoutModal from '../../components/LogoutModal';
 
-const NAVY = '#12103C';
-const GOLD = '#cfa235';
-const GOLD_LIGHT = 'rgba(207, 162, 53, 0.15)';
+const NAVY_DARK = '#0F1026';
+const GOLD = '#D4AF37';
+const GOLD_LIGHT = 'rgba(212, 175, 55, 0.15)';
 
 const menuItems = [
   { name: 'Inicio', path: '/aprendiz', icon: 'home-outline' as const },
   { name: 'Tareas', path: '/aprendiz/tareas', icon: 'clipboard-outline' as const },
   { name: 'Mi horario', path: '/aprendiz/horario', icon: 'calendar-outline' as const },
-  { name: 'Asistencia', path: '/aprendiz/asistencia', icon: 'checkmark-circle-outline' as const },
-  { name: 'Calificaciones', path: '/aprendiz/calificaciones', icon: 'star-outline' as const },
-  { name: 'Observaciones', path: '/aprendiz/observaciones', icon: 'eye-outline' as const },
+  { name: 'Asistencia', path: '/aprendiz/asistencia', icon: 'checkbox-outline' as const },
+  { name: 'Calificaciones', path: '/aprendiz/calificaciones', icon: 'bar-chart-outline' as const },
+  { name: 'Observaciones', path: '/aprendiz/observaciones', icon: 'chatbubbles-outline' as const },
   { name: 'Notificaciones', path: '/aprendiz/notificaciones', icon: 'notifications-outline' as const },
   { name: 'Documentos', path: '/aprendiz/documentos', icon: 'document-text-outline' as const },
   { name: 'Configuración', path: '/aprendiz/configuracion', icon: 'settings-outline' as const },
@@ -34,7 +34,7 @@ const menuItems = [
 const bottomNavItems = [
   { name: 'Inicio', path: '/aprendiz', icon: 'home-outline' as const },
   { name: 'Tareas', path: '/aprendiz/tareas', icon: 'clipboard-outline' as const },
-  { name: 'Notas', path: '/aprendiz/calificaciones', icon: 'star-outline' as const },
+  { name: 'Notas', path: '/aprendiz/calificaciones', icon: 'bar-chart-outline' as const },
   { name: 'Horario', path: '/aprendiz/horario', icon: 'calendar-outline' as const },
 ];
 
@@ -69,12 +69,13 @@ function SidebarContent({
           isHovered && !isActive && styles.menuItemHover,
         ]}
       >
-        <Ionicons
-          name={isActive ? (icon.replace('-outline', '') as any) : icon}
-          size={18}
-          color={isActive ? '#FFFFFF' : 'rgba(255,255,255,0.7)'}
-          style={{ marginRight: 12 }}
-        />
+        <View style={styles.iconContainer}>
+          <Ionicons
+            name={isActive ? (icon.replace('-outline', '') as any) : icon}
+            size={18}
+            color={isActive ? '#FFFFFF' : GOLD}
+          />
+        </View>
         <Text
           style={[
             styles.menuText,
@@ -99,8 +100,9 @@ function SidebarContent({
             resizeMode="contain"
           />
         </View>
-        <Text style={styles.roleSubtitle}>Aprendiz</Text>
-        <View style={styles.divider} />
+        <View style={styles.roleBadge}>
+          <Text style={styles.roleSubtitle}>Aprendiz</Text>
+        </View>
       </View>
 
       {/* Menu */}
@@ -112,7 +114,6 @@ function SidebarContent({
 
       {/* Logout */}
       <View style={styles.logoutSection}>
-        <View style={styles.divider} />
         <Pressable
           style={[styles.logoutBtn, logoutHover && styles.logoutBtnHover]}
           onPress={onLogout}
@@ -121,12 +122,12 @@ function SidebarContent({
         >
           <Ionicons
             name="log-out-outline"
-            size={20}
-            color={logoutHover ? '#FF4444' : 'rgba(255,255,255,0.7)'}
+            size={18}
+            color={logoutHover ? GOLD : 'rgba(255,255,255,0.7)'}
             style={{ marginRight: 10 }}
           />
           <Text style={[styles.logoutText, logoutHover && styles.logoutTextHover]}>
-            Cerrar Sesión
+            Cerrar Sesión →
           </Text>
         </Pressable>
       </View>
@@ -287,9 +288,13 @@ const styles = StyleSheet.create({
   },
   // Sidebar (desktop only)
   sidebar: {
-    width: 260,
-    backgroundColor: NAVY,
+    width: 230,
+    backgroundColor: NAVY_DARK,
+    display: 'flex',
+    flexDirection: 'column',
     height: '100%',
+    borderRightWidth: 1,
+    borderRightColor: 'rgba(255,255,255,0.05)',
   },
   sidebarInner: {
     flex: 1,
@@ -297,33 +302,37 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   logoSection: {
-    paddingTop: 24,
-    paddingBottom: 8,
+    paddingTop: 20,
+    paddingBottom: 14,
     alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
+    marginBottom: 8,
   },
   logoWrapper: {
-    width: 130,
-    height: 110,
+    width: 100,
+    height: 75,
     alignItems: 'center',
     justifyContent: 'center',
   },
   logoImage: {
-    width: 130,
-    height: 110,
+    width: 100,
+    height: 75,
+  },
+  roleBadge: {
+    backgroundColor: 'rgba(212, 175, 55, 0.15)',
+    paddingHorizontal: 12,
+    paddingVertical: 3,
+    borderRadius: 12,
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(212, 175, 55, 0.3)',
   },
   roleSubtitle: {
-    color: 'rgba(255,255,255,0.85)',
-    marginTop: 6,
-    fontSize: 14,
-    letterSpacing: 1,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    marginHorizontal: 20,
-    marginTop: 14,
-    marginBottom: 4,
-    width: '80%',
+    color: GOLD,
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.5,
   },
   menuContainer: {
     flex: 1,
@@ -332,11 +341,11 @@ const styles = StyleSheet.create({
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 11,
-    paddingHorizontal: 28,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
     marginHorizontal: 10,
     borderRadius: 8,
-    marginVertical: 1,
+    marginVertical: 2,
   },
   menuItemActive: {
     backgroundColor: GOLD,
@@ -344,9 +353,15 @@ const styles = StyleSheet.create({
   menuItemHover: {
     backgroundColor: GOLD_LIGHT,
   },
+  iconContainer: {
+    width: 24,
+    alignItems: 'center',
+    marginRight: 10,
+  },
   menuText: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 15,
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 14,
+    fontWeight: '400',
   },
   menuTextActive: {
     color: '#FFFFFF',
@@ -357,25 +372,27 @@ const styles = StyleSheet.create({
   },
   logoutSection: {
     paddingBottom: 20,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.08)',
   },
   logoutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 28,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
     marginHorizontal: 10,
     borderRadius: 8,
-    marginTop: 8,
   },
   logoutBtnHover: {
-    backgroundColor: 'rgba(255, 68, 68, 0.1)',
+    backgroundColor: 'rgba(255,255,255,0.05)',
   },
   logoutText: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 15,
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 14,
   },
   logoutTextHover: {
-    color: '#FF4444',
+    color: GOLD,
   },
   content: {
     flex: 1,
@@ -408,7 +425,7 @@ const styles = StyleSheet.create({
   mobileHeaderTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: NAVY,
+    color: NAVY_DARK,
     letterSpacing: 3,
   },
   mobileHeaderRight: {
@@ -440,7 +457,7 @@ const styles = StyleSheet.create({
   mobileNav: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    backgroundColor: NAVY,
+    backgroundColor: NAVY_DARK,
     paddingVertical: 10,
     paddingBottom: 14,
     borderTopWidth: 1,
@@ -471,8 +488,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
   drawerPanel: {
-    width: 280,
-    backgroundColor: NAVY,
+    width: 240,
+    backgroundColor: NAVY_DARK,
     height: '100%',
     position: 'absolute',
     left: 0,

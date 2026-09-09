@@ -49,6 +49,7 @@ export default function AuthScreen() {
 
   // Feedback Messages
   const [feedback, setFeedback] = useState<{ text: string; type: 'error' | 'success' } | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Validación de la contraseña en tiempo real para Registro
   const passValidation = validatePassword(regPassword);
@@ -81,7 +82,18 @@ export default function AuthScreen() {
   };
   handleGoogleResponse();
 }, [response, setSession]);
-  
+
+  useEffect(() => {
+    if (user) {
+      const destination =
+        user.role === 'INSTRUCTOR'
+          ? '/instructor/inicio'
+          : user.role === 'ADMIN'
+          ? '/admin'
+          : '/aprendiz';
+      router.replace(destination as any);
+    }
+  }, [user]);
 
   const handleMagicLink = async () => {
   if (!loginCorreo) {
@@ -99,7 +111,10 @@ export default function AuthScreen() {
       return;
     }
 
+    setIsSubmitting(true);
     const res = await login(loginCorreo, loginPassword);
+    setIsSubmitting(false);
+
     if (!res.success) {
       setFeedback({ text: res.message || 'Error al iniciar sesión', type: 'error' });
     } else {
@@ -109,13 +124,13 @@ export default function AuthScreen() {
 
   const handleRegister = async () => {
     setFeedback(null);
-    if (!regNombre || !regCorreo || !regPassword || !regConfirmPassword) {
+    if (!regNombre.trim() || !regCorreo.trim() || !regPassword || !regConfirmPassword) {
       setFeedback({ text: 'Por favor completa todos los campos del formulario.', type: 'error' });
       return;
     }
 
     if (!passValidation.isValid) {
-      setFeedback({ text: 'La contraseña no cumple con los requisitos de seguridad.', type: 'error' });
+      setFeedback({ text: 'La contraseña no cumple con los requisitos de seguridad: ' + passValidation.errors.join(', '), type: 'error' });
       return;
     }
 
@@ -124,11 +139,24 @@ export default function AuthScreen() {
       return;
     }
 
-    const res = await register(regNombre, regCorreo, regPassword, regConfirmPassword);
+    setIsLoading(true);
+    setIsSubmitting(true);
+    const res = await register(regNombre.trim(), regCorreo.trim(), regPassword, regConfirmPassword);
+
     if (!res.success) {
+      setIsLoading(false);
+      setIsSubmitting(false);
       setFeedback({ text: res.message || 'Error al registrar la cuenta.', type: 'error' });
     } else {
-      setFeedback({ text: res.message || '¡Cuenta creada y JWT almacenado exitosamente!', type: 'success' });
+      setFeedback({ text: '¡Cuenta creada con éxito! Entrando al sistema...', type: 'success' });
+      const loginRes = await login(regCorreo.trim(), regPassword);
+      setIsLoading(false);
+      setIsSubmitting(false);
+      if (!loginRes.success) {
+        setLoginCorreo(regCorreo.trim());
+        setFeedback({ text: '¡Cuenta creada! Ya puedes iniciar sesión con tus credenciales.', type: 'success' });
+        setCurrentScreen('login');
+      }
     }
   };
   return (
@@ -197,14 +225,17 @@ export default function AuthScreen() {
           >
             {/* Loading Indicator */}
             {isLoading && (
+            {(isLoading || isSubmitting) && (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#C59427" />
-                <Text style={styles.loadingText}>Verificando sesión JWT...</Text>
+                <Text style={styles.loadingText}>Iniciando sesión...</Text>
+                <Text style={styles.loadingText}>Procesando solicitud...</Text>
               </View>
             )}
 
             {/* Banner de Feedback Error/Éxito */}
             {feedback && !isLoading && (
+            {feedback && !isLoading && !isSubmitting && (
               <View style={[styles.feedbackBanner, feedback.type === 'error' ? styles.feedbackError : styles.feedbackSuccess]}>
                 <Ionicons 
                   name={feedback.type === 'error' ? 'alert-circle-outline' : 'checkmark-circle-outline'} 
@@ -217,7 +248,7 @@ export default function AuthScreen() {
               </View>
             )}
 
-            {/* ================= USUARIO AUTENTICADO (SESIÓN ACTIVA CON JWT) ================= */}
+            {/* ================= USUARIO AUTENTICADO ================= */}
             {user ? (
               <View style={styles.lightCard}>
                 <View style={styles.lightLogoContainer}>
@@ -229,17 +260,28 @@ export default function AuthScreen() {
                   <Text style={styles.lightLogoText}>AIMS</Text>
                 </View>
 
-                <View style={styles.authBadge}>
-                  <Ionicons name="shield-checkmark" size={16} color="#10B981" />
-                  <Text style={styles.authBadgeText}>SESIÓN AUTENTICADA CON JWT</Text>
-                </View>
-
-                <Text style={styles.cardTitleLight}>¡BIENVENIDO/A!</Text>
+                <Text style={styles.cardTitleLight}>¡Bienvenido/a!</Text>
                 <Text style={styles.userNameText}>{user.nombre}</Text>
                 <Text style={styles.userEmailText}>{user.correo}</Text>
 
-                <TouchableOpacity style={styles.logoutButton} activeOpacity={0.85} onPress={logout}>
+                <TouchableOpacity 
+                  style={styles.primaryActionButton} 
+                  activeOpacity={0.85} 
+                  onPress={() => {
+                    const destination =
+                      user.role === 'INSTRUCTOR'
+                        ? '/instructor/inicio'
+                        : user.role === 'ADMIN'
+                        ? '/admin'
+                        : '/aprendiz';
+                    router.replace(destination as any);
+                  }}
+                >
+                  <Ionicons name="enter-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                  <Text style={styles.primaryActionText}>INGRESAR AL SISTEMA</Text>
+                </TouchableOpacity>
 
+                <TouchableOpacity style={styles.logoutButton} activeOpacity={0.85} onPress={logout}>
                   <Ionicons name="log-out-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
                   <Text style={styles.logoutButtonText}>CERRAR SESIÓN</Text>
                 </TouchableOpacity>
@@ -267,7 +309,7 @@ export default function AuthScreen() {
                         <Ionicons name="mail" size={18} color="#475569" style={styles.fieldIcon} />
                         <TextInput
                           style={styles.borderedInput}
-                          placeholder="vtorres@formacionsena.edu.co"
+                          placeholder="usuario@sena.edu.co o @gmail.com"
                           placeholderTextColor="#94A3B8"
                           keyboardType="email-address"
                           autoCapitalize="none"
@@ -386,20 +428,26 @@ export default function AuthScreen() {
                       </View>
                     </View>
 
-                    {/* Correo Institucional */}
+                    {/* Correo Institucional / Personal */}
                     <View style={styles.fieldGroup}>
-                      <Text style={styles.labelDark}>Correo Institucional</Text>
+                      <Text style={styles.labelDark}>Correo Institucional o Personal</Text>
                       <View style={styles.whiteInputWrapper}>
                         <Ionicons name="mail" size={18} color="#475569" style={styles.fieldIcon} />
                         <TextInput
                           style={styles.whiteInput}
-                          placeholder="vtorres@formacionsena.edu.co"
+                          placeholder="aprendiz@soy.sena.edu.co o instructor@sena.edu.co"
                           placeholderTextColor="#94A3B8"
                           keyboardType="email-address"
                           autoCapitalize="none"
                           value={regCorreo}
                           onChangeText={setRegCorreo}
                         />
+                      </View>
+                      <View style={styles.domainHelperBox}>
+                        <Ionicons name="information-circle-outline" size={15} color="#C59427" style={{ marginRight: 6 }} />
+                        <Text style={styles.domainHelperText}>
+                          SENA: <Text style={styles.boldDomain}>@sena.edu.co</Text> (Instructor), <Text style={styles.boldDomain}>@soy.sena.edu.co</Text> o <Text style={styles.boldDomain}>@gmail.com</Text> (Aprendiz)
+                        </Text>
                       </View>
                       {regCorreo.length > 0 && isDisposableEmail(regCorreo) && (
                         <Text style={[styles.matchText, styles.matchError]}>
@@ -551,208 +599,6 @@ export default function AuthScreen() {
                 )}
               </>
             )}
-{false && (
-  <>
-    <View style={styles.lightCard}>
-                <Text style={styles.cardTitleLight}>INICIO DE SESIÓN</Text>
-
-                {/* Correo / Matrícula */}
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.labelLight}>Correo Institucional / Matrícula</Text>
-                  <View style={styles.borderedInputWrapper}>
-                    <Ionicons name="mail" size={18} color="#475569" style={styles.fieldIcon} />
-                    <TextInput
-                      style={styles.borderedInput}
-                      placeholder="vtorres@formacionsena.edu.co"
-                      placeholderTextColor="#94A3B8"
-                      keyboardType="email-address"
-                      autoCapitalize="none"
-                      value={loginCorreo}
-                      onChangeText={setLoginCorreo}
-                    />
-                  </View>
-                </View>
-
-                {/* Contraseña */}
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.labelLight}>Contraseña</Text>
-                  <View style={styles.borderedInputWrapper}>
-                    <Ionicons name="lock-closed" size={18} color="#475569" style={styles.fieldIcon} />
-                    <TextInput
-                      style={styles.borderedInput}
-                      placeholder="••••••••••••"
-                      placeholderTextColor="#94A3B8"
-                      secureTextEntry={!showLoginPassword}
-                      value={loginPassword}
-                      onChangeText={setLoginPassword}
-                    />
-                    <TouchableOpacity onPress={() => setShowLoginPassword(!showLoginPassword)}>
-                      <Ionicons name={showLoginPassword ? "eye-off-outline" : "eye-outline"} size={18} color="#64748B" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                {/* Options Row: Checkbox & Forgot Password */}
-                <View style={styles.optionsRow}>
-                  <TouchableOpacity 
-                    style={styles.checkboxRow} 
-                    activeOpacity={0.7}
-                    onPress={() => setRememberMe(!rememberMe)}
-                  >
-                    <Ionicons 
-                      name={rememberMe ? "checkbox" : "square-outline"} 
-                      size={18} 
-                      color={rememberMe ? "#C59427" : "#64748B"} 
-                    />
-                    <Text style={styles.rememberText}>Recordar mis datos</Text>
-                  </TouchableOpacity>
-
-                 <TouchableOpacity activeOpacity={0.7} onPress={() => router.push('../forgot-password')}>
-  <Text style={styles.forgotText}>¿Olvidaste tu contraseña?</Text>
-</TouchableOpacity>
-                </View>
-
-                {/* Submit Login Button */}
-                <TouchableOpacity style={styles.goldButton} activeOpacity={0.85} onPress={handleLogin}>
-                  <Text style={styles.goldButtonText}>INICIAR SESIÓN →</Text>
-                </TouchableOpacity>
-
-                {/* Social Login Separator */}
-                <View style={styles.dividerRow}>
-                  <View style={styles.dividerLine} />
-                  <Text style={styles.dividerText}>O inicia sesión con:</Text>
-                  <View style={styles.dividerLine} />
-                </View>
-
-                {/* Social Buttons (Outlook & Google) */}
-                <View style={styles.socialRow}>
-                  <TouchableOpacity style={styles.socialButton} activeOpacity={0.8}>
-                    <Ionicons name="mail" size={22} color="#0078D4" />
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity
-                    style={styles.socialButton}
-                    activeOpacity={0.8}
-                    disabled={!request}
-                    onPress={() => promptAsync()}
-                  >
-                    <Ionicons name="logo-google" size={22} color="#EA4335" />
-                  </TouchableOpacity>
-                </View>
-
-                {/* Switch to Register Button */}
-                <View style={styles.switchContainer}>
-                  <Text style={styles.switchTextLight}>¿No tienes una cuenta? </Text>
-                  <TouchableOpacity onPress={() => setCurrentScreen('register')}>
-                    <Text style={styles.goldLink}>Regístrate</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-            {/* ================= REGISTRO DE CUENTA ================= */}
-            {currentScreen === 'register' && (
-              <View style={styles.darkCard}>
-                <View style={styles.cardHeaderLogo}>
-                  <Image 
-                    source={require('../assets/images/logo.jpeg')} 
-                    style={styles.cardLogoImg} 
-                    resizeMode="contain" 
-                  />
-                  <View>
-                    <Text style={styles.cardLogoTitle}>ACADEMIC INTELLIGENT</Text>
-                    <Text style={styles.cardLogoSubtitle}>MANAGEMENT SYSTEM</Text>
-                  </View>
-                </View>
-
-                <Text style={styles.cardTitleDark}>REGISTRO</Text>
-
-                {/* Nombre Completo */}
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.labelDark}>Nombre Completo</Text>
-                  <View style={styles.whiteInputWrapper}>
-                    <Ionicons name="person" size={18} color="#475569" style={styles.fieldIcon} />
-                    <TextInput
-                      style={styles.whiteInput}
-                      placeholder="Valentina Torres"
-                      placeholderTextColor="#94A3B8"
-                      value={regNombre}
-                      onChangeText={setRegNombre}
-                    />
-                  </View>
-                </View>
-
-                {/* Correo Institucional */}
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.labelDark}>Correo Institucional</Text>
-                  <View style={styles.whiteInputWrapper}>
-                    <Ionicons name="mail" size={18} color="#475569" style={styles.fieldIcon} />
-                    <TextInput
-                      style={styles.whiteInput}
-                      placeholder="vtorres@formacionsena.edu.co"
-                      placeholderTextColor="#94A3B8"
-                      keyboardType="email-address"
-                      autoCapitalize="none"
-                      value={regCorreo}
-                      onChangeText={setRegCorreo}
-                    />
-                  </View>
-                </View>
-
-                {/* Contraseña */}
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.labelDark}>Contraseña</Text>
-                  <View style={styles.whiteInputWrapper}>
-                    <Ionicons name="lock-closed" size={18} color="#475569" style={styles.fieldIcon} />
-                    <TextInput
-                      style={styles.whiteInput}
-                      placeholder="••••••••••••"
-                      placeholderTextColor="#94A3B8"
-                      secureTextEntry={!showRegPassword}
-                      value={regPassword}
-                      onChangeText={setRegPassword}
-                    />
-                    <TouchableOpacity onPress={() => setShowRegPassword(!showRegPassword)}>
-                      <Ionicons name={showRegPassword ? "eye-off-outline" : "eye-outline"} size={18} color="#64748B" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                {/* Confirmar Contraseña */}
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.labelDark}>Confirmar Contraseña</Text>
-                  <View style={styles.whiteInputWrapper}>
-                    <Ionicons name="lock-closed" size={18} color="#475569" style={styles.fieldIcon} />
-                    <TextInput
-                      style={styles.whiteInput}
-                      placeholder="••••••••••••"
-                      placeholderTextColor="#94A3B8"
-                      secureTextEntry={!showRegConfirmPassword}
-                      value={regConfirmPassword}
-                      onChangeText={setRegConfirmPassword}
-                    />
-                    <TouchableOpacity onPress={() => setShowRegConfirmPassword(!showRegConfirmPassword)}>
-                      <Ionicons name={showRegConfirmPassword ? "eye-off-outline" : "eye-outline"} size={18} color="#64748B" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                {/* Submit Register Button */}
-                <TouchableOpacity style={styles.goldButton} activeOpacity={0.85} onPress={handleRegister}>
-                  <Text style={styles.goldButtonText}>CREAR CUENTA →</Text>
-                </TouchableOpacity>
-
-                {/* Switch back to Login */}
-                <View style={styles.switchContainer}>
-                  <Text style={styles.switchTextDark}>¿Ya tienes una cuenta? </Text>
-                  <TouchableOpacity onPress={() => setCurrentScreen('login')}>
-                    <Text style={styles.goldLink}>Inicia Sesión</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-
-  </>
-)}
           </ScrollView>
         </KeyboardAvoidingView>
 
@@ -1219,6 +1065,21 @@ const styles = StyleSheet.create({
     padding: 6,
     borderRadius: 6,
   },
+  primaryActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0F2027',
+    borderRadius: 24,
+    height: 48,
+    marginBottom: 12,
+  },
+  primaryActionText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1294,5 +1155,26 @@ const styles = StyleSheet.create({
   },
   matchError: {
     color: '#F87171',
+  },
+  domainHelperBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1E293B',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  domainHelperText: {
+    fontSize: 11,
+    color: '#CBD5E1',
+    flex: 1,
+    lineHeight: 15,
+  },
+  boldDomain: {
+    fontWeight: '700',
+    color: '#F1F5F9',
   },
 });

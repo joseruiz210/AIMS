@@ -72,9 +72,14 @@ export const authService = {
       return { success: false, message: 'Las contraseñas no coinciden.' };
     }
 
-    // el backend espera firstName/lastName separados, no un "nombre" completo
-    const [firstName, ...resto] = nombre.trim().split(' ');
-    const lastName = resto.join(' ') || firstName;
+    // el backend espera firstName y lastName separados
+    const parts = nombre.trim().split(/\s+/);
+    const firstName = parts[0] || '';
+    const lastName = parts.slice(1).join(' ') || firstName;
+
+    if (firstName.length < 2) {
+      return { success: false, message: 'El nombre debe tener al menos 2 caracteres.' };
+    }
 
     try {
       const response = await fetch(`${API_BASE_URL}/auth/register`, {

@@ -14,6 +14,22 @@ export interface Calificacion {
   fecha: string;
 }
 
+export interface StudentGrade {
+  id: string;
+  name: string;
+  nota: number;
+  maxNota: number;
+  hasRecord?: boolean;
+}
+
+export interface CompetenciaGroup {
+  id: string;
+  title: string;
+  codigo?: string;
+  overallNota: number;
+  students: StudentGrade[];
+}
+
 export const calificacionesService = {
   async getMisCalificaciones(): Promise<Calificacion[]> {
     try {
@@ -41,6 +57,18 @@ export const calificacionesService = {
   },
 
   async registrarCalificacion(payload: { aprendizId: string; moduloId?: string; actividad: string; valor: number; comentario?: string }) {
+  async getCalificacionesByFicha(fichaId: string): Promise<CompetenciaGroup[]> {
+    try {
+      const response = await authService.fetchWithAuth(`${API_BASE_URL}/calificaciones/ficha/${fichaId}`);
+      const data = await response.json();
+      if (!response.ok || !data.data) return [];
+      return data.data;
+    } catch {
+      return [];
+    }
+  },
+
+  async registrarCalificacion(payload: { aprendizId: string; competenciaId?: string; moduloId?: string; nota: number; periodo?: string }) {
     const response = await authService.fetchWithAuth(`${API_BASE_URL}/calificaciones`, {
       method: 'POST',
       body: JSON.stringify(payload),

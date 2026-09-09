@@ -9,8 +9,11 @@ import {
   useWindowDimensions,
   Animated,
   Easing,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { fichasService } from '../../services/fichasService';
+import { asistenciaService } from '../../services/asistenciaService';
 
 const NAVY = '#12103C';
 const GOLD = '#cfa235';
@@ -112,6 +115,30 @@ export default function AsistenciaAnimatedScreen() {
 
   const [apprentices, setApprentices] = useState<ApprenticeAttendance[]>(INITIAL_APPRENTICES);
   const [selectedDate, setSelectedDate] = useState('Hoy (26 Ago)');
+  const [apprentices, setApprentices] = useState<ApprenticeAttendance[]>([]);
+  const [fichaId, setFichaId] = useState<string>('');
+  const [fichaNumero, setFichaNumero] = useState<string>('2670142');
+  const [programaNombre, setProgramaNombre] = useState<string>('ADSO');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const dateOptions = React.useMemo(() => {
+    const today = new Date();
+    return [0, 1, 2, 3].map(offset => {
+      const d = new Date(today);
+      d.setDate(today.getDate() - offset);
+      const iso = d.toISOString().split('T')[0];
+      const dayName = offset === 0 ? 'Hoy' : offset === 1 ? 'Ayer' : d.toLocaleDateString('es-CO', { weekday: 'short' });
+      const dayNum = d.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' });
+      return {
+        iso,
+        label: `${dayName} (${dayNum})`,
+        shortLabel: dayNum,
+      };
+    });
+  }, []);
+
+  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'todos' | AttendanceState>('todos');
   const [viewMode, setViewMode] = useState<'uno-por-uno' | 'tarjetas' | 'matriz'>('uno-por-uno');
@@ -127,9 +154,113 @@ export default function AsistenciaAnimatedScreen() {
 
   const total = apprentices.length;
 
+  useEffect(() => {
+    loadApprenticesFromDb();
+  }, []);
+
+  const fetchAttendanceForDate = async (currentFichaId: string, isoDate: string, currentList?: ApprenticeAttendance[]) => {
+    try {
+      const prevRecords = await asistenciaService.getAsistenciasByFicha(currentFichaId, isoDate);
+      const prevMap = new Map<string, string>();
+      prevRecords.forEach(r => prevMap.set(r.aprendizId, r.estado));
+
+      setApprentices(prev => {
+        const base = currentList || prev;
+        return base.map(a => {
+          const prevStatus = prevMap.get(a.id);
+          let st: AttendanceState = 'presente';
+          if (prevStatus === 'AUSENTE') st = 'ausente';
+          else if (prevStatus === 'EXCUSA') st = 'excusa';
+          return { ...a, status: st };
+        });
+      });
+    } catch (err) {
+      console.error('Error al obtener asistencias por fecha:', err);
+    }
+  };
+
+  const handleSelectDate = async (isoDate: string) => {
+    setSelectedDate(isoDate);
+    if (fichaId) {
+      await fetchAttendanceForDate(fichaId, isoDate);
+      showToast(`Sesión: ${isoDate}`);
+    }
+  };
+
+  const loadApprenticesFromDb = async () => {
+    setLoading(true);
+    try {
+      const fichas = await fichasService.getFichas();
+      if (fichas.length > 0) {
+        const targetFicha = fichas[0];
+        setFichaId(targetFicha.id);
+        setFichaNumero(targetFicha.numero);
+        setProgramaNombre(targetFicha.programaNombre || 'ADSO');
+
+        const detail = await fichasService.getFichaById(targetFicha.id);
+        if (detail && detail.matriculas && detail.matriculas.length > 0) {
+          const todayIso = dateOptions[0].iso;
+          setSelectedDate(todayIso);
+
+          const list: ApprenticeAttendance[] = detail.matriculas.map((m: any) => {
+            const a = m.aprendiz;
+            const fullName = `${a.firstName} ${a.lastName || ''}`.trim();
+            const initials = `${a.firstName?.[0] || 'A'}${a.lastName?.[0] || 'P'}`.toUpperCase();
+
+            return {
+              id: a.id,
+              name: fullName,
+              doc: a.phone || a.id.slice(0, 8),
+              ficha: targetFicha.numero,
+              initials,
+              status: 'presente',
+              history: [
+                { date: dateOptions[3].shortLabel, status: 'presente' },
+                { date: dateOptions[2].shortLabel, status: 'presente' },
+                { date: dateOptions[1].shortLabel, status: 'presente' },
+              ],
+            };
+          });
+
+          await fetchAttendanceForDate(targetFicha.id, todayIso, list);
+        }
+      }
+    } catch (err) {
+      console.error('Error cargando aprendices desde BD:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveAttendance = async () => {
+    if (!fichaId || apprentices.length === 0) return;
+    setSaving(true);
+    try {
+      const payload = {
+        fichaId,
+        fecha: selectedDate,
+        tema: `Sesión de Formación - ${programaNombre}`,
+        asistencias: apprentices.map(a => ({
+          aprendizId: a.id,
+          estado: a.status === 'presente' ? 'PRESENTE' : a.status === 'ausente' ? 'AUSENTE' : 'EXCUSA',
+          observacion: a.note || undefined,
+        })),
+      };
+
+      await asistenciaService.registrarAsistencia(payload);
+      showToast('✅ Asistencia guardada exitosamente en PostgreSQL');
+    } catch (err: any) {
+      console.error('Error guardando asistencia en BD:', err);
+      showToast('⚠️ ' + (err.message || 'Error al registrar asistencia'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // Animate progress bar width smooth transition
   useEffect(() => {
     const targetProgress = Math.min(100, (currentIndex / total) * 100);
+    const targetProgress = total > 0 ? Math.min(100, (currentIndex / total) * 100) : 0;
     Animated.timing(progressAnim, {
       toValue: targetProgress,
       duration: 300,
@@ -310,22 +441,43 @@ export default function AsistenciaAnimatedScreen() {
       <View style={styles.quickActionBar}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dateScroll}>
           {['Hoy (26 Ago)', 'Ayer (25 Ago)', 'Jul 4', 'Jul 3'].map((d, i) => (
+          {dateOptions.map((d, i) => (
             <Pressable
               key={i}
               style={[styles.dateChip, selectedDate === d && styles.dateChipActive]}
               onPress={() => setSelectedDate(d)}
+              style={[styles.dateChip, selectedDate === d.iso && styles.dateChipActive]}
+              onPress={() => handleSelectDate(d.iso)}
             >
               <Text style={[styles.dateChipText, selectedDate === d && styles.dateChipTextActive]}>
                 {d}
+              <Text style={[styles.dateChipText, selectedDate === d.iso && styles.dateChipTextActive]}>
+                {d.label}
               </Text>
             </Pressable>
           ))}
         </ScrollView>
 
         <View style={styles.massBtnGroup}>
+          <Pressable 
+            style={[styles.btnSaveDb, saving && { opacity: 0.7 }]} 
+            onPress={handleSaveAttendance}
+            disabled={saving}
+          >
+            {saving ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Ionicons name="cloud-upload-outline" size={16} color="#FFFFFF" />
+            )}
+            <Text style={styles.btnSaveDbText}>
+              {saving ? 'Guardando...' : 'Guardar en BD'}
+            </Text>
+          </Pressable>
+
           <Pressable style={styles.btnMassPresent} onPress={handleMarkAllPresent}>
             <Ionicons name="flash-outline" size={16} color="#FFFFFF" />
             <Text style={styles.btnMassPresentText}>Marcar Todos Presentes</Text>
+            <Text style={styles.btnMassPresentText}>Todos Presentes</Text>
           </Pressable>
 
           <Pressable style={styles.btnMassReset} onPress={handleResetAll}>
@@ -633,6 +785,10 @@ export default function AsistenciaAnimatedScreen() {
             <Text style={styles.headerCell}>Jul 3</Text>
             <Text style={styles.headerCell}>Jul 4</Text>
             <Text style={[styles.headerCell, styles.hoyHeaderCell]}>Hoy</Text>
+            {dateOptions.slice(1).reverse().map((d, i) => (
+              <Text key={i} style={styles.headerCell}>{d.shortLabel}</Text>
+            ))}
+            <Text style={[styles.headerCell, styles.hoyHeaderCell]}>Sesión</Text>
           </View>
 
           {filteredApprentices.map(item => (
@@ -780,6 +936,27 @@ const styles = StyleSheet.create({
   massBtnGroup: {
     flexDirection: 'row',
     gap: 8,
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  },
+  btnSaveDb: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0F2027',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    gap: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  btnSaveDbText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
   btnMassPresent: {
     flexDirection: 'row',
