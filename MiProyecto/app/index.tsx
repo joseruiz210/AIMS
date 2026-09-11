@@ -159,18 +159,15 @@ useEffect(() => {
       return;
     }
 
-    setIsLoading(true);
     setIsSubmitting(true);
     const res = await register(regNombre.trim(), regCorreo.trim(), regPassword, regConfirmPassword);
 
     if (!res.success) {
-      setIsLoading(false);
       setIsSubmitting(false);
       setFeedback({ text: res.message || 'Error al registrar la cuenta.', type: 'error' });
     } else {
       setFeedback({ text: '¡Cuenta creada con éxito! Entrando al sistema...', type: 'success' });
       const loginRes = await login(regCorreo.trim(), regPassword);
-      setIsLoading(false);
       setIsSubmitting(false);
       if (!loginRes.success) {
         setLoginCorreo(regCorreo.trim());
@@ -244,17 +241,16 @@ useEffect(() => {
             showsVerticalScrollIndicator={false}
           >
             {/* Loading Indicator */}
-            {isLoading && (
             {(isLoading || isSubmitting) && (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#C59427" />
-                <Text style={styles.loadingText}>Iniciando sesión...</Text>
-                <Text style={styles.loadingText}>Procesando solicitud...</Text>
+                <Text style={styles.loadingText}>
+                  {isLoading ? 'Verificando sesión...' : 'Procesando solicitud...'}
+                </Text>
               </View>
             )}
 
             {/* Banner de Feedback Error/Éxito */}
-            {feedback && !isLoading && (
             {feedback && !isLoading && !isSubmitting && (
               <View style={[styles.feedbackBanner, feedback.type === 'error' ? styles.feedbackError : styles.feedbackSuccess]}>
                 <Ionicons 

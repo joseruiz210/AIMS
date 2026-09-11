@@ -3,6 +3,8 @@ import { View, Text, StyleSheet, Pressable, Image, useWindowDimensions, ScrollVi
 import { useState, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { authService } from '../../services/authService';
+import { useAuth } from '../../context/AuthContext';
+import LogoutModal from '../../components/LogoutModal';
 
 const NAVY_DARK = '#0F1026';
 const NAVY_LIGHT = '#1A183B';
@@ -20,10 +22,11 @@ export default function InstructorLayout() {
   const router = useRouter();
   const pathname = usePathname();
   const { width } = useWindowDimensions();
-  const isDesktop = width >= 1024;
-
+    const isDesktop = width >= 1024;
+  const { logout } = useAuth();
   const [logoutHover, setLogoutHover] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [userName, setUserName] = useState('Roberto Vargas');
 
   useEffect(() => {
@@ -119,7 +122,7 @@ export default function InstructorLayout() {
               style={styles.mobileLogoutBtn}
               onPress={() => {
                 setMobileMenuOpen(false);
-                router.push('/');
+                setShowLogoutModal(true);
               }}
             >
               <Ionicons name="log-out-outline" size={18} color={GOLD} style={{ marginRight: 8 }} />
@@ -215,7 +218,7 @@ export default function InstructorLayout() {
             style={[styles.logoutBtn, logoutHover && styles.logoutBtnHover]}
             onHoverIn={() => setLogoutHover(true)}
             onHoverOut={() => setLogoutHover(false)}
-            onPress={() => router.push('/')}
+            onPress={() => setShowLogoutModal(true)}
           >
             <Ionicons name="log-out-outline" size={18} color={logoutHover ? GOLD : 'rgba(255,255,255,0.7)'} style={{ marginRight: 10 }} />
             <Text style={[styles.logoutText, logoutHover && styles.logoutTextHover]}>
@@ -248,10 +251,18 @@ export default function InstructorLayout() {
           <Slot />
         </View>
       </View>
+
+      <LogoutModal
+        visible={showLogoutModal}
+        onClose={() => setShowLogoutModal(false)}
+        onConfirm={() => {
+          setShowLogoutModal(false);
+          logout();
+        }}
+      />
     </View>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,

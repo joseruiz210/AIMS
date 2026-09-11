@@ -36,27 +36,25 @@ export const calificacionesService = {
       const response = await authService.fetchWithAuth(`${API_BASE_URL}/calificaciones/mis-calificaciones`);
       const data = await response.json();
       if (!response.ok || !data.data) return [];
-      
-      const rawList = Array.isArray(data.data) 
-        ? data.data 
-        : (data.data.gradesData || []);
-
-      return rawList.map((item: any, index: number) => ({
-        id: item.id || String(index + 1),
-        actividad: item.subject || item.actividad || item.evaluacion || 'Evaluación',
-        moduloNombre: item.subject || item.modulo?.nombre || 'Módulo Principal',
-        aprendizId: item.aprendizId || '',
-        nota: item.grade ?? item.valor ?? item.nota ?? 0,
-        esAprobado: (item.grade ?? item.valor ?? item.nota ?? 0) >= 3.5,
-        comentario: item.comentario,
-        fecha: item.createdAt || new Date().toISOString(),
-      }));
+      const rawList = Array.isArray(data.data) ? data.data : (data.data.gradesData || []);
+      return rawList.map((item: any, index: number) => {
+        const nota = item.grade ?? item.valor ?? item.nota ?? 0;
+        return {
+          id: item.id || String(index + 1),
+          actividad: item.subject || item.actividad || item.evaluacion || 'Evaluación',
+          moduloNombre: item.subject || item.modulo?.nombre || 'Módulo Principal',
+          aprendizId: item.aprendizId || '',
+          nota,
+          esAprobado: nota >= 3.5,
+          comentario: item.comentario,
+          fecha: item.createdAt || new Date().toISOString(),
+        };
+      });
     } catch {
       return [];
     }
   },
 
-  async registrarCalificacion(payload: { aprendizId: string; moduloId?: string; actividad: string; valor: number; comentario?: string }) {
   async getCalificacionesByFicha(fichaId: string): Promise<CompetenciaGroup[]> {
     try {
       const response = await authService.fetchWithAuth(`${API_BASE_URL}/calificaciones/ficha/${fichaId}`);
@@ -68,7 +66,7 @@ export const calificacionesService = {
     }
   },
 
-  async registrarCalificacion(payload: { aprendizId: string; competenciaId?: string; moduloId?: string; nota: number; periodo?: string }) {
+  async registrarCalificacion(payload: { aprendizId: string; competenciaId?: string; moduloId?: string; actividad?: string; nota?: number; valor?: number; periodo?: string; comentario?: string }) {
     const response = await authService.fetchWithAuth(`${API_BASE_URL}/calificaciones`, {
       method: 'POST',
       body: JSON.stringify(payload),
@@ -76,5 +74,5 @@ export const calificacionesService = {
     const data = await response.json();
     if (!response.ok) throw new Error(data.message || 'Error al registrar calificación');
     return data.data;
-  }
+  },
 };

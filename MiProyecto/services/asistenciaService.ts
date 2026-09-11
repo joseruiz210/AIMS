@@ -15,7 +15,7 @@ export interface RegistroAsistencia {
 export const asistenciaService = {
   async getAsistenciasByFicha(fichaId: string, fecha?: string): Promise<RegistroAsistencia[]> {
     try {
-      const query = fecha ? `?fecha=${fecha}` : '';
+      const query = fecha ? `?fecha=${encodeURIComponent(fecha)}` : '';
       const response = await authService.fetchWithAuth(`${API_BASE_URL}/asistencia/ficha/${fichaId}${query}`);
       const data = await response.json();
       if (!response.ok || !data.data) return [];
@@ -52,7 +52,6 @@ export const asistenciaService = {
     }
   },
 
-  async registrarAsistencia(payload: { fichaId?: string; fecha: string; asistencias: Array<{ aprendizId: string; estado: string; observacion?: string }> }) {
   async registrarAsistencia(payload: { fichaId?: string; fecha: string; tema?: string; asistencias: Array<{ aprendizId: string; estado: string; observacion?: string }> }) {
     const response = await authService.fetchWithAuth(`${API_BASE_URL}/asistencia/registrar`, {
       method: 'POST',
@@ -61,5 +60,5 @@ export const asistenciaService = {
     const data = await response.json();
     if (!response.ok) throw new Error(data.message || 'Error al registrar asistencia');
     return data.data;
-  }
+  },
 };
