@@ -244,9 +244,13 @@ useEffect(() => {
             {(isLoading || isSubmitting) && (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#C59427" />
+<<<<<<< HEAD
                 <Text style={styles.loadingText}>
                   {isLoading ? 'Verificando sesión...' : 'Procesando solicitud...'}
                 </Text>
+=======
+                <Text style={styles.loadingText}>Procesando solicitud...</Text>
+>>>>>>> 73ee7842ad18e133f6032a127c51fc3148683cdd
               </View>
             )}
 

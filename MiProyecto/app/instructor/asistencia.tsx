@@ -468,7 +468,6 @@ export default function AsistenciaAnimatedScreen() {
 
           <Pressable style={styles.btnMassPresent} onPress={handleMarkAllPresent}>
             <Ionicons name="flash-outline" size={16} color="#FFFFFF" />
-            <Text style={styles.btnMassPresentText}>Marcar Todos Presentes</Text>
             <Text style={styles.btnMassPresentText}>Todos Presentes</Text>
           </Pressable>
 

@@ -16,6 +16,7 @@ import { useAuth } from '../../context/AuthContext';
 import LogoutModal from '../../components/LogoutModal';
 
 const NAVY_DARK = '#0F1026';
+const NAVY = NAVY_DARK;
 const GOLD = '#D4AF37';
 const GOLD_LIGHT = 'rgba(212, 175, 55, 0.15)';
 

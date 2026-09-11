@@ -19,6 +19,11 @@ const ROLE_ROUTES: Record<User['role'], string> = {
   APRENDIZ: '/aprendiz',
 };
 
+function normalizeUser(user: User): User {
+  const role = String(user.role).toUpperCase() as User['role'];
+  return { ...user, role };
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -28,8 +33,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     (async () => {
       const { user: storedUser } = await authService.checkSession();
       if (storedUser) {
-        setUser(storedUser);
-        const destination = ROLE_ROUTES[storedUser.role] ?? '/(tabs)';
+        const normalizedUser = normalizeUser(storedUser);
+        setUser(normalizedUser);
+        const destination = ROLE_ROUTES[normalizedUser.role] ?? '/(tabs)';
         router.replace(destination as any);
       }
       setIsLoading(false);
@@ -43,9 +49,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { success: false, message: result.message };
     }
 
-    setUser(result.user);
+    const loggedUser = normalizeUser(result.user);
+    setUser(loggedUser);
 
-    const destination = ROLE_ROUTES[result.user.role] ?? '/(tabs)';
+    const destination = ROLE_ROUTES[loggedUser.role] ?? '/(tabs)';
     router.replace(destination as any);
 
     return { success: true };
@@ -62,8 +69,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const setSession = (loggedUser: User) => {
-    setUser(loggedUser);
-    const destination = ROLE_ROUTES[loggedUser.role] ?? '/(tabs)';
+    const normalizedUser = normalizeUser(loggedUser);
+    setUser(normalizedUser);
+    const destination = ROLE_ROUTES[normalizedUser.role] ?? '/(tabs)';
     router.replace(destination as any);
   };
 

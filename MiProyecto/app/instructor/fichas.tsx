@@ -136,7 +136,7 @@ export default function FichasScreenPremium() {
             <View style={styles.actionsRow}>
               <Pressable
                 style={styles.btnGold}
-                onPress={() => router.push('/instructor/asistencia')}
+                onPress={() => router.push('/instructor/asistencia' as any)}
               >
                 <Ionicons name="checkbox-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
                 <Text style={styles.btnGoldText}>Ver Asistencia</Text>
@@ -144,7 +144,7 @@ export default function FichasScreenPremium() {
 
               <Pressable
                 style={styles.btnWhite}
-                onPress={() => router.push('/instructor/aprendices')}
+                onPress={() => router.push('/instructor/aprendices' as any)}
               >
                 <Ionicons name="people-outline" size={16} color="#1E293B" style={{ marginRight: 6 }} />
                 <Text style={styles.btnWhiteText}>Ver Aprendices</Text>
@@ -152,7 +152,7 @@ export default function FichasScreenPremium() {
 
               <Pressable
                 style={styles.btnWhite}
-                onPress={() => router.push('/instructor/calificaciones')}
+                onPress={() => router.push('/instructor/calificaciones' as any)}
               >
                 <Ionicons name="bar-chart-outline" size={16} color="#1E293B" style={{ marginRight: 6 }} />
                 <Text style={styles.btnWhiteText}>Ver Notas</Text>
