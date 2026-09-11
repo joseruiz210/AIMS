@@ -100,7 +100,7 @@ export default function InstructorLayout() {
           <View style={styles.mobileHeaderRight}>
             <Pressable 
               style={styles.headerIconWrap}
-              onPress={() => router.push('/instructor/notificaciones')}
+              onPress={() => router.push('/instructor/notificaciones' as any)}
             >
               <Ionicons name="notifications-outline" size={22} color={NAVY_DARK} />
               <View style={styles.bellDot} />
@@ -134,7 +134,7 @@ export default function InstructorLayout() {
 
         {/* Mobile Bottom Navigation Bar */}
         <View style={styles.mobileNav}>
-          <Pressable style={styles.mobileNavItem} onPress={() => router.push('/instructor/inicio')}>
+          <Pressable style={styles.mobileNavItem} onPress={() => router.push('/instructor/inicio' as any)}>
             <Ionicons
               name="home-outline"
               size={18}
@@ -145,7 +145,7 @@ export default function InstructorLayout() {
             </Text>
           </Pressable>
 
-          <Pressable style={styles.mobileNavItem} onPress={() => router.push('/instructor/aprendices')}>
+          <Pressable style={styles.mobileNavItem} onPress={() => router.push('/instructor/aprendices' as any)}>
             <Ionicons
               name="people-outline"
               size={18}
@@ -156,7 +156,7 @@ export default function InstructorLayout() {
             </Text>
           </Pressable>
 
-          <Pressable style={styles.mobileNavItem} onPress={() => router.push('/instructor/fichas')}>
+          <Pressable style={styles.mobileNavItem} onPress={() => router.push('/instructor/fichas' as any)}>
             <Ionicons
               name="grid-outline"
               size={18}
@@ -167,7 +167,7 @@ export default function InstructorLayout() {
             </Text>
           </Pressable>
 
-          <Pressable style={styles.mobileNavItem} onPress={() => router.push('/instructor/reportes')}>
+          <Pressable style={styles.mobileNavItem} onPress={() => router.push('/instructor/reportes' as any)}>
             <Ionicons
               name="document-text-outline"
               size={18}
@@ -232,7 +232,7 @@ export default function InstructorLayout() {
           <View style={styles.headerUserSection}>
             <Pressable 
               style={styles.iconBtn}
-              onPress={() => router.push('/instructor/notificaciones')}
+              onPress={() => router.push('/instructor/notificaciones' as any)}
             >
               <Ionicons name="notifications-outline" size={24} color={NAVY_DARK} />
               <View style={styles.bellDot} />

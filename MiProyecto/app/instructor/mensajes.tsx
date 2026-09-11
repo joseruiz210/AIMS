@@ -1,54 +1,30 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { comunicadosService, ComunicadoItem } from '../../services/comunicadosService';
 
 const GOLD = '#D4AF37';
 const BG_PAGE = '#F8FAFC';
 const NAVY = '#0F1026';
 
-const MESSAGES = [
-  {
-    id: '1',
-    sender: 'Carlos Mendoza',
-    initials: 'CM',
-    time: '10:45 AM',
-    text: 'Profesor, adjunto la excusa médica de la semana pasada.',
-    unread: true,
-  },
-  {
-    id: '2',
-    sender: 'Laura Jiménez',
-    initials: 'LJ',
-    time: 'Ayer',
-    text: 'Muchas gracias por el material de refuerzo en SQL.',
-    unread: false,
-  },
-];
-export default function MensajesScreenPremium() {
+export default function MensajesScreen() {
   const [messages, setMessages] = useState<ComunicadoItem[]>([]);
   const [loading, setLoading] = useState(true);
-
-export default function MensajesScreenPremium() {
-  useEffect(() => {
-    loadData();
-  }, []);
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const data = await comunicadosService.getComunicados();
-      setMessages(data);
-    } catch (err) {
-      console.error('Error cargando mensajes:', err);
+      setMessages(await comunicadosService.getComunicados());
     } finally {
       setLoading(false);
     }
   };
 
-  const handlePressMessage = async (id: string) => {
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const markAsRead = async (id: string) => {
     await comunicadosService.marcarLeido(id);
   };
 
@@ -56,224 +32,65 @@ export default function MensajesScreenPremium() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={GOLD} />
-        <Text style={styles.loadingText}>Cargando mensajes desde PostgreSQL...</Text>
+        <Text style={styles.mutedText}>Cargando mensajes...</Text>
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      <Text style={styles.pageTitle}>Mensajes</Text>
-      
-      <View style={styles.list}>
-        {MESSAGES.map(item => (
-          <Pressable key={item.id} style={[styles.msgCard, item.unread && styles.msgCardUnread]}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{item.initials}</Text>
-            </View>
-            <View style={styles.contentWrap}>
-              <View style={styles.topRow}>
-                <Text style={styles.sender}>{item.sender}</Text>
-                <Text style={styles.time}>{item.time}</Text>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.headerRow}>
         <View>
-          <Text style={styles.pageTitle}>Mensajería y Comunicados</Text>
-          <Text style={styles.pageSubtitle}>Canal institucional de avisos y notificaciones</Text>
+          <Text style={styles.title}>Mensajeria y comunicados</Text>
+          <Text style={styles.subtitle}>Avisos y notificaciones institucionales</Text>
         </View>
-
-        <Pressable style={styles.refreshBtn} onPress={loadData}>
-          <Ionicons name="reload-outline" size={16} color="#475569" />
-          <Text style={styles.refreshBtnText}>Actualizar</Text>
+        <Pressable style={styles.refreshButton} onPress={loadData}>
+          <Ionicons name="reload-outline" size={18} color={NAVY} />
+          <Text style={styles.refreshText}>Actualizar</Text>
         </Pressable>
       </View>
 
       {messages.length === 0 ? (
         <View style={styles.emptyCard}>
-          <Ionicons name="mail-open-outline" size={48} color="#94A3B8" />
-          <Text style={styles.emptyTitle}>Bandeja al día</Text>
-          <Text style={styles.emptySub}>
-            No tienes mensajes o comunicados institucionales pendientes en la base de datos.
-          </Text>
+          <Ionicons name="mail-open-outline" size={44} color="#94A3B8" />
+          <Text style={styles.cardTitle}>Bandeja al dia</Text>
+          <Text style={styles.mutedText}>No hay mensajes o comunicados pendientes.</Text>
         </View>
-      ) : (
-        <View style={styles.list}>
-          {messages.map(item => (
-            <Pressable
-              key={item.id}
-              style={styles.msgCard}
-              onPress={() => handlePressMessage(item.id)}
-            >
-              <View style={styles.avatar}>
-                <Ionicons name="megaphone-outline" size={18} color="#FFFFFF" />
-              </View>
-              <Text style={styles.msgText}>{item.text}</Text>
+      ) : messages.map((message) => (
+        <Pressable key={message.id} style={styles.messageCard} onPress={() => markAsRead(message.id)}>
+          <View style={styles.avatar}>
+            <Ionicons name="megaphone-outline" size={20} color="#FFFFFF" />
+          </View>
+          <View style={styles.flexOne}>
+            <View style={styles.messageHeader}>
+              <Text style={styles.cardTitle}>{message.titulo}</Text>
+              <Text style={styles.mutedText}>{message.fecha}</Text>
             </View>
-          </Pressable>
-        ))}
-      </View>
-              <View style={styles.contentWrap}>
-                <View style={styles.topRow}>
-                  <Text style={styles.sender}>{item.titulo}</Text>
-                  <Text style={styles.time}>{item.fecha}</Text>
-                </View>
-                <Text style={styles.destText}>Destinatario: {item.destinatario}</Text>
-                <Text style={styles.msgText}>{item.mensaje}</Text>
-              </View>
-            </Pressable>
-          ))}
-        </View>
-      )}
+            <Text style={styles.destination}>Destinatario: {message.destinatario}</Text>
+            <Text style={styles.messageText}>{message.mensaje}</Text>
+          </View>
+        </Pressable>
+      ))}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: BG_PAGE,
-  },
-  contentContainer: {
-    paddingHorizontal: 28,
-    paddingVertical: 24,
-    paddingBottom: 40,
-  },
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: BG_PAGE,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 12,
-  },
-  loadingText: {
-    fontSize: 14,
-    color: '#64748B',
-    fontWeight: '500',
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24,
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  pageTitle: {
-    fontSize: 26,
-    fontWeight: '700',
-    color: '#0F172A',
-    marginBottom: 20,
-  },
-  pageSubtitle: {
-    fontSize: 14,
-    color: '#64748B',
-    marginTop: 4,
-  },
-  refreshBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#E2E8F0',
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 8,
-    gap: 6,
-  },
-  refreshBtnText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#475569',
-  },
-  emptyCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 32,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    gap: 8,
-  },
-  emptyTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#0F172A',
-    marginTop: 6,
-  },
-  emptySub: {
-    fontSize: 13,
-    color: '#64748B',
-    textAlign: 'center',
-  },
-  list: {
-    gap: 12,
-    gap: 14,
-  },
-  msgCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    padding: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  msgCardUnread: {
-    borderLeftWidth: 4,
-    borderLeftColor: GOLD,
-    backgroundColor: '#FFFDF5',
-  },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: NAVY,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 15,
-  },
-  contentWrap: {
-    flex: 1,
-  },
-  topRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  sender: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0F172A',
-    flex: 1,
-    marginRight: 8,
-  },
-  time: {
-    fontSize: 12,
-    color: '#64748B',
-  },
-  destText: {
-    fontSize: 12,
-    color: GOLD,
-    fontWeight: '600',
-    marginBottom: 6,
-  },
-  msgText: {
-    fontSize: 13,
-    color: '#475569',
-    color: '#334155',
-    lineHeight: 19,
-  },
+  container: { flex: 1, backgroundColor: BG_PAGE },
+  content: { padding: 28, paddingBottom: 48 },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12, backgroundColor: BG_PAGE },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 16, marginBottom: 20 },
+  title: { color: NAVY, fontSize: 25, fontWeight: '700' },
+  subtitle: { color: '#64748B', marginTop: 5 },
+  refreshButton: { flexDirection: 'row', alignItems: 'center', gap: 6, padding: 10, backgroundColor: '#FFFFFF', borderRadius: 8 },
+  refreshText: { color: NAVY, fontWeight: '600' },
+  messageCard: { flexDirection: 'row', gap: 14, backgroundColor: '#FFFFFF', borderRadius: 12, padding: 18, marginBottom: 12 },
+  avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: NAVY, alignItems: 'center', justifyContent: 'center' },
+  messageHeader: { flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
+  messageText: { color: '#334155', marginTop: 8, lineHeight: 21 },
+  destination: { color: GOLD, fontSize: 12, marginTop: 5 },
+  flexOne: { flex: 1 },
+  cardTitle: { color: NAVY, fontSize: 16, fontWeight: '700' },
+  mutedText: { color: '#64748B', fontSize: 14 },
+  emptyCard: { alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 12, padding: 32, gap: 10 },
 });

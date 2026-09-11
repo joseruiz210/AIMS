@@ -473,8 +473,6 @@ export default function TareasAprendizScreen() {
                 </View>
                 <Text style={styles.feedbackTextBody}>
                   {activeEvidencia?.entrega?.feedback ||
-                    'Excelente desarrollo de la evidencia. Se evidencia dominio conceptual, correcta aplicación de estándares de la industria y estructura técnica impecable.'}
-                    activeEvidencia?.entrega?.comentario ||
                     'Excelente desarrollo de la evidencia. Se evidencia dominio conceptual, correcta aplicación de estándares y estructura técnica completa.'}
                 </Text>
               </View>

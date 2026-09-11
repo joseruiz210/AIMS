@@ -52,7 +52,6 @@ export const asistenciaService = {
     }
   },
 
-  async registrarAsistencia(payload: { fichaId?: string; fecha: string; asistencias: Array<{ aprendizId: string; estado: string; observacion?: string }> }) {
   async registrarAsistencia(payload: { fichaId?: string; fecha: string; tema?: string; asistencias: Array<{ aprendizId: string; estado: string; observacion?: string }> }) {
     const response = await authService.fetchWithAuth(`${API_BASE_URL}/asistencia/registrar`, {
       method: 'POST',

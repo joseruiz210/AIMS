@@ -56,7 +56,6 @@ export const calificacionesService = {
     }
   },
 
-  async registrarCalificacion(payload: { aprendizId: string; moduloId?: string; actividad: string; valor: number; comentario?: string }) {
   async getCalificacionesByFicha(fichaId: string): Promise<CompetenciaGroup[]> {
     try {
       const response = await authService.fetchWithAuth(`${API_BASE_URL}/calificaciones/ficha/${fichaId}`);

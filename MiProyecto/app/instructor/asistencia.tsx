@@ -113,8 +113,6 @@ export default function AsistenciaAnimatedScreen() {
   const isMobile = width < 768;
   const isSmallPhone = width < 400;
 
-  const [apprentices, setApprentices] = useState<ApprenticeAttendance[]>(INITIAL_APPRENTICES);
-  const [selectedDate, setSelectedDate] = useState('Hoy (26 Ago)');
   const [apprentices, setApprentices] = useState<ApprenticeAttendance[]>([]);
   const [fichaId, setFichaId] = useState<string>('');
   const [fichaNumero, setFichaNumero] = useState<string>('2670142');
@@ -259,7 +257,6 @@ export default function AsistenciaAnimatedScreen() {
 
   // Animate progress bar width smooth transition
   useEffect(() => {
-    const targetProgress = Math.min(100, (currentIndex / total) * 100);
     const targetProgress = total > 0 ? Math.min(100, (currentIndex / total) * 100) : 0;
     Animated.timing(progressAnim, {
       toValue: targetProgress,
@@ -440,17 +437,12 @@ export default function AsistenciaAnimatedScreen() {
       {/* Quick Date Selector & Mass Actions */}
       <View style={styles.quickActionBar}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dateScroll}>
-          {['Hoy (26 Ago)', 'Ayer (25 Ago)', 'Jul 4', 'Jul 3'].map((d, i) => (
           {dateOptions.map((d, i) => (
             <Pressable
               key={i}
-              style={[styles.dateChip, selectedDate === d && styles.dateChipActive]}
-              onPress={() => setSelectedDate(d)}
               style={[styles.dateChip, selectedDate === d.iso && styles.dateChipActive]}
               onPress={() => handleSelectDate(d.iso)}
             >
-              <Text style={[styles.dateChipText, selectedDate === d && styles.dateChipTextActive]}>
-                {d}
               <Text style={[styles.dateChipText, selectedDate === d.iso && styles.dateChipTextActive]}>
                 {d.label}
               </Text>
@@ -476,7 +468,6 @@ export default function AsistenciaAnimatedScreen() {
 
           <Pressable style={styles.btnMassPresent} onPress={handleMarkAllPresent}>
             <Ionicons name="flash-outline" size={16} color="#FFFFFF" />
-            <Text style={styles.btnMassPresentText}>Marcar Todos Presentes</Text>
             <Text style={styles.btnMassPresentText}>Todos Presentes</Text>
           </Pressable>
 

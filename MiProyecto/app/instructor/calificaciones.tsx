@@ -1,17 +1,15 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  ActivityIndicator,
-  TextInput,
-  Modal,
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { fichasService } from '../../services/fichasService';
 import {
   calificacionesService,
@@ -25,63 +23,20 @@ const NAVY = '#0F1026';
 const GREEN = '#2ECC71';
 const RED = '#E74C3C';
 
-interface StudentGrade {
-  name: string;
-  nota: number;
-  maxNota: number;
-}
-export default function CalificacionesScreenPremium() {
+export default function CalificacionesScreen() {
   const [loading, setLoading] = useState(true);
-  const [fichaId, setFichaId] = useState<string>('');
-  const [fichaNumero, setFichaNumero] = useState<string>('2670142');
-  const [programaNombre, setProgramaNombre] = useState<string>('ADSO');
+  const [fichaNumero, setFichaNumero] = useState('');
+  const [programaNombre, setProgramaNombre] = useState('');
   const [groups, setGroups] = useState<CompetenciaGroup[]>([]);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-
-interface CompetenciaGroup {
-  id: string;
-  title: string;
-  overallNota: number;
-  students: StudentGrade[];
-}
-  // Modal para editar/asignar calificación
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<StudentGrade | null>(null);
-  const [selectedCompId, setSelectedCompId] = useState<string>('');
+  const [selectedCompId, setSelectedCompId] = useState('');
   const [inputNota, setInputNota] = useState('');
   const [savingGrade, setSavingGrade] = useState(false);
 
-const GRADES_DATA: CompetenciaGroup[] = [
-  {
-    id: '1',
-    title: 'Analisis de Datos',
-    overallNota: 4.2,
-    students: [
-      { name: 'Valentina Torres', nota: 4.5, maxNota: 5.0 },
-      { name: 'Carlos Mendoza', nota: 3.8, maxNota: 5.0 },
-      { name: 'Laura Jiménez', nota: 4.2, maxNota: 5.0 },
-      { name: 'Andrés Reyes', nota: 4.9, maxNota: 5.0 },
-    ],
-  },
-  {
-    id: '2',
-    title: 'Programación BD',
-    overallNota: 4.2,
-    students: [
-      { name: 'Valentina Torres', nota: 4.5, maxNota: 5.0 },
-      { name: 'Carlos Mendoza', nota: 3.8, maxNota: 5.0 },
-      { name: 'Laura Jiménez', nota: 4.2, maxNota: 5.0 },
-      { name: 'Andrés Reyes', nota: 4.9, maxNota: 5.0 },
-    ],
-  },
-];
-  useEffect(() => {
-    loadData();
-  }, []);
-
-export default function CalificacionesScreenPremium() {
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
+  const showToast = (message: string) => {
+    setToastMessage(message);
     setTimeout(() => setToastMessage(null), 2500);
   };
 
@@ -89,66 +44,61 @@ export default function CalificacionesScreenPremium() {
     setLoading(true);
     try {
       const fichas = await fichasService.getFichas();
-      if (fichas.length > 0) {
-        const target = fichas[0];
-        setFichaId(target.id);
-        setFichaNumero(target.numero);
-        setProgramaNombre(target.programaNombre || 'ADSO');
-
-        const data = await calificacionesService.getCalificacionesByFicha(target.id);
-        setGroups(data);
+      if (fichas.length === 0) {
+        setGroups([]);
+        return;
       }
-    } catch (err) {
-      console.error('Error cargando calificaciones:', err);
-      showToast('Error al conectar con la base de datos');
+      const ficha = fichas[0];
+      setFichaNumero(ficha.numero);
+      setProgramaNombre(ficha.programaNombre || 'ADSO');
+      setGroups(await calificacionesService.getCalificacionesByFicha(ficha.id));
+    } catch (error) {
+      console.error('Error cargando calificaciones:', error);
+      showToast('No se pudieron cargar las calificaciones');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleOpenGradeModal = (comp: CompetenciaGroup, student: StudentGrade) => {
-    setSelectedCompId(comp.id);
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const openGradeModal = (group: CompetenciaGroup, student: StudentGrade) => {
+    setSelectedCompId(group.id);
     setSelectedStudent(student);
-    setInputNota(student.nota ? student.nota.toString() : '4.0');
+    setInputNota(student.nota ? String(student.nota) : '');
     setModalVisible(true);
   };
 
-  const handleSaveGrade = async () => {
+  const saveGrade = async () => {
     if (!selectedStudent || !selectedCompId) return;
-    const notaNum = parseFloat(inputNota.replace(',', '.'));
-    if (isNaN(notaNum) || notaNum < 0.0 || notaNum > 5.0) {
-      showToast('⚠️ La nota debe estar entre 0.0 y 5.0');
+    const nota = Number.parseFloat(inputNota.replace(',', '.'));
+    if (Number.isNaN(nota) || nota < 0 || nota > 5) {
+      showToast('La nota debe estar entre 0.0 y 5.0');
       return;
     }
-
     setSavingGrade(true);
     try {
       await calificacionesService.registrarCalificacion({
         aprendizId: selectedStudent.id,
         competenciaId: selectedCompId,
-        nota: Number(notaNum.toFixed(1)),
+        nota: Number(nota.toFixed(1)),
         periodo: '2026-1',
       });
-
-      // Actualizar estado local inmediatamente
-      setGroups(prev =>
-        prev.map(g => {
-          if (g.id !== selectedCompId) return g;
-          const updatedStudents = g.students.map(s =>
-            s.id === selectedStudent.id ? { ...s, nota: Number(notaNum.toFixed(1)), hasRecord: true } : s
-          );
-          const graded = updatedStudents.filter(s => s.hasRecord);
-          const sum = graded.reduce((acc, curr) => acc + curr.nota, 0);
-          const overallNota = graded.length > 0 ? Number((sum / graded.length).toFixed(1)) : g.overallNota;
-          return { ...g, students: updatedStudents, overallNota };
-        })
-      );
-
+      setGroups((current) => current.map((group) => {
+        if (group.id !== selectedCompId) return group;
+        const students = group.students.map((student) => (
+          student.id === selectedStudent.id
+            ? { ...student, nota: Number(nota.toFixed(1)), hasRecord: true }
+            : student
+        ));
+        return { ...group, students };
+      }));
       setModalVisible(false);
-      showToast(`✅ Calificación guardada: ${notaNum.toFixed(1)}`);
-    } catch (err: any) {
-      console.error('Error al guardar calificación:', err);
-      showToast('⚠️ ' + (err.message || 'Error al guardar'));
+      showToast('Calificacion guardada');
+    } catch (error: any) {
+      showToast(error.message || 'Error al guardar la calificacion');
     } finally {
       setSavingGrade(false);
     }
@@ -158,225 +108,88 @@ export default function CalificacionesScreenPremium() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={GOLD} />
-        <Text style={styles.loadingText}>Cargando calificaciones desde PostgreSQL...</Text>
+        <Text style={styles.mutedText}>Cargando calificaciones...</Text>
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      {/* Title */}
-      <Text style={styles.pageTitle}>Calificaciones</Text>
-      {/* Toast Notification */}
-      {toastMessage && (
-        <View style={styles.toastBanner}>
-          <Text style={styles.toastText}>{toastMessage}</Text>
-        </View>
-      )}
-
-      {/* Cards List */}
-      <View style={styles.cardsList}>
-        {GRADES_DATA.map((group) => (
-          <View key={group.id} style={styles.gradeCard}>
-            {/* Header row inside card */}
-            <View style={styles.cardHeaderRow}>
-              <Text style={styles.cardTitle}>{group.title}</Text>
-              <View style={styles.scoreBadge}>
-                <Text style={styles.scoreBadgeLabel}>Promedio:</Text>
-                <Text style={styles.overallScore}>{group.overallNota.toFixed(1)}</Text>
-      {/* Header */}
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.headerRow}>
         <View>
-          <Text style={styles.pageTitle}>Libro de Calificaciones</Text>
-          <Text style={styles.pageSubtitle}>
-            Ficha {fichaNumero} • {programaNombre}
-          </Text>
+          <Text style={styles.title}>Libro de calificaciones</Text>
+          <Text style={styles.subtitle}>Ficha {fichaNumero || 'sin asignar'} - {programaNombre || 'ADSO'}</Text>
         </View>
-
-        <Pressable style={styles.refreshBtn} onPress={loadData}>
-          <Ionicons name="reload-outline" size={16} color="#475569" />
-          <Text style={styles.refreshBtnText}>Actualizar</Text>
+        <Pressable style={styles.refreshButton} onPress={loadData}>
+          <Ionicons name="reload-outline" size={18} color={NAVY} />
+          <Text style={styles.refreshText}>Actualizar</Text>
         </Pressable>
       </View>
 
+      {toastMessage && <Text style={styles.toast}>{toastMessage}</Text>}
+
       {groups.length === 0 ? (
         <View style={styles.emptyCard}>
-          <Ionicons name="school-outline" size={48} color="#94A3B8" />
-          <Text style={styles.emptyTitle}>Sin registros de competencias</Text>
-          <Text style={styles.emptySub}>
-            No se encontraron competencias o aprendices matriculados en la ficha {fichaNumero}.
-          </Text>
+          <Ionicons name="school-outline" size={44} color="#94A3B8" />
+          <Text style={styles.cardTitle}>Sin calificaciones</Text>
+          <Text style={styles.mutedText}>No hay competencias o aprendices registrados.</Text>
         </View>
-      ) : (
-        /* Cards List */
-        <View style={styles.cardsList}>
-          {groups.map(group => (
-            <View key={group.id} style={styles.gradeCard}>
-              {/* Header row inside card */}
-              <View style={styles.cardHeaderRow}>
-                <View style={{ flex: 1, marginRight: 12 }}>
-                  <Text style={styles.cardTitle}>{group.title}</Text>
-                  {group.codigo && <Text style={styles.compCode}>Código: {group.codigo}</Text>}
-                </View>
-                <View style={styles.scoreBadge}>
-                  <Text style={styles.scoreBadgeLabel}>Promedio:</Text>
-                  <Text style={[styles.overallScore, group.overallNota >= 3.5 ? { color: GREEN } : { color: RED }]}>
-                    {group.overallNota.toFixed(1)}
-                  </Text>
-                </View>
-              </View>
+      ) : groups.map((group) => (
+        <View key={group.id} style={styles.gradeCard}>
+          <View style={styles.cardHeader}>
+            <View style={styles.flexOne}>
+              <Text style={styles.cardTitle}>{group.title}</Text>
+              {group.codigo && <Text style={styles.mutedText}>Codigo: {group.codigo}</Text>}
             </View>
-
-            {/* Table Column Headers */}
-            <View style={styles.tableHeaderRow}>
-              <Text style={[styles.headerCell, styles.nameHeader]}>Aprendiz</Text>
-              <Text style={[styles.headerCell, styles.notaHeader]}>Nota</Text>
-              <Text style={[styles.headerCell, styles.progressHeader]}>Progreso</Text>
-            </View>
-              {/* Table Column Headers */}
-              <View style={styles.tableHeaderRow}>
-                <Text style={[styles.headerCell, styles.nameHeader]}>Aprendiz</Text>
-                <Text style={[styles.headerCell, styles.notaHeader]}>Nota</Text>
-                <Text style={[styles.headerCell, styles.progressHeader]}>Cumplimiento</Text>
-                <Text style={[styles.headerCell, styles.actionHeader]}>Acción</Text>
-              </View>
-
-            {/* Student Rows */}
-            {group.students.map((student, idx) => {
-              const progressPct = (student.nota / student.maxNota) * 100;
-              return (
-                <View key={idx} style={styles.studentRow}>
-                  <View style={styles.nameGroup}>
-                    <View style={styles.miniAvatar}>
-                      <Text style={styles.miniAvatarText}>
-                        {student.name.split(' ').map(n => n[0]).join('')}
-              {/* Student Rows */}
-              {group.students.map((student, idx) => {
-                const isApproved = student.nota >= 3.5;
-                const progressPct = Math.min(100, Math.max(0, (student.nota / student.maxNota) * 100));
-
-                return (
-                  <View key={student.id || idx} style={styles.studentRow}>
-                    <View style={styles.nameGroup}>
-                      <View style={styles.miniAvatar}>
-                        <Text style={styles.miniAvatarText}>
-                          {student.name
-                            .split(' ')
-                            .map(n => n[0])
-                            .join('')
-                            .slice(0, 2)
-                            .toUpperCase()}
-                        </Text>
-                      </View>
-                      <Text style={styles.studentName} numberOfLines={1}>
-                        {student.name}
-                      </Text>
-                    </View>
-                    <Text style={styles.studentName}>{student.name}</Text>
+            <Text style={styles.average}>Promedio {group.overallNota.toFixed(1)}</Text>
+          </View>
+          {group.students.map((student, index) => {
+            const progress = Math.min(100, Math.max(0, (student.nota / student.maxNota) * 100));
+            const approved = student.nota >= 3.5;
+            return (
+              <View key={student.id || index} style={styles.studentRow}>
+                <View style={styles.flexOne}>
+                  <Text style={styles.studentName}>{student.name}</Text>
+                  <View style={styles.progressBackground}>
+                    <View style={[styles.progress, { width: `${progress}%`, backgroundColor: approved ? GREEN : RED }]} />
                   </View>
-
-                  <Text style={styles.studentNota}>{student.nota.toFixed(1)}</Text>
-                  
-                  <View style={styles.progressContainer}>
-                    <View style={styles.progressBarBg}>
-                      <View style={[styles.progressBarFill, { width: `${progressPct}%` }]} />
-                    <Text
-                      style={[
-                        styles.studentNota,
-                        student.hasRecord
-                          ? isApproved
-                            ? { color: GREEN }
-                            : { color: RED }
-                          : { color: '#64748B' },
-                      ]}
-                    >
-                      {student.nota.toFixed(1)}
-                    </Text>
-
-                    <View style={styles.progressContainer}>
-                      <View style={styles.progressBarBg}>
-                        <View
-                          style={[
-                            styles.progressBarFill,
-                            { width: `${progressPct}%` },
-                            isApproved ? { backgroundColor: GREEN } : { backgroundColor: RED },
-                          ]}
-                        />
-                      </View>
-                    </View>
-
-                    <View style={styles.actionCell}>
-                      <Pressable
-                        style={styles.btnEditGrade}
-                        onPress={() => handleOpenGradeModal(group, student)}
-                      >
-                        <Ionicons name="create-outline" size={15} color={NAVY} />
-                      </Pressable>
-                    </View>
-                  </View>
-                );
-              })}
-            </View>
-          ))}
+                </View>
+                <Text style={[styles.grade, { color: approved ? GREEN : RED }]}>{student.nota.toFixed(1)}</Text>
+                <Pressable style={styles.editButton} onPress={() => openGradeModal(group, student)}>
+                  <Ionicons name="create-outline" size={18} color={NAVY} />
+                </Pressable>
+              </View>
+            );
+          })}
         </View>
-      )}
+      ))}
 
-      {/* Grade Edit Modal */}
-      <Modal visible={modalVisible} transparent animationType="fade">
+      <Modal visible={modalVisible} transparent animationType="fade" onRequestClose={() => setModalVisible(false)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Asignar Calificación</Text>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardTitle}>Asignar calificacion</Text>
               <Pressable onPress={() => setModalVisible(false)}>
                 <Ionicons name="close" size={22} color="#64748B" />
               </Pressable>
             </View>
-
-            {selectedStudent && (
-              <View style={styles.modalBody}>
-                <Text style={styles.modalStudentName}>{selectedStudent.name}</Text>
-                <Text style={styles.modalScaleNote}>Escala formativa SENA: 0.0 a 5.0 (Aprobación ≥ 3.5)</Text>
-
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Nota definitiva:</Text>
-                  <TextInput
-                    style={styles.gradeInput}
-                    value={inputNota}
-                    onChangeText={setInputNota}
-                    keyboardType="numeric"
-                    placeholder="Ej. 4.5"
-                    maxLength={4}
-                  />
-                </View>
-              );
-            })}
-
-                <View style={styles.modalActions}>
-                  <Pressable
-                    style={styles.btnModalCancel}
-                    onPress={() => setModalVisible(false)}
-                    disabled={savingGrade}
-                  >
-                    <Text style={styles.btnModalCancelText}>Cancelar</Text>
-                  </Pressable>
-
-                  <Pressable
-                    style={[styles.btnModalSave, savingGrade && { opacity: 0.7 }]}
-                    onPress={handleSaveGrade}
-                    disabled={savingGrade}
-                  >
-                    {savingGrade ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                      <Text style={styles.btnModalSaveText}>Guardar en BD</Text>
-                    )}
-                  </Pressable>
-                </View>
-              </View>
-            )}
+            <Text style={styles.mutedText}>{selectedStudent?.name}</Text>
+            <TextInput
+              style={styles.input}
+              value={inputNota}
+              onChangeText={setInputNota}
+              keyboardType="numeric"
+              placeholder="Ej. 4.5"
+            />
+            <View style={styles.modalActions}>
+              <Pressable style={styles.cancelButton} onPress={() => setModalVisible(false)}>
+                <Text>Cancelar</Text>
+              </Pressable>
+              <Pressable style={styles.saveButton} onPress={saveGrade} disabled={savingGrade}>
+                {savingGrade ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.saveText}>Guardar</Text>}
+              </Pressable>
+            </View>
           </View>
-        ))}
-      </View>
         </View>
       </Modal>
     </ScrollView>
@@ -384,334 +197,33 @@ export default function CalificacionesScreenPremium() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: BG_PAGE,
-  },
-  contentContainer: {
-    paddingHorizontal: 28,
-    paddingVertical: 24,
-    paddingBottom: 40,
-  },
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: BG_PAGE,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 12,
-  },
-  loadingText: {
-    fontSize: 14,
-    color: '#64748B',
-    fontWeight: '500',
-  },
-  toastBanner: {
-    backgroundColor: '#0F2027',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    marginBottom: 16,
-    alignSelf: 'center',
-  },
-  toastText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24,
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  pageTitle: {
-    fontSize: 26,
-    fontWeight: '700',
-    color: '#0F172A',
-    marginBottom: 24,
-  },
-  pageSubtitle: {
-    fontSize: 14,
-    color: '#64748B',
-    marginTop: 4,
-  },
-  refreshBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#E2E8F0',
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 8,
-    gap: 6,
-  },
-  refreshBtnText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#475569',
-  },
-  emptyCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 32,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    gap: 8,
-  },
-  emptyTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#0F172A',
-    marginTop: 6,
-  },
-  emptySub: {
-    fontSize: 13,
-    color: '#64748B',
-    textAlign: 'center',
-  },
-  cardsList: {
-    gap: 24,
-  },
-  gradeCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    elevation: 3,
-  },
-  cardHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  compCode: {
-    fontSize: 12,
-    color: '#64748B',
-    marginTop: 2,
-  },
-  scoreBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FEF3C7',
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    paddingVertical: 6,
-    borderRadius: 10,
-    gap: 6,
-  },
-  scoreBadgeLabel: {
-    fontSize: 12,
-    color: '#78350F',
-    color: '#475569',
-    fontWeight: '500',
-  },
-  overallScore: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: GOLD,
-  },
-  tableHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  headerCell: {
-    fontSize: 13,
-    color: '#64748B',
-    fontWeight: '600',
-  },
-  nameHeader: {
-    flex: 2,
-    flex: 3,
-  },
-  notaHeader: {
-    flex: 1,
-    textAlign: 'center',
-  },
-  progressHeader: {
-    flex: 2,
-    textAlign: 'center',
-  },
-  actionHeader: {
-    flex: 0.8,
-    textAlign: 'center',
-  },
-  studentRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F8FAFC',
-  },
-  nameGroup: {
-    flex: 2,
-    flex: 3,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  miniAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: NAVY,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  miniAvatarText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  studentName: {
-    fontSize: 14,
-    color: '#1E293B',
-    fontWeight: '500',
-    flexShrink: 1,
-  },
-  studentNota: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: 14,
-    color: '#0F172A',
-    fontWeight: '700',
-  },
-  progressContainer: {
-    flex: 2,
-    justifyContent: 'center',
-    paddingHorizontal: 8,
-  },
-  progressBarBg: {
-    height: 8,
-    backgroundColor: '#F1F5F9',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: GOLD,
-    borderRadius: 4,
-  },
-  actionCell: {
-    flex: 0.8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  btnEditGrade: {
-    padding: 6,
-    borderRadius: 6,
-    backgroundColor: '#F1F5F9',
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    width: '100%',
-    maxWidth: 420,
-    padding: 22,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  modalBody: {
-    gap: 12,
-  },
-  modalStudentName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1E293B',
-  },
-  modalScaleNote: {
-    fontSize: 12,
-    color: '#64748B',
-  },
-  inputGroup: {
-    marginTop: 8,
-    gap: 6,
-  },
-  inputLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#334155',
-  },
-  gradeInput: {
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  modalActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 10,
-    marginTop: 18,
-  },
-  btnModalCancel: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    backgroundColor: '#F1F5F9',
-  },
-  btnModalCancelText: {
-    color: '#475569',
-    fontWeight: '600',
-    fontSize: 13,
-  },
-  btnModalSave: {
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    borderRadius: 8,
-    backgroundColor: '#0F2027',
-    minWidth: 110,
-    alignItems: 'center',
-  },
-  btnModalSaveText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 13,
-  },
+  container: { flex: 1, backgroundColor: BG_PAGE },
+  content: { padding: 28, paddingBottom: 48 },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12, backgroundColor: BG_PAGE },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 16, marginBottom: 20 },
+  title: { color: NAVY, fontSize: 25, fontWeight: '700' },
+  subtitle: { color: '#64748B', marginTop: 5 },
+  refreshButton: { flexDirection: 'row', alignItems: 'center', gap: 6, padding: 10, backgroundColor: '#FFFFFF', borderRadius: 8 },
+  refreshText: { color: NAVY, fontWeight: '600' },
+  toast: { color: '#FFFFFF', backgroundColor: NAVY, padding: 12, borderRadius: 8, marginBottom: 16 },
+  gradeCard: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 18, marginBottom: 16 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 12 },
+  cardTitle: { color: NAVY, fontSize: 17, fontWeight: '700' },
+  average: { color: GOLD, fontWeight: '700' },
+  flexOne: { flex: 1 },
+  mutedText: { color: '#64748B', fontSize: 14 },
+  studentRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#EEF2F6' },
+  studentName: { color: NAVY, fontWeight: '600', marginBottom: 7 },
+  progressBackground: { height: 6, backgroundColor: '#E2E8F0', borderRadius: 3, overflow: 'hidden' },
+  progress: { height: '100%', borderRadius: 3 },
+  grade: { width: 36, fontSize: 17, fontWeight: '700', textAlign: 'right' },
+  editButton: { padding: 8, borderRadius: 6, backgroundColor: '#F1F5F9' },
+  emptyCard: { alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 12, padding: 32, gap: 10 },
+  modalBackdrop: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, backgroundColor: 'rgba(0,0,0,0.45)' },
+  modalCard: { width: '100%', maxWidth: 440, backgroundColor: '#FFFFFF', borderRadius: 12, padding: 22, gap: 14 },
+  input: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, padding: 12, color: NAVY },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10 },
+  cancelButton: { padding: 12 },
+  saveButton: { backgroundColor: NAVY, borderRadius: 8, paddingHorizontal: 18, paddingVertical: 12, minWidth: 90, alignItems: 'center' },
+  saveText: { color: '#FFFFFF', fontWeight: '700' },
 });
