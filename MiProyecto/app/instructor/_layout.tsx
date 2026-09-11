@@ -100,7 +100,7 @@ export default function InstructorLayout() {
           <View style={styles.mobileHeaderRight}>
             <Pressable 
               style={styles.headerIconWrap}
-              onPress={() => router.push('/instructor/notificaciones' as any)}
+              onPress={() => router.push('/instructor/notificaciones')}
             >
               <Ionicons name="notifications-outline" size={22} color={NAVY_DARK} />
               <View style={styles.bellDot} />
@@ -134,7 +134,7 @@ export default function InstructorLayout() {
 
         {/* Mobile Bottom Navigation Bar */}
         <View style={styles.mobileNav}>
-          <Pressable style={styles.mobileNavItem} onPress={() => router.push('/instructor/inicio' as any)}>
+          <Pressable style={styles.mobileNavItem} onPress={() => router.push('/instructor/inicio')}>
             <Ionicons
               name="home-outline"
               size={18}
@@ -145,7 +145,7 @@ export default function InstructorLayout() {
             </Text>
           </Pressable>
 
-          <Pressable style={styles.mobileNavItem} onPress={() => router.push('/instructor/aprendices' as any)}>
+          <Pressable style={styles.mobileNavItem} onPress={() => router.push('/instructor/aprendices')}>
             <Ionicons
               name="people-outline"
               size={18}
@@ -156,7 +156,7 @@ export default function InstructorLayout() {
             </Text>
           </Pressable>
 
-          <Pressable style={styles.mobileNavItem} onPress={() => router.push('/instructor/fichas' as any)}>
+          <Pressable style={styles.mobileNavItem} onPress={() => router.push('/instructor/fichas')}>
             <Ionicons
               name="grid-outline"
               size={18}
@@ -167,7 +167,7 @@ export default function InstructorLayout() {
             </Text>
           </Pressable>
 
-          <Pressable style={styles.mobileNavItem} onPress={() => router.push('/instructor/reportes' as any)}>
+          <Pressable style={styles.mobileNavItem} onPress={() => router.push('/instructor/reportes')}>
             <Ionicons
               name="document-text-outline"
               size={18}
@@ -212,10 +212,10 @@ export default function InstructorLayout() {
 
         <View style={styles.logoutSection}>
           <Pressable
-            style={[styles.logoutBtn, logoutHover && styles.logoutBtnHover]}
-            onHoverIn={() => setLogoutHover(true)}
-            onHoverOut={() => setLogoutHover(false)}
-            onPress={() => router.push('/')}
+           onPress={async () => {
+  await authService.logout(); // o el nombre real del método en tu servicio
+  router.replace('/'); // replace en vez de push, así no puede volver con el botón "atrás"
+}}
           >
             <Ionicons name="log-out-outline" size={18} color={logoutHover ? GOLD : 'rgba(255,255,255,0.7)'} style={{ marginRight: 10 }} />
             <Text style={[styles.logoutText, logoutHover && styles.logoutTextHover]}>
@@ -232,7 +232,7 @@ export default function InstructorLayout() {
           <View style={styles.headerUserSection}>
             <Pressable 
               style={styles.iconBtn}
-              onPress={() => router.push('/instructor/notificaciones' as any)}
+              onPress={() => router.push('/instructor/notificaciones')}
             >
               <Ionicons name="notifications-outline" size={24} color={NAVY_DARK} />
               <View style={styles.bellDot} />
