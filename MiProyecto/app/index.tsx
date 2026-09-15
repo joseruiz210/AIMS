@@ -2,7 +2,8 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
 import * as AuthSession from 'expo-auth-session';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { Modal, FlatList, TouchableWithoutFeedback } from 'react-native';
 import { 
   View, 
   Text, 
@@ -23,6 +24,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../context/AuthContext';
 import { router } from 'expo-router';
 import { authService } from '../services/authService';
+import { fichasService, type Ficha } from '../services/fichasService';
 import { validatePassword, validatePasswordMatch, isDisposableEmail } from '../utils/validation';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -51,6 +53,46 @@ export default function AuthScreen() {
   // Feedback Messages
   const [feedback, setFeedback] = useState<{ text: string; type: 'error' | 'success' } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Campos académicos para Aprendices
+  const [regFichaNumero, setRegFichaNumero] = useState('');
+  const [regSede, setRegSede] = useState('');
+  const [regTrimestre, setRegTrimestre] = useState('');
+  const [fichaEncontrada, setFichaEncontrada] = useState<Ficha | null>(null);
+  const [buscandoFicha, setBuscandoFicha] = useState(false);
+  const [fichasDisponibles, setFichasDisponibles] = useState<Ficha[]>([]);
+  const [mostrarSelectorFicha, setMostrarSelectorFicha] = useState(false);
+
+  // Detectar si el correo corresponde a un APRENDIZ
+  const esAprendiz = regCorreo.includes('@gmail.com') || regCorreo.includes('@soy.sena.edu.co') || regCorreo.includes('@formacionsena.edu.co');
+
+  const buscarFichas = useCallback(async (texto: string) => {
+    if (!texto.trim() || texto.trim().length < 3) {
+      setFichasDisponibles([]);
+      setFichaEncontrada(null);
+      return;
+    }
+    setBuscandoFicha(true);
+    try {
+      const fichas = await fichasService.getFichas({ search: texto.trim() });
+      setFichasDisponibles(fichas);
+      const exacta = fichas.find((f) => f.numero.toLowerCase() === texto.trim().toLowerCase());
+      setFichaEncontrada(exacta || null);
+    } catch {
+      setFichasDisponibles([]);
+    } finally {
+      setBuscandoFicha(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!esAprendiz) {
+      setRegFichaNumero('');
+      setRegSede('');
+      setRegTrimestre('');
+      setFichaEncontrada(null);
+    }
+  }, [esAprendiz]);
 
   // Validación de la contraseña en tiempo real para Registro
   const passValidation = validatePassword(regPassword);
@@ -160,7 +202,15 @@ useEffect(() => {
     }
 
     setIsSubmitting(true);
-    const res = await register(regNombre.trim(), regCorreo.trim(), regPassword, regConfirmPassword);
+    const academicData = esAprendiz && regFichaNumero.trim()
+      ? {
+          fichaNumero: regFichaNumero.trim(),
+          sede: regSede.trim() || undefined,
+          trimestre: regTrimestre ? parseInt(regTrimestre, 10) : undefined,
+        }
+      : undefined;
+
+    const res = await register(regNombre.trim(), regCorreo.trim(), regPassword, regConfirmPassword, academicData);
 
     if (!res.success) {
       setIsSubmitting(false);
@@ -603,6 +653,165 @@ useEffect(() => {
                       )}
                     </View>
 
+                    {/* ─── CAMPOS ACADÉMICOS (solo si el correo es APRENDIZ) ─── */}
+                    {esAprendiz && (
+                      <>
+                        <View style={styles.academicSectionHeader}>
+                          <Ionicons name="school-outline" size={16} color="#C59427" />
+                          <Text style={styles.academicSectionTitle}>Datos Académicos (Opcional)</Text>
+                        </View>
+
+                        {/* Número de Ficha con búsqueda */}
+                        <View style={styles.fieldGroup}>
+                          <Text style={styles.labelDark}>Número de Ficha</Text>
+                          <View style={styles.fichaInputRow}>
+                            <View style={[styles.whiteInputWrapper, { flex: 1 }]}>
+                              <Ionicons name="id-card-outline" size={18} color="#475569" style={styles.fieldIcon} />
+                              <TextInput
+                                style={styles.whiteInput}
+                                placeholder="Ej: 2693551"
+                                placeholderTextColor="#94A3B8"
+                                keyboardType="number-pad"
+                                value={regFichaNumero}
+                                onChangeText={(t) => {
+                                  setRegFichaNumero(t);
+                                  buscarFichas(t);
+                                }}
+                              />
+                              {buscandoFicha && <ActivityIndicator size="small" color="#C59427" />}
+                            </View>
+                            <TouchableOpacity
+                              style={styles.fichaSearchBtn}
+                              onPress={() => setMostrarSelectorFicha(true)}
+                            >
+                              <Ionicons name="search-outline" size={18} color="#FFF" />
+                            </TouchableOpacity>
+                          </View>
+                          {fichaEncontrada && (
+                            <View style={styles.fichaFoundBadge}>
+                              <Ionicons name="checkmark-circle" size={14} color="#10B981" />
+                              <Text style={styles.fichaFoundText}>
+                                {fichaEncontrada.numero} — {fichaEncontrada.programaNombre}
+                              </Text>
+                            </View>
+                          )}
+                          {regFichaNumero.length >= 3 && !fichaEncontrada && !buscandoFicha && (
+                            <Text style={[styles.matchText, styles.matchError]}>
+                              ⚠ Ficha no encontrada, puedes continuar igual y el admin la asignará
+                            </Text>
+                          )}
+                        </View>
+
+                        {/* Sede */}
+                        <View style={styles.fieldGroup}>
+                          <Text style={styles.labelDark}>Sede del Centro de Formación</Text>
+                          <View style={styles.whiteInputWrapper}>
+                            <Ionicons name="location-outline" size={18} color="#475569" style={styles.fieldIcon} />
+                            <TextInput
+                              style={styles.whiteInput}
+                              placeholder="Ej: Sede Cazucá"
+                              placeholderTextColor="#94A3B8"
+                              value={regSede}
+                              onChangeText={setRegSede}
+                            />
+                          </View>
+                        </View>
+
+                        {/* Trimestre */}
+                        <View style={styles.fieldGroup}>
+                          <Text style={styles.labelDark}>Trimestre Actual</Text>
+                          <View style={styles.trimestreRow}>
+                            {['1','2','3','4','5','6'].map((t) => (
+                              <TouchableOpacity
+                                key={t}
+                                style={[
+                                  styles.trimestreChip,
+                                  regTrimestre === t && styles.trimestreChipActive,
+                                ]}
+                                onPress={() => setRegTrimestre(t)}
+                              >
+                                <Text style={[
+                                  styles.trimestreChipText,
+                                  regTrimestre === t && styles.trimestreChipTextActive,
+                                ]}>
+                                  {t}°
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        </View>
+                      </>
+                    )}
+
+                    {/* Modal Selector de Fichas */}
+                    <Modal
+                      visible={mostrarSelectorFicha}
+                      transparent
+                      animationType="slide"
+                      onRequestClose={() => setMostrarSelectorFicha(false)}
+                    >
+                      <TouchableWithoutFeedback onPress={() => setMostrarSelectorFicha(false)}>
+                        <View style={styles.modalOverlay}>
+                          <TouchableWithoutFeedback>
+                            <View style={styles.modalSheet}>
+                              <View style={styles.modalHeader}>
+                                <Text style={styles.modalTitle}>Seleccionar Ficha</Text>
+                                <TouchableOpacity onPress={() => setMostrarSelectorFicha(false)}>
+                                  <Ionicons name="close-circle" size={24} color="#64748B" />
+                                </TouchableOpacity>
+                              </View>
+                              <View style={styles.modalSearchBox}>
+                                <Ionicons name="search-outline" size={16} color="#94A3B8" />
+                                <TextInput
+                                  style={styles.modalSearchInput}
+                                  placeholder="Buscar por número de ficha..."
+                                  placeholderTextColor="#94A3B8"
+                                  keyboardType="number-pad"
+                                  onChangeText={(t) => buscarFichas(t)}
+                                  autoFocus
+                                />
+                              </View>
+                              {buscandoFicha && (
+                                <ActivityIndicator color="#C59427" style={{ marginTop: 12 }} />
+                              )}
+                              <FlatList
+                                data={fichasDisponibles}
+                                keyExtractor={(item) => item.id}
+                                ListEmptyComponent={!buscandoFicha ? (
+                                  <Text style={styles.modalEmpty}>Escribe al menos 3 dígitos para buscar</Text>
+                                ) : null}
+                                renderItem={({ item }) => (
+                                  <TouchableOpacity
+                                    style={styles.modalFichaItem}
+                                    onPress={() => {
+                                      setRegFichaNumero(item.numero);
+                                      setFichaEncontrada(item);
+                                      setMostrarSelectorFicha(false);
+                                    }}
+                                  >
+                                    <Ionicons name="document-text-outline" size={18} color="#C59427" />
+                                    <View style={{ flex: 1, marginLeft: 10 }}>
+                                      <Text style={styles.modalFichaNumero}>Ficha {item.numero}</Text>
+                                      <Text style={styles.modalFichaPrograma}>{item.programaNombre}</Text>
+                                      {item.instructorNombre && (
+                                        <Text style={styles.modalFichaInstructor}>{item.instructorNombre}</Text>
+                                      )}
+                                    </View>
+                                    <View style={[
+                                      styles.estadoBadge,
+                                      { backgroundColor: item.estado === 'Activo' ? '#10B981' : '#94A3B8' }
+                                    ]}>
+                                      <Text style={styles.estadoBadgeText}>{item.estado || 'Activo'}</Text>
+                                    </View>
+                                  </TouchableOpacity>
+                                )}
+                              />
+                            </View>
+                          </TouchableWithoutFeedback>
+                        </View>
+                      </TouchableWithoutFeedback>
+                    </Modal>
+
                     {/* Submit Register Button */}
                     <TouchableOpacity style={styles.goldButton} activeOpacity={0.85} onPress={handleRegister}>
                       <Text style={styles.goldButtonText}>CREAR CUENTA →</Text>
@@ -635,6 +844,164 @@ const styles = StyleSheet.create({
   outerContainer: {
     flex: 1,
     backgroundColor: '#020308',
+  },
+  /* ─── CAMPOS ACADÉMICOS ─── */
+  academicSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 12,
+    marginBottom: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: 'rgba(197,148,39,0.12)',
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#C59427',
+  },
+  academicSectionTitle: {
+    color: '#C59427',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  fichaInputRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  fichaSearchBtn: {
+    backgroundColor: '#C59427',
+    borderRadius: 12,
+    padding: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fichaFoundBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(16,185,129,0.12)',
+    borderRadius: 8,
+  },
+  fichaFoundText: {
+    color: '#10B981',
+    fontSize: 12,
+    fontWeight: '600',
+    flex: 1,
+  },
+  trimestreRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
+  },
+  trimestreChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+  },
+  trimestreChipActive: {
+    backgroundColor: '#C59427',
+    borderColor: '#C59427',
+  },
+  trimestreChipText: {
+    color: '#94A3B8',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  trimestreChipTextActive: {
+    color: '#FFF',
+  },
+  /* ─── MODAL SELECTOR FICHAS ─── */
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: '#0F172A',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 32,
+    maxHeight: '70%',
+    borderTopWidth: 3,
+    borderTopColor: '#C59427',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  modalTitle: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  modalSearchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1E293B',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
+    marginBottom: 10,
+  },
+  modalSearchInput: {
+    flex: 1,
+    color: '#FFF',
+    fontSize: 14,
+  },
+  modalEmpty: {
+    color: '#64748B',
+    textAlign: 'center',
+    marginTop: 20,
+    fontSize: 13,
+  },
+  modalFichaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1E293B',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(197,148,39,0.2)',
+  },
+  modalFichaNumero: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  modalFichaPrograma: {
+    color: '#94A3B8',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  modalFichaInstructor: {
+    color: '#C59427',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  estadoBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  estadoBadgeText: {
+    color: '#FFF',
+    fontSize: 10,
+    fontWeight: '700',
   },
   safeArea: {
     flex: 1,

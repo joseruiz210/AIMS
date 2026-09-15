@@ -2,12 +2,20 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { router } from 'expo-router';
 import { authService, User } from '../services/authService';
 
+import { notificationsUtil } from '../utils/notifications';
+
 type AuthContextType = {
   user: User | null;
   isLoading: boolean;
   login: (correo: string, contrasenia: string) => Promise<{ success: boolean; message?: string }>;
-   setSession: (user: User) => void;
-  register: (nombre: string, correo: string, contrasenia: string, confirmContrasenia: string) => Promise<{ success: boolean; message?: string }>;
+  setSession: (user: User) => void;
+  register: (
+    nombre: string,
+    correo: string,
+    contrasenia: string,
+    confirmContrasenia: string,
+    academicData?: { fichaId?: string; fichaNumero?: string; sede?: string; trimestre?: number }
+  ) => Promise<{ success: boolean; message?: string }>;
   logout: () => Promise<void>;
 };
 
@@ -58,8 +66,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { success: true };
   };
 
-  const register = async (nombre: string, correo: string, contrasenia: string, confirmContrasenia: string) => {
-    return authService.register(nombre, correo, contrasenia, confirmContrasenia);
+  const register = async (
+    nombre: string,
+    correo: string,
+    contrasenia: string,
+    confirmContrasenia: string,
+    academicData?: { fichaId?: string; fichaNumero?: string; sede?: string; trimestre?: number }
+  ) => {
+    return authService.register(nombre, correo, contrasenia, confirmContrasenia, academicData);
   };
 
   const logout = async () => {
