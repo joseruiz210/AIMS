@@ -48,6 +48,9 @@ export default function InstructorLayout() {
     { name: 'Calificaciones', path: '/instructor/calificaciones', icon: 'bar-chart-outline' },
     { name: 'Observaciones', path: '/instructor/observaciones', icon: 'chatbubbles-outline' },
     { name: 'Reportes', path: '/instructor/reportes', icon: 'document-text-outline' },
+    { name: 'Mensajes', path: '/instructor/mensajes', icon: 'mail-outline' },
+    { name: 'Notificaciones', path: '/instructor/notificaciones', icon: 'notifications-outline' },
+    { name: 'Configuración', path: '/instructor/configuracion', icon: 'settings-outline' },
   ];
 
   const MenuItem = ({ name, path, icon }: MenuItemType) => {
