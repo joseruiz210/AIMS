@@ -75,22 +75,18 @@ export const authService = {
   /**
    * Registrar nuevo usuario con validación de contraseña y datos académicos opcionales (Ficha, Sede, Trimestre)
    */
-<<<<<<< HEAD
-  async register({ nombre, correo, contrasenia, confirmContrasenia, role, tipoDocumento, documento, ficha, programa }: RegisterData): Promise<AuthResponse> {
-=======
-  async register(
-    nombre: string,
-    correo: string,
-    contrasenia: string,
-    confirmContrasenia: string,
-    academicData?: {
-      fichaId?: string;
-      fichaNumero?: string;
-      sede?: string;
-      trimestre?: number;
-    }
-  ): Promise<AuthResponse> {
->>>>>>> fd75f86255e37d5344fe6aba227ba17e29ad7fdf
+  async register({
+    nombre,
+    correo,
+    contrasenia,
+    confirmContrasenia,
+    role,
+    tipoDocumento,
+    documento,
+    ficha,
+    programa,
+    academicData,
+  }: RegisterData): Promise<AuthResponse> {
     if (!nombre.trim()) {
       return { success: false, message: 'El nombre completo es requerido.' };
     }
@@ -123,6 +119,18 @@ export const authService = {
         password: contrasenia,
       };
 
+      if (role) payload.role = role;
+      if (tipoDocumento) payload.documentType = tipoDocumento;
+      if (documento) payload.documentNumber = documento;
+      if (ficha) {
+        payload.fichaId = ficha;
+        payload.ficha = ficha;
+      }
+      if (programa) {
+        payload.programaId = programa;
+        payload.programa = programa;
+      }
+
       if (academicData) {
         if (academicData.fichaId) payload.fichaId = academicData.fichaId;
         if (academicData.fichaNumero) payload.fichaNumero = academicData.fichaNumero;
@@ -133,23 +141,7 @@ export const authService = {
       const response = await fetch(`${API_BASE_URL}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-<<<<<<< HEAD
-        body: JSON.stringify({
-          firstName,
-          lastName,
-          email: correo,
-          password: contrasenia,
-          role,
-          documentType: tipoDocumento,
-          documentNumber: documento,
-          fichaId: ficha,
-          ficha: ficha,
-          programaId: programa,
-          programa: programa,
-        }),
-=======
         body: JSON.stringify(payload),
->>>>>>> fd75f86255e37d5344fe6aba227ba17e29ad7fdf
       });
       const data = await response.json();
 
@@ -320,6 +312,7 @@ async googleLogin(idToken: string): Promise<AuthResponse> {
     await saveUserData(data.data.user);
     return { success: true, token: data.data.accessToken, user: data.data.user, message: data.message };
   } catch (error: any) {
+    return { success: false, message: error.message || 'Error de conexión con el servidor.' };
   },
 
   /**
