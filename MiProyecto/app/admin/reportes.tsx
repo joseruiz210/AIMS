@@ -428,7 +428,7 @@ const styles = StyleSheet.create({
   barsFlexContainer: {
     flex: 1,
     flexDirection: 'row',
-    justify.content: 'space-around',
+    justifyContent: 'space-around',
     alignItems: 'flex-end',
     height: '100%',
     borderLeftWidth: 1,
