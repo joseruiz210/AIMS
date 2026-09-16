@@ -2,12 +2,26 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { router } from 'expo-router';
 import { authService, User, RegisterData } from '../services/authService';
 
+import { notificationsUtil } from '../utils/notifications';
+
 type AuthContextType = {
   user: User | null;
   isLoading: boolean;
+<<<<<<< HEAD
   login: (credentials: { correo: string; contrasenia: string; role: 'INSTRUCTOR' | 'APRENDIZ'; documento?: string }) => Promise<{ success: boolean; message?: string }>;
    setSession: (user: User) => void;
   register: (data: RegisterData) => Promise<{ success: boolean; message?: string }>;
+=======
+  login: (correo: string, contrasenia: string) => Promise<{ success: boolean; message?: string }>;
+  setSession: (user: User) => void;
+  register: (
+    nombre: string,
+    correo: string,
+    contrasenia: string,
+    confirmContrasenia: string,
+    academicData?: { fichaId?: string; fichaNumero?: string; sede?: string; trimestre?: number }
+  ) => Promise<{ success: boolean; message?: string }>;
+>>>>>>> fd75f86255e37d5344fe6aba227ba17e29ad7fdf
   logout: () => Promise<void>;
 };
 
@@ -59,8 +73,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { success: true };
   };
 
+<<<<<<< HEAD
   const register = async (data: RegisterData) => {
     return authService.register(data);
+=======
+  const register = async (
+    nombre: string,
+    correo: string,
+    contrasenia: string,
+    confirmContrasenia: string,
+    academicData?: { fichaId?: string; fichaNumero?: string; sede?: string; trimestre?: number }
+  ) => {
+    return authService.register(nombre, correo, contrasenia, confirmContrasenia, academicData);
+>>>>>>> fd75f86255e37d5344fe6aba227ba17e29ad7fdf
   };
 
   const logout = async () => {

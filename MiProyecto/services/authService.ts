@@ -73,9 +73,24 @@ export const authService = {
   },
 
   /**
-   * Registrar nuevo usuario con validación de contraseña
+   * Registrar nuevo usuario con validación de contraseña y datos académicos opcionales (Ficha, Sede, Trimestre)
    */
+<<<<<<< HEAD
   async register({ nombre, correo, contrasenia, confirmContrasenia, role, tipoDocumento, documento, ficha, programa }: RegisterData): Promise<AuthResponse> {
+=======
+  async register(
+    nombre: string,
+    correo: string,
+    contrasenia: string,
+    confirmContrasenia: string,
+    academicData?: {
+      fichaId?: string;
+      fichaNumero?: string;
+      sede?: string;
+      trimestre?: number;
+    }
+  ): Promise<AuthResponse> {
+>>>>>>> fd75f86255e37d5344fe6aba227ba17e29ad7fdf
     if (!nombre.trim()) {
       return { success: false, message: 'El nombre completo es requerido.' };
     }
@@ -101,9 +116,24 @@ export const authService = {
     }
 
     try {
+      const payload: any = {
+        firstName,
+        lastName,
+        email: correo,
+        password: contrasenia,
+      };
+
+      if (academicData) {
+        if (academicData.fichaId) payload.fichaId = academicData.fichaId;
+        if (academicData.fichaNumero) payload.fichaNumero = academicData.fichaNumero;
+        if (academicData.sede) payload.sede = academicData.sede;
+        if (academicData.trimestre) payload.trimestre = academicData.trimestre;
+      }
+
       const response = await fetch(`${API_BASE_URL}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+<<<<<<< HEAD
         body: JSON.stringify({
           firstName,
           lastName,
@@ -117,6 +147,9 @@ export const authService = {
           programaId: programa,
           programa: programa,
         }),
+=======
+        body: JSON.stringify(payload),
+>>>>>>> fd75f86255e37d5344fe6aba227ba17e29ad7fdf
       });
       const data = await response.json();
 
@@ -124,7 +157,7 @@ export const authService = {
         return { success: false, message: data.message || 'Error al registrar usuario.' };
       }
 
-      // el registro NO devuelve token (revisa auth.controller.js: solo retorna el user creado)
+      // el registro NO devuelve token (solo retorna el user creado y su matrícula si aplica)
       return { success: true, user: data.data, message: data.message };
     } catch (error: any) {
       return { success: false, message: error.message || 'Error al conectar con el servidor.' };
@@ -287,7 +320,27 @@ async googleLogin(idToken: string): Promise<AuthResponse> {
     await saveUserData(data.data.user);
     return { success: true, token: data.data.accessToken, user: data.data.user, message: data.message };
   } catch (error: any) {
-    return { success: false, message: error.message || 'Error de conexión con el servidor.' };
-  }
-},
+  },
+
+  /**
+   * Actualizar Expo Push Token para notificaciones móviles
+   */
+  async updatePushToken(pushToken: string): Promise<boolean> {
+    try {
+      const token = await getToken();
+      if (!token) return false;
+
+      const response = await fetch(`${API_BASE_URL}/users/push-token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ pushToken }),
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  },
 };
