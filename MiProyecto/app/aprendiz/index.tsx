@@ -1,25 +1,15 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, useWindowDimensions } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, Pressable, useWindowDimensions, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import ActionModal from '../../components/ActionModal';
+import { authService } from '../../services/authService';
+import { calificacionesService } from '../../services/calificacionesService';
+import { evidenciasService } from '../../services/evidenciasService';
+import { asistenciaService } from '../../services/asistenciaService';
 
 const NAVY = '#12103C';
 const GOLD = '#cfa235';
-
-const competencias = [
-  { nombre: 'Analisis de Datos', nota: 4.5, max: 5 },
-  { nombre: 'POO', nota: 4.0, max: 5 },
-  { nombre: 'Requisitos', nota: 3.8, max: 5 },
-  { nombre: 'Programación BD', nota: 4.2, max: 5 },
-];
-
-const statCards = [
-  { label: 'PROMEDIO', value: '4.0', highlight: true, icon: 'star-outline', route: '/aprendiz/calificaciones' },
-  { label: 'ASISTENCIA', value: '96%', highlight: true, icon: 'checkmark-circle-outline', route: '/aprendiz/asistencia' },
-  { label: 'TAREAS', value: '2', highlight: true, icon: 'clipboard-outline', route: '/aprendiz/tareas' },
-  { label: 'MATERIAS', value: '6', highlight: false, icon: 'book-outline', route: '/aprendiz/horario' },
-];
 
 const proximasClases = [
   { hora: '07:00 - 09:00', materia: 'Analisis de Datos', instructor: 'Roberto Vargas', aula: '201' },
@@ -31,8 +21,80 @@ export default function AprendizHome() {
   const isDesktop = width >= 1024;
   const router = useRouter();
 
+  const [userName, setUserName] = useState('Aprendiz');
+  const [promedio, setPromedio] = useState('0.0');
+  const [asistenciaPct, setAsistenciaPct] = useState('100%');
+  const [tareasPendientes, setTareasPendientes] = useState(0);
+  const [competencias, setCompetencias] = useState<Array<{ nombre: string; nota: number; max: number }>>([]);
+  const [loading, setLoading] = useState(true);
+
   const [selectedClase, setSelectedClase] = useState<typeof proximasClases[0] | null>(null);
   const [claseModalVisible, setClaseModalVisible] = useState(false);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  const loadDashboardData = async () => {
+    setLoading(true);
+    try {
+      // 1. Obtener usuario de la sesión
+      const { user } = await authService.checkSession();
+      if (user) {
+        const full = (user as any).firstName
+          ? `${(user as any).firstName} ${(user as any).lastName || ''}`.trim()
+          : user.nombre || 'Aprendiz';
+        setUserName(full);
+      }
+
+      // 2. Cargar calificaciones, evidencias y asistencias en paralelo
+      const [grades, evidencias, asistencias] = await Promise.all([
+        calificacionesService.getMisCalificaciones(),
+        evidenciasService.getMisEvidencias(),
+        asistenciaService.getMisAsistencias(),
+      ]);
+
+      // Métricas de calificaciones
+      if (grades.length > 0) {
+        const avg = (grades.reduce((s, g) => s + g.nota, 0) / grades.length).toFixed(1);
+        setPromedio(avg);
+        setCompetencias(
+          grades.slice(0, 5).map((g) => ({
+            nombre: g.actividad || g.moduloNombre || 'Competencia',
+            nota: g.nota,
+            max: 5,
+          }))
+        );
+      } else {
+        setPromedio('0.0');
+        setCompetencias([]);
+      }
+
+      // Métricas de tareas pendientes
+      const pending = evidencias.filter((e) => e.estado === 'Pendiente').length;
+      setTareasPendientes(pending);
+
+      // Métricas de asistencia
+      if (asistencias.length > 0) {
+        const attended = asistencias.filter((a) => a.estado === 'PRESENTE' || (a.estado as any) === 'EXCUSADO').length;
+        const pct = Math.round((attended / asistencias.length) * 100);
+        setAsistenciaPct(`${pct}%`);
+      } else {
+        setAsistenciaPct('100%');
+      }
+    } catch (e) {
+      console.error('Error cargando dashboard de aprendiz:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const statCards = [
+    { label: 'PROMEDIO', value: promedio, highlight: true, icon: 'star-outline', route: '/aprendiz/calificaciones' },
+    { label: 'ASISTENCIA', value: asistenciaPct, highlight: true, icon: 'checkmark-circle-outline', route: '/aprendiz/asistencia' },
+    { label: 'TAREAS', value: String(tareasPendientes), highlight: true, icon: 'clipboard-outline', route: '/aprendiz/tareas' },
+    { label: 'MATERIAS', value: String(competencias.length || 1), highlight: false, icon: 'book-outline', route: '/aprendiz/horario' },
+  ];
 
   const handleOpenClase = (clase: typeof proximasClases[0]) => {
     setSelectedClase(clase);
@@ -46,11 +108,10 @@ export default function AprendizHome() {
       {/* Header greeting + bell */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.greeting}>Bienvenida,</Text>
-          <Text style={styles.name}>Maria Torres</Text>
+          <Text style={styles.greeting}>Bienvenido(a),</Text>
+          <Text style={styles.name}>{userName}</Text>
         </View>
-        <View style={styles.headerActions}>
-        </View>
+        <View style={styles.headerActions}></View>
       </View>
 
       {/* Stat Cards */}
@@ -77,25 +138,33 @@ export default function AprendizHome() {
       {/* Mis Competencias */}
       <View style={styles.section}>
         <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionLabel}>MIS COMPETENCIAS</Text>
+          <Text style={styles.sectionLabel}>MIS COMPETENCIAS ({competencias.length})</Text>
           <Pressable onPress={() => router.push('/aprendiz/calificaciones' as any)}>
             <Text style={styles.sectionLink}>Ver todo →</Text>
           </Pressable>
         </View>
 
-        {competencias.map((comp, i) => (
-          <Pressable
-            key={i}
-            style={({ hovered }: any) => [styles.compRow, hovered && styles.compRowHover]}
-            onPress={() => router.push('/aprendiz/calificaciones' as any)}
-          >
-            <Text style={styles.compNombre}>{comp.nombre}</Text>
-            <View style={styles.barBg}>
-              <View style={[styles.barFill, { width: `${(comp.nota / comp.max) * 100}%` as any }]} />
-            </View>
-            <Text style={styles.compNota}>{comp.nota.toFixed(1)}</Text>
-          </Pressable>
-        ))}
+        {loading ? (
+          <ActivityIndicator size="small" color={GOLD} style={{ padding: 10 }} />
+        ) : competencias.length === 0 ? (
+          <Text style={{ color: '#64748B', fontSize: 13, paddingVertical: 8 }}>
+            No hay competencias ni calificaciones registradas aún.
+          </Text>
+        ) : (
+          competencias.map((comp, i) => (
+            <Pressable
+              key={i}
+              style={({ hovered }: any) => [styles.compRow, hovered && styles.compRowHover]}
+              onPress={() => router.push('/aprendiz/calificaciones' as any)}
+            >
+              <Text style={styles.compNombre} numberOfLines={1}>{comp.nombre}</Text>
+              <View style={styles.barBg}>
+                <View style={[styles.barFill, { width: `${(comp.nota / comp.max) * 100}%` as any }]} />
+              </View>
+              <Text style={styles.compNota}>{comp.nota.toFixed(1)}</Text>
+            </Pressable>
+          ))
+        )}
       </View>
 
       {/* Próximas clases */}
@@ -142,7 +211,6 @@ export default function AprendizHome() {
           ]}
         />
       )}
-
     </ScrollView>
   );
 }

@@ -74,7 +74,7 @@ export async function verifyEmailDomainExistence(email: string): Promise<EmailVe
   const domain = trimmed.split('@')[1];
 
   // Dominios institucionales y oficiales permitidos de antemano
-  const trustedDomains = ['sena.edu.co', 'soy.sena.edu.co', 'misena.edu.co', 'gmail.com'];
+  const trustedDomains = ['sena.edu.co', 'soy.sena.edu.co', 'misena.edu.co', 'gmail.com', 'aims.edu.co'];
   if (trustedDomains.includes(domain)) {
     return {
       isValidFormat: true,

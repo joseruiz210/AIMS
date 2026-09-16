@@ -1,60 +1,59 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   Pressable,
-
   useWindowDimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ActionModal from '../../components/ActionModal';
+import { observacionesService, ObservacionItem } from '../../services/observacionesService';
 
 const NAVY = '#12103C';
 const GOLD = '#cfa235';
 
-interface ObservacionItem {
-  id: string;
-  tipo: 'Felicitación' | 'Académica' | 'Disciplinaria';
-  fecha: string;
-  instructor: string;
-  materia: string;
-  descripcion: string;
-}
-
-const OBSERVACIONES: ObservacionItem[] = [
-  {
-    id: '1',
-    tipo: 'Felicitación',
-    fecha: '24 de Agosto, 2026',
-    instructor: 'Roberto Vargas',
-    materia: 'Desarrollo de Software',
-    descripcion: 'Excelente desempeño en el proyecto integrador de React Native y arquitectura backend.',
-  },
-  {
-    id: '2',
-    tipo: 'Académica',
-    fecha: '15 de Agosto, 2026',
-    instructor: 'Carmen López',
-    materia: 'Bases de Datos SQL',
-    descripcion: 'Se recomienda repasar la optimización de consultas JOIN y procedimientos almacenados.',
-  },
-  {
-    id: '3',
-    tipo: 'Disciplinaria',
-    fecha: '02 de Agosto, 2026',
-    instructor: 'Coordinación Académica',
-    materia: 'Asistencia General',
-    descripcion: 'Llegada tardía justificada en la sesión de las 7:00 AM.',
-  },
-];
-
 export default function ObservacionesAprendizScreen() {
   const { width } = useWindowDimensions();
   const isDesktop = width >= 1024;
+  const [items, setItems] = useState<ObservacionItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedObs, setSelectedObs] = useState<ObservacionItem | null>(null);
+
+  useEffect(() => {
+    loadObservaciones();
+  }, []);
+
+  const loadObservaciones = async () => {
+    setLoading(true);
+    try {
+      const data = await observacionesService.getMisObservaciones();
+      setItems(data);
+    } catch {
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatTipoLabel = (tipo: string) => {
+    switch (tipo) {
+      case 'RECONOCIMIENTO':
+      case 'Felicitación':
+        return 'Felicitación';
+      case 'ACADEMICA':
+      case 'Académica':
+        return 'Académica';
+      case 'DISCIPLINARIA':
+      case 'Disciplinaria':
+        return 'Disciplinaria';
+      default:
+        return 'General';
+    }
+  };
 
   const handleOpenObs = (obs: ObservacionItem) => {
     setSelectedObs(obs);
@@ -74,68 +73,87 @@ export default function ObservacionesAprendizScreen() {
       </View>
 
       {/* Observaciones List */}
-      <View style={styles.listContainer}>
-        {OBSERVACIONES.map((item) => (
-          <View key={item.id} style={styles.obsCard}>
-            <View style={styles.cardHeader}>
-              <View
-                style={[
-                  styles.typeBadge,
-                  item.tipo === 'Felicitación'
-                    ? styles.badgeFelicitacion
-                    : item.tipo === 'Académica'
-                    ? styles.badgeAcademica
-                    : styles.badgeDisciplinaria,
-                ]}
-              >
-                <Ionicons
-                  name={
-                    item.tipo === 'Felicitación'
-                      ? 'star'
-                      : item.tipo === 'Académica'
-                      ? 'book'
-                      : 'alert-circle'
-                  }
-                  size={14}
-                  color={
-                    item.tipo === 'Felicitación'
-                      ? '#047857'
-                      : item.tipo === 'Académica'
-                      ? '#1D4ED8'
-                      : '#B91C1C'
-                  }
-                  style={{ marginRight: 4 }}
-                />
-                <Text
-                  style={[
-                    styles.typeText,
-                    item.tipo === 'Felicitación'
-                      ? styles.textFelicitacion
-                      : item.tipo === 'Académica'
-                      ? styles.textAcademica
-                      : styles.textDisciplinaria,
-                  ]}
+      {loading ? (
+        <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={GOLD} />
+          <Text style={{ marginTop: 12, color: '#64748B', fontSize: 14 }}>Cargando observaciones...</Text>
+        </View>
+      ) : items.length === 0 ? (
+        <View style={styles.emptyCard}>
+          <Ionicons name="document-text-outline" size={48} color="#94A3B8" />
+          <Text style={styles.emptyTitle}>Sin observaciones registradas</Text>
+          <Text style={styles.emptySubtext}>Actualmente no tienes observaciones ni anotaciones en tu historial.</Text>
+        </View>
+      ) : (
+        <View style={styles.listContainer}>
+          {items.map((item) => {
+            const tipoLabel = formatTipoLabel(item.tipo);
+            const isFelicitacion = tipoLabel === 'Felicitación';
+            const isAcademica = tipoLabel === 'Académica';
+
+            return (
+              <View key={item.id} style={styles.obsCard}>
+                <View style={styles.cardHeader}>
+                  <View
+                    style={[
+                      styles.typeBadge,
+                      isFelicitacion
+                        ? styles.badgeFelicitacion
+                        : isAcademica
+                        ? styles.badgeAcademica
+                        : styles.badgeDisciplinaria,
+                    ]}
+                  >
+                    <Ionicons
+                      name={
+                        isFelicitacion
+                          ? 'star'
+                          : isAcademica
+                          ? 'book'
+                          : 'alert-circle'
+                      }
+                      size={14}
+                      color={
+                        isFelicitacion
+                          ? '#047857'
+                          : isAcademica
+                          ? '#1D4ED8'
+                          : '#B91C1C'
+                      }
+                      style={{ marginRight: 4 }}
+                    />
+                    <Text
+                      style={[
+                        styles.typeText,
+                        isFelicitacion
+                          ? styles.textFelicitacion
+                          : isAcademica
+                          ? styles.textAcademica
+                          : styles.textDisciplinaria,
+                      ]}
+                    >
+                      {tipoLabel}
+                    </Text>
+                  </View>
+
+                  <Text style={styles.dateText}>{item.fecha}</Text>
+                </View>
+
+                <Text style={styles.materiaText}>{item.materia || 'Formación Técnica ADSO'}</Text>
+                <Text style={styles.instructorText}>Instructor: {item.instructorNombre || 'Instructor SENA'}</Text>
+                <Text style={styles.descText}>{item.descripcion}</Text>
+
+                <Pressable
+                  style={({ hovered }: any) => [styles.actionBtn, hovered && styles.actionBtnHover]}
+                  onPress={() => handleOpenObs(item)}
                 >
-                  {item.tipo}
-                </Text>
+                  <Text style={styles.actionBtnText}>Ver detalles de la observación</Text>
+                </Pressable>
               </View>
-
-              <Text style={styles.dateText}>{item.fecha}</Text>
-            </View>
-
-            <Text style={styles.materiaText}>{item.materia}</Text>
-            <Text style={styles.instructorText}>Instructor: {item.instructor}</Text>
-            <Text style={styles.descText}>{item.descripcion}</Text>
-
-            <Pressable
-              style={({ hovered }: any) => [styles.actionBtn, hovered && styles.actionBtnHover]}
-              onPress={() => handleOpenObs(item)}
-            >
-              <Text style={styles.actionBtnText}>Ver detalles de la observación</Text>
-            </Pressable>
-          </View>
-        ))}
-      </View>
+            );
+          })}
+        </View>
+      )}
 
       {/* Interactive Detail Modal */}
       {selectedObs && (
@@ -265,6 +283,26 @@ const styles = StyleSheet.create({
     color: GOLD,
     fontWeight: '700',
     fontSize: 13,
+  },
+  emptyCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 36,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#D0D8E4',
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: NAVY,
+    marginTop: 12,
+  },
+  emptySubtext: {
+    fontSize: 13,
+    color: '#64748B',
+    marginTop: 4,
+    textAlign: 'center',
   },
 });
 

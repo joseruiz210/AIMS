@@ -112,8 +112,10 @@ export const authService = {
           role,
           documentType: tipoDocumento,
           documentNumber: documento,
-          ficha,
-          programa,
+          fichaId: ficha,
+          ficha: ficha,
+          programaId: programa,
+          programa: programa,
         }),
       });
       const data = await response.json();

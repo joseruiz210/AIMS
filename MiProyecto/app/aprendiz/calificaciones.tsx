@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, useWindowDimensions } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, Pressable, useWindowDimensions, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ActionModal from '../../components/ActionModal';
 
@@ -16,23 +16,22 @@ interface GradeItem {
   estado: 'Aprobado' | 'En proceso' | 'Por mejorar';
 }
 
-const INITIAL_GRADES: GradeItem[] = [
-  { subject: 'Analisis de Datos', grade: 4.5, periodo: 'Trimestre I - 2026', instructor: 'Roberto Vargas', estado: 'Aprobado' },
-  { subject: 'POO', grade: 4.0, periodo: 'Trimestre I - 2026', instructor: 'Carmen López', estado: 'Aprobado' },
-  { subject: 'Requisitos', grade: 3.8, periodo: 'Trimestre I - 2026', instructor: 'Juan Pérez', estado: 'Aprobado' },
-  { subject: 'Programación BD', grade: 4.2, periodo: 'Trimestre I - 2026', instructor: 'Ana Martínez', estado: 'Aprobado' },
-];
-
 export default function CalificacionesAprendiz() {
   const { width } = useWindowDimensions();
   const isDesktop = width >= 1024;
 
-  const [items, setItems] = useState<GradeItem[]>(INITIAL_GRADES);
+  const [items, setItems] = useState<GradeItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState<GradeItem | null>(null);
 
-  React.useEffect(() => {
-    (async () => {
+  useEffect(() => {
+    loadCalificaciones();
+  }, []);
+
+  const loadCalificaciones = async () => {
+    setLoading(true);
+    try {
       const records = await calificacionesService.getMisCalificaciones();
       if (records.length > 0) {
         setItems(
@@ -40,13 +39,19 @@ export default function CalificacionesAprendiz() {
             subject: r.actividad || r.moduloNombre || 'Evaluación',
             grade: r.nota,
             periodo: 'Trimestre Actual',
-            instructor: r.aprendizNombre || 'Instructor',
+            instructor: r.aprendizNombre || 'Instructor SENA',
             estado: r.esAprobado ? 'Aprobado' : 'Por mejorar',
           }))
         );
+      } else {
+        setItems([]);
       }
-    })();
-  }, []);
+    } catch {
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getGradeColor = (grade: number) => {
     if (grade >= 4.0) return '#4CAF50';
@@ -59,9 +64,9 @@ export default function CalificacionesAprendiz() {
     setModalVisible(true);
   };
 
-  const promedio = (items.reduce((s, g) => s + g.grade, 0) / items.length).toFixed(1);
-  const masAlta = Math.max(...items.map((g) => g.grade)).toFixed(1);
-  const masAltaSubject = items.find((g) => g.grade === Math.max(...items.map((g2) => g2.grade)))?.subject ?? '';
+  const promedio = items.length > 0 ? (items.reduce((s, g) => s + g.grade, 0) / items.length).toFixed(1) : '0.0';
+  const masAlta = items.length > 0 ? Math.max(...items.map((g) => g.grade)).toFixed(1) : '0.0';
+  const masAltaSubject = items.length > 0 ? items.find((g) => g.grade === Math.max(...items.map((g2) => g2.grade)))?.subject ?? '' : 'Sin notas';
 
   const pad = isDesktop ? 24 : 14;
 
@@ -80,7 +85,7 @@ export default function CalificacionesAprendiz() {
         <View style={styles.summaryCard}>
           <Text style={styles.summaryLabel}>MÁS ALTA</Text>
           <Text style={[styles.summaryValue, { color: '#4CAF50' }]}>{masAlta}</Text>
-          <Text style={styles.summarySubtext}>{masAltaSubject}</Text>
+          <Text style={styles.summarySubtext} numberOfLines={1}>{masAltaSubject}</Text>
         </View>
         <View style={styles.summaryCard}>
           <Text style={styles.summaryLabel}>COMPETENCIAS</Text>
@@ -91,48 +96,61 @@ export default function CalificacionesAprendiz() {
 
       {/* Grade Detail List */}
       <Text style={styles.sectionTitle}>MIS COMPETENCIAS</Text>
-      <View style={styles.listContainer}>
-        {items.map((item, index) => (
-          <Pressable
-            key={index}
-            style={({ hovered }: any) => [styles.gradeCard, hovered && styles.gradeCardHover]}
-            onPress={() => handleOpenDetail(item)}
-          >
-            <View style={styles.cardHeader}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.subjectName}>{item.subject}</Text>
-                <Text style={styles.instructorText}>Instructor: {item.instructor}</Text>
+      {loading ? (
+        <View style={{ paddingVertical: 30, alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={GOLD} />
+          <Text style={{ marginTop: 10, color: '#64748B' }}>Cargando calificaciones...</Text>
+        </View>
+      ) : items.length === 0 ? (
+        <View style={styles.emptyCard}>
+          <Ionicons name="star-outline" size={48} color="#94A3B8" />
+          <Text style={styles.emptyTitle}>Sin calificaciones aún</Text>
+          <Text style={styles.emptySubtext}>Tus instructores actualizarán tus calificaciones al revisar tus evidencias.</Text>
+        </View>
+      ) : (
+        <View style={styles.listContainer}>
+          {items.map((item, index) => (
+            <Pressable
+              key={index}
+              style={({ hovered }: any) => [styles.gradeCard, hovered && styles.gradeCardHover]}
+              onPress={() => handleOpenDetail(item)}
+            >
+              <View style={styles.cardHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.subjectName}>{item.subject}</Text>
+                  <Text style={styles.instructorText}>Instructor: {item.instructor}</Text>
+                </View>
+                <Text style={[styles.gradeNum, { color: getGradeColor(item.grade) }]}>
+                  {item.grade.toFixed(1)}
+                </Text>
               </View>
-              <Text style={[styles.gradeNum, { color: getGradeColor(item.grade) }]}>
-                {item.grade.toFixed(1)}
-              </Text>
-            </View>
 
-            <View style={styles.progressBarBg}>
-              <View
-                style={[
-                  styles.progressBarFill,
-                  {
-                    width: `${(item.grade / 5) * 100}%` as any,
-                    backgroundColor: getGradeColor(item.grade),
-                  },
-                ]}
-              />
-            </View>
+              <View style={styles.progressBarBg}>
+                <View
+                  style={[
+                    styles.progressBarFill,
+                    {
+                      width: `${(item.grade / 5) * 100}%` as any,
+                      backgroundColor: getGradeColor(item.grade),
+                    },
+                  ]}
+                />
+              </View>
 
-            <View style={styles.cardFooter}>
-              <Text style={styles.periodoText}>{item.periodo}</Text>
-              <Pressable
-                style={({ hovered }: any) => [styles.detailBtn, hovered && styles.detailBtnHover]}
-                onPress={() => handleOpenDetail(item)}
-              >
-                <Ionicons name="eye-outline" size={14} color={GOLD} style={{ marginRight: 4 }} />
-                <Text style={styles.detailBtnText}>Ver detalle</Text>
-              </Pressable>
-            </View>
-          </Pressable>
-        ))}
-      </View>
+              <View style={styles.cardFooter}>
+                <Text style={styles.periodoText}>{item.periodo}</Text>
+                <Pressable
+                  style={({ hovered }: any) => [styles.detailBtn, hovered && styles.detailBtnHover]}
+                  onPress={() => handleOpenDetail(item)}
+                >
+                  <Ionicons name="eye-outline" size={14} color={GOLD} style={{ marginRight: 4 }} />
+                  <Text style={styles.detailBtnText}>Ver detalle</Text>
+                </Pressable>
+              </View>
+            </Pressable>
+          ))}
+        </View>
+      )}
 
       {/* Action Modal */}
       {selectedItem && (
@@ -299,6 +317,26 @@ const styles = StyleSheet.create({
     color: GOLD,
     fontSize: 13,
     fontWeight: '700',
+  },
+  emptyCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 36,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#D0D8E4',
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: NAVY,
+    marginTop: 12,
+  },
+  emptySubtext: {
+    fontSize: 13,
+    color: '#64748B',
+    marginTop: 4,
+    textAlign: 'center',
   },
 });
 

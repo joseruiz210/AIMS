@@ -1,17 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { fichasService } from '../../services/fichasService';
 
 const NAVY = '#12103C';
 const GOLD = '#cfa235';
 
-interface InstructorItem {
+export interface InstructorItem {
   id: string;
   initials: string;
   nombre: string;
@@ -22,52 +24,42 @@ interface InstructorItem {
   aprendicesCount: number;
 }
 
-const INITIAL_INSTRUCTORES: InstructorItem[] = [
-  {
-    id: '1',
-    initials: 'RV',
-    nombre: 'Roberto Vargas',
-    especialidad: 'Desarrollo de Software',
-    email: 'r.vargas@sena.edu.co',
-    status: 'Activo',
-    fichasCount: 2,
-    aprendicesCount: 52,
-  },
-  {
-    id: '2',
-    initials: 'CL',
-    nombre: 'Carmen López',
-    especialidad: 'Bases de Datos & SQL',
-    email: 'c.lopez@sena.edu.co',
-    status: 'Activo',
-    fichasCount: 3,
-    aprendicesCount: 78,
-  },
-  {
-    id: '3',
-    initials: 'JP',
-    nombre: 'Jorge Pinzón',
-    especialidad: 'Finanzas y Contabilidad',
-    email: 'j.pinzon@sena.edu.co',
-    status: 'Activo',
-    fichasCount: 2,
-    aprendicesCount: 44,
-  },
-  {
-    id: '4',
-    initials: 'MR',
-    nombre: 'María Ruiz',
-    especialidad: 'Diseño Gráfico y UI/UX',
-    email: 'm.ruiz@sena.edu.co',
-    status: 'Activo',
-    fichasCount: 1,
-    aprendicesCount: 20,
-  },
-];
-
 export default function InstructoresScreen() {
   const [search, setSearch] = useState('');
-  const [instructores] = useState<InstructorItem[]>(INITIAL_INSTRUCTORES);
+  const [instructores, setInstructores] = useState<InstructorItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  async function loadInstructores() {
+    setLoading(true);
+    try {
+      const data = await fichasService.getInstructores();
+      const mapped = data.map((item: any) => {
+        const fullName = `${item.firstName || ''} ${item.lastName || ''}`.trim() || item.email || 'Instructor SENA';
+        const parts = fullName.split(' ');
+        const initials = ((parts[0]?.[0] || '') + (parts[1]?.[0] || '')).toUpperCase() || 'INS';
+
+        return {
+          id: item.id,
+          initials,
+          nombre: fullName,
+          especialidad: item.especialidad || 'Formación Técnica SENA',
+          email: item.email,
+          status: item.isActive !== false ? 'Activo' : 'Inactivo',
+          fichasCount: item._count?.instructorFichas ?? (item.instructorFichas?.length || 0),
+          aprendicesCount: item.aprendicesCount || 0,
+        };
+      });
+      setInstructores(mapped);
+    } catch (error) {
+      console.error('Error al cargar instructores:', error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadInstructores();
+  }, []);
 
   const filteredInstructores = instructores.filter(
     (ins) =>
@@ -76,27 +68,27 @@ export default function InstructoresScreen() {
       ins.email.toLowerCase().includes(search.toLowerCase())
   );
 
+  const totalFichasAsignadas = instructores.reduce((acc, i) => acc + i.fichasCount, 0);
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       {/* Top Header */}
       <View style={styles.topHeader}>
-        <Text style={styles.pageTitle}>Instructores</Text>
+        <View>
+          <Text style={styles.pageTitle}>Instructores</Text>
+          <Text style={styles.pageSubtitle}>Directorio de instructores registrados en la base de datos</Text>
+        </View>
       </View>
 
       {/* Metrics Row */}
       <View style={styles.metricsGrid}>
         <View style={styles.metricCard}>
-          <Text style={styles.metricLabel}>INSTRUCTORES</Text>
-          <Text style={styles.metricValueGold}>20</Text>
+          <Text style={styles.metricLabel}>INSTRUCTORES REGISTRADOS</Text>
+          <Text style={styles.metricValueGold}>{loading ? '-' : instructores.length}</Text>
         </View>
         <View style={styles.metricCard}>
           <Text style={styles.metricLabel}>FICHAS ASIGNADAS</Text>
-          <Text style={styles.metricValueDark}>25</Text>
-        </View>
-        <View style={styles.metricCard}>
-          <Text style={styles.metricLabel}>PROMEDIO APRENDICES</Text>
-          <Text style={styles.metricValueGold}>20</Text>
-          <Text style={styles.metricSubtext}>Por Instructor</Text>
+          <Text style={styles.metricValueDark}>{loading ? '-' : totalFichasAsignadas}</Text>
         </View>
       </View>
 
@@ -113,45 +105,52 @@ export default function InstructoresScreen() {
       </View>
 
       {/* Instructors List */}
-      <View style={styles.listContainer}>
-        {filteredInstructores.map((ins) => (
-          <View key={ins.id} style={styles.instructorCard}>
-            <View style={styles.cardLeft}>
-              {/* Avatar Initials Circle */}
-              <View style={styles.avatarCircle}>
-                <Text style={styles.avatarText}>{ins.initials}</Text>
-              </View>
-
-              {/* Info */}
-              <View style={styles.infoGroup}>
-                <View style={styles.nameRow}>
-                  <Text style={styles.instructorName}>{ins.nombre}</Text>
-                  <View style={styles.statusBadge}>
-                    <Text style={styles.statusText}>{ins.status}</Text>
-                  </View>
+      {loading ? (
+        <View style={styles.centerLoading}>
+          <ActivityIndicator size="large" color={GOLD} />
+          <Text style={styles.loadingText}>Cargando instructores desde la base de datos...</Text>
+        </View>
+      ) : filteredInstructores.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="people-outline" size={54} color="#94A3B8" />
+          <Text style={styles.emptyTitle}>No hay instructores registrados</Text>
+          <Text style={styles.emptySubtitle}>
+            Actualmente no hay usuarios con rol de Instructor en la base de datos.
+          </Text>
+        </View>
+      ) : (
+        <View style={styles.listContainer}>
+          {filteredInstructores.map((ins) => (
+            <View key={ins.id} style={styles.instructorCard}>
+              <View style={styles.cardLeft}>
+                <View style={styles.avatarCircle}>
+                  <Text style={styles.avatarText}>{ins.initials}</Text>
                 </View>
-                <Text style={styles.especialidadText}>{ins.especialidad}</Text>
-                <Text style={styles.emailText}>{ins.email}</Text>
 
-                {/* Sub Counters */}
-                <View style={styles.countersRow}>
-                  <View style={styles.counterItem}>
-                    <Text style={styles.counterNum}>{ins.fichasCount}</Text>
-                    <Text style={styles.counterLabel}>
-                      {ins.fichasCount === 1 ? 'ficha' : 'fichas'}
-                    </Text>
+                <View style={styles.infoGroup}>
+                  <View style={styles.nameRow}>
+                    <Text style={styles.instructorName}>{ins.nombre}</Text>
+                    <View style={styles.statusBadge}>
+                      <Text style={styles.statusText}>{ins.status}</Text>
+                    </View>
                   </View>
-                  <View style={styles.counterItem}>
-                    <Text style={styles.counterNum}>{ins.aprendicesCount}</Text>
-                    <Text style={styles.counterLabel}>aprendices</Text>
+                  <Text style={styles.especialidadText}>{ins.especialidad}</Text>
+                  <Text style={styles.emailText}>{ins.email}</Text>
+
+                  <View style={styles.countersRow}>
+                    <View style={styles.counterItem}>
+                      <Text style={styles.counterNum}>{ins.fichasCount}</Text>
+                      <Text style={styles.counterLabel}>
+                        {ins.fichasCount === 1 ? 'ficha asignada' : 'fichas asignadas'}
+                      </Text>
+                    </View>
                   </View>
                 </View>
               </View>
             </View>
-          </View>
-        ))}
-      </View>
-
+          ))}
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -176,26 +175,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: NAVY,
   },
-  newBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: GOLD,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-    shadowColor: GOLD,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  newBtnHover: {
-    backgroundColor: '#b88d2a',
-  },
-  newBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-    fontSize: 15,
+  pageSubtitle: {
+    fontSize: 13,
+    color: '#64748B',
+    marginTop: 2,
   },
   metricsGrid: {
     flexDirection: 'row',
@@ -206,12 +189,14 @@ const styles = StyleSheet.create({
   metricCard: {
     flex: 1,
     minWidth: 160,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
     paddingVertical: 16,
     paddingHorizontal: 18,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   metricLabel: {
     fontSize: 12,
@@ -231,11 +216,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: NAVY,
   },
-  metricSubtext: {
-    fontSize: 11,
-    color: '#64748B',
-    marginTop: 2,
-  },
   searchWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -246,29 +226,51 @@ const styles = StyleSheet.create({
     marginBottom: 22,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
   },
   searchInput: {
     flex: 1,
     fontSize: 14,
     color: NAVY,
   },
+  centerLoading: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    color: '#64748B',
+    fontWeight: '600',
+  },
+  emptyContainer: {
+    padding: 40,
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginTop: 10,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: NAVY,
+    marginTop: 12,
+  },
+  emptySubtitle: {
+    fontSize: 13,
+    color: '#64748B',
+    textAlign: 'center',
+    marginTop: 6,
+  },
   listContainer: {
     gap: 16,
   },
   instructorCard: {
-    backgroundColor: '#EAEAEA',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 20,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
+    borderColor: '#E2E8F0',
   },
   cardLeft: {
     flexDirection: 'row',
@@ -276,9 +278,9 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   avatarCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
     backgroundColor: NAVY,
     alignItems: 'center',
     justifyContent: 'center',
@@ -286,7 +288,7 @@ const styles = StyleSheet.create({
   avatarText: {
     color: '#FFFFFF',
     fontWeight: '800',
-    fontSize: 20,
+    fontSize: 18,
   },
   infoGroup: {
     flex: 1,
@@ -298,22 +300,20 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   instructorName: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '700',
     color: NAVY,
   },
   statusBadge: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#DCFCE7',
     paddingVertical: 4,
     paddingHorizontal: 12,
     borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
   },
   statusText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
-    color: GOLD,
+    color: '#15803D',
   },
   especialidadText: {
     fontSize: 14,
@@ -332,10 +332,10 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   counterItem: {
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   counterNum: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     color: NAVY,
   },

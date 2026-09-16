@@ -1,5 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Modal } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Pressable,
+  ActivityIndicator,
+  Modal,
+  Platform,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { fichasService, Ficha } from '../../services/fichasService';
@@ -8,13 +17,18 @@ const NAVY = '#0F1026';
 const GOLD = '#D4AF37';
 const BG_PAGE = '#F8FAFC';
 
-export default function FichasScreenPremium() {
+export default function FichasScreenInstructor() {
   const router = useRouter();
   const [fichas, setFichas] = useState<Ficha[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // State para modal de carga CSV
   const [uploadFicha, setUploadFicha] = useState<Ficha | null>(null);
+  const [isGeneralUpload, setIsGeneralUpload] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadFileName, setUploadFileName] = useState('');
-  const [uploadStatus, setUploadStatus] = useState<'idle' | 'validated' | 'saved'>('idle');
+  const [isUploading, setIsUploading] = useState(false);
+  const [feedback, setFeedback] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
   async function loadFichas() {
     setLoading(true);
@@ -29,30 +43,93 @@ export default function FichasScreenPremium() {
   }
 
   useEffect(() => {
-    const loadTimer = setTimeout(() => {
-      void loadFichas();
-    }, 0);
-
-    return () => clearTimeout(loadTimer);
+    loadFichas();
   }, []);
 
   const totalAprendices = fichas.reduce((acc, f) => acc + (f.aprendicesCount || 0), 0);
 
-  const handleOpenUpload = (ficha: Ficha) => {
-    setUploadFicha(ficha);
+  const handleOpenGeneralUpload = () => {
+    setIsGeneralUpload(true);
+    setUploadFicha(null);
+    setSelectedFile(null);
     setUploadFileName('');
-    setUploadStatus('idle');
+    setFeedback(null);
   };
 
-  const handleSelectFile = (format: 'CSV' | 'Excel') => {
-    setUploadFileName(`lista_aprendices_${uploadFicha?.numero || 'ficha'}.${format === 'CSV' ? 'csv' : 'xlsx'}`);
-    setUploadStatus('idle');
+  const handleOpenFichaUpload = (ficha: Ficha) => {
+    setIsGeneralUpload(false);
+    setUploadFicha(ficha);
+    setSelectedFile(null);
+    setUploadFileName('');
+    setFeedback(null);
+  };
+
+  const handleTriggerFilePicker = () => {
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.csv, .xls, .xlsx';
+      input.onchange = (e: any) => {
+        const file = e.target?.files?.[0];
+        if (file) {
+          setSelectedFile(file);
+          setUploadFileName(file.name);
+          setFeedback(null);
+        }
+      };
+      input.click();
+    } else {
+      alert('Por favor usa la versión web para seleccionar archivos localmente.');
+    }
+  };
+
+  const handleConfirmUpload = async () => {
+    if (!selectedFile) {
+      setFeedback({ text: 'Por favor selecciona un archivo CSV o Excel.', type: 'error' });
+      return;
+    }
+
+    setIsUploading(true);
+    setFeedback(null);
+
+    try {
+      if (isGeneralUpload) {
+        const res = await fichasService.importAprendicesGeneral(selectedFile);
+        setFeedback({
+          text: `¡Carga exitosa! Se procesaron ${res.totalRows || 0} filas correctamente.`,
+          type: 'success',
+        });
+      } else if (uploadFicha) {
+        const res = await fichasService.importAprendices(uploadFicha.id, selectedFile);
+        setFeedback({
+          text: `¡Aprendices cargados exitosamente a la Ficha ${uploadFicha.numero}!`,
+          type: 'success',
+        });
+      }
+      await loadFichas();
+    } catch (err: any) {
+      setFeedback({
+        text: err.message || 'Error al procesar el archivo CSV/Excel.',
+        type: 'error',
+      });
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
       {/* Title */}
-      <Text style={styles.pageTitle}>Mis Fichas de Formación</Text>
+      <View style={styles.topHeader}>
+        <View>
+          <Text style={styles.pageTitle}>Mis Fichas de Formación</Text>
+          <Text style={styles.pageSubtitle}>Carga y gestión de aprendices asignados</Text>
+        </View>
+        <Pressable style={styles.uploadMainBtn} onPress={handleOpenGeneralUpload}>
+          <Ionicons name="cloud-upload-outline" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+          <Text style={styles.uploadMainBtnText}>Cargar CSV / Excel General</Text>
+        </Pressable>
+      </View>
 
       {/* Top Stat Cards Row */}
       <View style={styles.statsRow}>
@@ -75,16 +152,6 @@ export default function FichasScreenPremium() {
             <Text style={styles.statNumber}>{loading ? '-' : totalAprendices}</Text>
           </View>
         </View>
-
-        <View style={styles.statCard}>
-          <View style={styles.statIconWrap}>
-            <Ionicons name="analytics-outline" size={18} color={GOLD} />
-          </View>
-          <View style={styles.statTextGroup}>
-            <Text style={styles.statLabel}>Promedio Global</Text>
-            <Text style={styles.statNumber}>4.5</Text>
-          </View>
-        </View>
       </View>
 
       {loading ? (
@@ -94,9 +161,15 @@ export default function FichasScreenPremium() {
         </View>
       ) : fichas.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="folder-open-outline" size={48} color="#94A3B8" />
+          <Ionicons name="folder-open-outline" size={54} color="#94A3B8" />
           <Text style={styles.emptyTitle}>No hay fichas asignadas</Text>
-          <Text style={styles.emptySubtitle}>No tienes fichas de formación vinculadas en este momento.</Text>
+          <Text style={styles.emptySubtitle}>
+            No tienes fichas vinculadas en este momento. Puedes cargar un archivo CSV/Excel para asociar tus fichas y aprendices.
+          </Text>
+          <Pressable style={styles.emptyActionBtn} onPress={handleOpenGeneralUpload}>
+            <Ionicons name="cloud-upload-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+            <Text style={styles.emptyActionText}>Cargar CSV de Fichas</Text>
+          </Pressable>
         </View>
       ) : (
         fichas.map((ficha) => (
@@ -105,7 +178,7 @@ export default function FichasScreenPremium() {
             <View style={styles.fichaHeaderRow}>
               <View style={styles.fichaLeftHeader}>
                 <View style={styles.codeBadge}>
-                  <Text style={styles.codeBadgeText}>{ficha.numero}</Text>
+                  <Text style={styles.codeBadgeText}>{ficha.numero.slice(-3) || '000'}</Text>
                 </View>
                 <View style={styles.fichaTitleGroup}>
                   <Text style={styles.fichaTitle}>{ficha.programaNombre || 'Programa de Formación'}</Text>
@@ -114,39 +187,13 @@ export default function FichasScreenPremium() {
                   </Text>
                 </View>
               </View>
-
-              <View style={styles.statusBadge}>
-                <View style={styles.statusDot} />
-                <Text style={styles.statusBadgeText}>{ficha.estado ? ficha.estado.toUpperCase() : 'ACTIVO'}</Text>
-              </View>
             </View>
 
-            {/* 3 Pills Row */}
+            {/* Pills Row */}
             <View style={styles.pillsRow}>
               <View style={styles.goldPill}>
                 <Ionicons name="people" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
                 <Text style={styles.goldPillText}>{ficha.aprendicesCount || 0} Aprendices</Text>
-              </View>
-
-              <View style={styles.whitePill}>
-                <Ionicons name="checkbox-outline" size={14} color="#10B981" style={{ marginRight: 6 }} />
-                <Text style={styles.whitePillText}>90% Asistencia</Text>
-              </View>
-
-              <View style={styles.whitePill}>
-                <Ionicons name="star-outline" size={14} color={GOLD} style={{ marginRight: 6 }} />
-                <Text style={styles.whitePillText}>4.5 Promedio</Text>
-              </View>
-            </View>
-
-            {/* Progress bar section */}
-            <View style={styles.progressSection}>
-              <View style={styles.progressLabelRow}>
-                <Text style={styles.progressLabel}>Asistencia general del grupo</Text>
-                <Text style={styles.progressPercentage}>90%</Text>
-              </View>
-              <View style={styles.progressBarBg}>
-                <View style={[styles.progressBarFill, { width: '90%' }]} />
               </View>
             </View>
 
@@ -169,16 +216,8 @@ export default function FichasScreenPremium() {
               </Pressable>
 
               <Pressable
-                style={styles.btnWhite}
-                onPress={() => router.push('/instructor/calificaciones' as any)}
-              >
-                <Ionicons name="bar-chart-outline" size={16} color="#1E293B" style={{ marginRight: 6 }} />
-                <Text style={styles.btnWhiteText}>Ver Notas</Text>
-              </Pressable>
-
-              <Pressable
                 style={styles.btnNavy}
-                onPress={() => handleOpenUpload(ficha)}
+                onPress={() => handleOpenFichaUpload(ficha)}
               >
                 <Ionicons name="cloud-upload-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
                 <Text style={styles.btnNavyText}>Cargar aprendices</Text>
@@ -188,90 +227,78 @@ export default function FichasScreenPremium() {
         ))
       )}
 
+      {/* Modal de Carga CSV / Excel */}
       <Modal
-        visible={!!uploadFicha}
+        visible={isGeneralUpload || !!uploadFicha}
         transparent
-        animationType="slide"
-        onRequestClose={() => setUploadFicha(null)}
+        animationType="fade"
+        onRequestClose={() => {
+          setIsGeneralUpload(false);
+          setUploadFicha(null);
+        }}
       >
-        <View style={styles.uploadOverlay}>
-          <View style={styles.uploadModal}>
-            <View style={styles.uploadHeader}>
-              <View style={styles.uploadTitleRow}>
-                <View style={styles.uploadIconBadge}>
-                  <Ionicons name="cloud-upload-outline" size={21} color={GOLD} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.uploadTitle}>Cargar aprendices</Text>
-                  <Text style={styles.uploadSubtitle}>
-                    Ficha {uploadFicha?.numero || ''} · {uploadFicha?.programaNombre || 'Programa de formación'}
-                  </Text>
-                </View>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Ionicons name="cloud-upload-outline" size={24} color={GOLD} />
+                <Text style={styles.modalTitle}>
+                  {isGeneralUpload ? 'Cargar CSV / Excel General' : `Cargar Aprendices Ficha ${uploadFicha?.numero}`}
+                </Text>
               </View>
-              <Pressable onPress={() => setUploadFicha(null)} style={styles.closeUploadBtn}>
-                <Ionicons name="close" size={22} color="#64748B" />
+              <Pressable onPress={() => { setIsGeneralUpload(false); setUploadFicha(null); }}>
+                <Ionicons name="close" size={24} color="#64748B" />
               </Pressable>
             </View>
 
-            <ScrollView contentContainerStyle={styles.uploadBody}>
-              <Text style={styles.uploadSectionTitle}>Archivo de aprendices</Text>
-              <Text style={styles.uploadDescription}>
-                Selecciona el formato de la plantilla que vas a cargar para esta ficha.
+            <View style={styles.modalBody}>
+              <Text style={styles.modalDesc}>
+                {isGeneralUpload
+                  ? 'Sube un archivo CSV/Excel con columnas (tipoDocumento, numeroDocumento, nombres, apellidos, correo, ficha, programa).'
+                  : `Sube un archivo CSV/Excel para cargar los aprendices de la Ficha ${uploadFicha?.numero}.`}
               </Text>
 
-              <View style={styles.fileButtonsRow}>
-                <Pressable style={styles.fileFormatBtn} onPress={() => handleSelectFile('CSV')}>
-                  <Ionicons name="document-text-outline" size={20} color={GOLD} />
-                  <Text style={styles.fileFormatText}>Seleccionar CSV</Text>
-                </Pressable>
-                <Pressable style={styles.fileFormatBtn} onPress={() => handleSelectFile('Excel')}>
-                  <Ionicons name="grid-outline" size={20} color={GOLD} />
-                  <Text style={styles.fileFormatText}>Seleccionar Excel</Text>
-                </Pressable>
-              </View>
+              <Pressable style={styles.selectFileBtn} onPress={handleTriggerFilePicker}>
+                <Ionicons name="document-text-outline" size={22} color={NAVY} />
+                <Text style={styles.selectFileBtnText}>
+                  {uploadFileName ? uploadFileName : 'Seleccionar archivo CSV o Excel (.csv, .xlsx)'}
+                </Text>
+              </Pressable>
 
-              <View style={styles.selectedFileBox}>
-                <Ionicons name={uploadFileName ? 'document-attach-outline' : 'folder-open-outline'} size={21} color="#64748B" />
-                <Text style={styles.selectedFileText} numberOfLines={1}>
-                  {uploadFileName || 'Ningún archivo seleccionado'}
+              <View style={styles.reqColumnsBox}>
+                <Text style={styles.reqTitle}>Columnas requeridas en el archivo:</Text>
+                <Text style={styles.reqText}>
+                  tipoDocumento · numeroDocumento · nombres · apellidos · correo {isGeneralUpload ? '· ficha · programa' : ''}
                 </Text>
               </View>
 
-              <View style={styles.columnsBox}>
-                <Text style={styles.columnsTitle}>Columnas requeridas</Text>
-                <Text style={styles.columnsText}>Tipo de documento · Documento · Nombres · Apellidos · Correo</Text>
-                <Text style={styles.columnsHint}>La validación también revisará filas vacías y documentos repetidos.</Text>
-              </View>
-
-              {uploadStatus !== 'idle' && (
-                <View style={styles.uploadFeedback}>
-                  <Ionicons name="checkmark-circle-outline" size={20} color="#047857" />
-                  <Text style={styles.uploadFeedbackText}>
-                    {uploadStatus === 'saved' ? 'Carga confirmada en la vista previa.' : 'Archivo listo para revisar y confirmar.'}
+              {feedback && (
+                <View style={[styles.feedbackBox, feedback.type === 'error' ? styles.feedbackErr : styles.feedbackOk]}>
+                  <Ionicons name={feedback.type === 'error' ? 'alert-circle' : 'checkmark-circle'} size={20} color={feedback.type === 'error' ? '#DC2626' : '#16A34A'} />
+                  <Text style={[styles.feedbackText, feedback.type === 'error' ? { color: '#DC2626' } : { color: '#16A34A' }]}>
+                    {feedback.text}
                   </Text>
                 </View>
               )}
-            </ScrollView>
+            </View>
 
-            <View style={styles.uploadFooter}>
-              <Pressable style={styles.cancelUploadBtn} onPress={() => setUploadFicha(null)}>
-                <Text style={styles.cancelUploadText}>Cerrar</Text>
+            <View style={styles.modalFooter}>
+              <Pressable style={styles.closeBtn} onPress={() => { setIsGeneralUpload(false); setUploadFicha(null); }}>
+                <Text style={styles.closeBtnText}>Cerrar</Text>
               </Pressable>
               <Pressable
-                style={[styles.validateUploadBtn, !uploadFileName && styles.disabledUploadBtn]}
-                disabled={!uploadFileName}
-                onPress={() => setUploadStatus('validated')}
+                style={[styles.submitBtn, (!selectedFile || isUploading) && styles.submitBtnDisabled]}
+                disabled={!selectedFile || isUploading}
+                onPress={handleConfirmUpload}
               >
-                <Ionicons name="shield-checkmark-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                <Text style={styles.validateUploadText}>Validar archivo</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.saveUploadBtn, uploadStatus !== 'validated' && styles.disabledUploadBtn]}
-                disabled={uploadStatus !== 'validated'}
-                onPress={() => setUploadStatus('saved')}
-              >
-                <Ionicons name="save-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                <Text style={styles.saveUploadText}>Confirmar carga</Text>
+                {isUploading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons name="cloud-upload" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                    <Text style={styles.submitBtnText}>Confirmar e Importar</Text>
+                  </>
+                )}
               </Pressable>
             </View>
           </View>
@@ -291,11 +318,36 @@ const styles = StyleSheet.create({
     paddingVertical: 24,
     paddingBottom: 40,
   },
+  topHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    flexWrap: 'wrap',
+    gap: 12,
+  },
   pageTitle: {
     fontSize: 26,
     fontWeight: '700',
-    color: '#0F172A',
-    marginBottom: 20,
+    color: NAVY,
+  },
+  pageSubtitle: {
+    fontSize: 13,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  uploadMainBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: NAVY,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 10,
+  },
+  uploadMainBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 14,
   },
   statsRow: {
     flexDirection: 'row',
@@ -313,11 +365,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 1,
   },
   statIconWrap: {
     width: 40,
@@ -349,19 +396,34 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    marginTop: 20,
+    marginTop: 10,
   },
   emptyTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
-    color: '#334155',
+    color: NAVY,
     marginTop: 12,
   },
   emptySubtitle: {
     fontSize: 13,
     color: '#64748B',
     textAlign: 'center',
-    marginTop: 4,
+    marginTop: 6,
+    maxWidth: 480,
+  },
+  emptyActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: GOLD,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 10,
+    marginTop: 20,
+  },
+  emptyActionText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 14,
   },
   fichaCard: {
     backgroundColor: '#FFFFFF',
@@ -370,19 +432,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
   },
   fichaHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 18,
-    flexWrap: 'wrap',
-    gap: 10,
+    marginBottom: 14,
   },
   fichaLeftHeader: {
     flexDirection: 'row',
@@ -407,38 +462,17 @@ const styles = StyleSheet.create({
   fichaTitle: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#0F172A',
+    color: NAVY,
   },
   fichaSubtitle: {
     fontSize: 13,
     color: '#64748B',
     marginTop: 2,
   },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#DCFCE7',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
-    gap: 6,
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#16A34A',
-  },
-  statusBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#15803D',
-  },
   pillsRow: {
     flexDirection: 'row',
     gap: 10,
     marginBottom: 18,
-    flexWrap: 'wrap',
   },
   goldPill: {
     flexDirection: 'row',
@@ -452,50 +486,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#FFFFFF',
-  },
-  whitePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  whitePillText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#334155',
-  },
-  progressSection: {
-    marginBottom: 18,
-  },
-  progressLabelRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  progressLabel: {
-    fontSize: 13,
-    color: '#475569',
-    fontWeight: '500',
-  },
-  progressPercentage: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  progressBarBg: {
-    height: 8,
-    backgroundColor: '#F1F5F9',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: GOLD,
-    borderRadius: 4,
   },
   actionsRow: {
     flexDirection: 'row',
@@ -546,196 +536,127 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
   },
-  uploadOverlay: {
+  modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 16, 38, 0.58)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
-  uploadModal: {
-    width: '94%',
-    maxWidth: 620,
-    maxHeight: '88%',
+  modalCard: {
+    width: '100%',
+    maxWidth: 560,
     backgroundColor: '#FFFFFF',
-    borderRadius: 18,
+    borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 10,
   },
-  uploadHeader: {
+  modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#F8FAFC',
+    padding: 18,
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
   },
-  uploadTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  uploadIconBadge: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: 'rgba(212, 175, 55, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  uploadTitle: {
+  modalTitle: {
     fontSize: 17,
     fontWeight: '700',
     color: NAVY,
   },
-  uploadSubtitle: {
+  modalBody: {
+    padding: 20,
+    gap: 14,
+  },
+  modalDesc: {
+    fontSize: 13,
+    color: '#475569',
+    lineHeight: 18,
+  },
+  selectFileBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 2,
+    borderColor: GOLD,
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    padding: 18,
+    backgroundColor: '#FFFBEB',
+    justifyContent: 'center',
+  },
+  selectFileBtnText: {
+    color: NAVY,
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  reqColumnsBox: {
+    backgroundColor: '#F8FAFC',
+    padding: 12,
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: GOLD,
+  },
+  reqTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: NAVY,
+  },
+  reqText: {
     fontSize: 12,
     color: '#64748B',
     marginTop: 2,
   },
-  closeUploadBtn: {
-    padding: 6,
-  },
-  uploadBody: {
-    padding: 20,
-    gap: 14,
-  },
-  uploadSectionTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: NAVY,
-  },
-  uploadDescription: {
-    fontSize: 13,
-    color: '#64748B',
-    lineHeight: 19,
-  },
-  fileButtonsRow: {
-    flexDirection: 'row',
-    gap: 10,
-    flexWrap: 'wrap',
-  },
-  fileFormatBtn: {
+  feedbackBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    borderWidth: 1,
-    borderColor: GOLD,
-    borderRadius: 9,
-    paddingVertical: 11,
-    paddingHorizontal: 14,
-    backgroundColor: '#FFFCF2',
-  },
-  fileFormatText: {
-    color: NAVY,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  selectedFileBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-    borderRadius: 9,
-    backgroundColor: '#F8FAFC',
-    padding: 13,
-  },
-  selectedFileText: {
-    flex: 1,
-    color: '#475569',
-    fontSize: 13,
-  },
-  columnsBox: {
-    borderLeftWidth: 3,
-    borderLeftColor: GOLD,
-    backgroundColor: '#FFFCF2',
-    padding: 13,
-    gap: 5,
-  },
-  columnsTitle: {
-    color: NAVY,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  columnsText: {
-    color: '#334155',
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  columnsHint: {
-    color: '#64748B',
-    fontSize: 11,
-    lineHeight: 16,
-  },
-  uploadFeedback: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#ECFDF5',
-    borderRadius: 9,
     padding: 12,
+    borderRadius: 8,
   },
-  uploadFeedbackText: {
-    flex: 1,
-    color: '#047857',
-    fontSize: 12,
+  feedbackOk: {
+    backgroundColor: '#DCFCE7',
+  },
+  feedbackErr: {
+    backgroundColor: '#FEE2E2',
+  },
+  feedbackText: {
+    fontSize: 13,
     fontWeight: '600',
+    flex: 1,
   },
-  uploadFooter: {
+  modalFooter: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    gap: 9,
-    flexWrap: 'wrap',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+    gap: 10,
+    padding: 16,
     borderTopWidth: 1,
     borderTopColor: '#E2E8F0',
     backgroundColor: '#F8FAFC',
   },
-  cancelUploadBtn: {
+  closeBtn: {
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 8,
     backgroundColor: '#E2E8F0',
   },
-  cancelUploadText: {
+  closeBtnText: {
     color: '#475569',
     fontWeight: '600',
     fontSize: 13,
   },
-  validateUploadBtn: {
+  submitBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 8,
-    backgroundColor: '#0F766E',
-  },
-  saveUploadBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
+    paddingHorizontal: 18,
     borderRadius: 8,
     backgroundColor: GOLD,
   },
-  disabledUploadBtn: {
-    opacity: 0.45,
+  submitBtnDisabled: {
+    opacity: 0.5,
   },
-  validateUploadText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  saveUploadText: {
+  submitBtnText: {
     color: '#FFFFFF',
     fontWeight: '700',
     fontSize: 13,

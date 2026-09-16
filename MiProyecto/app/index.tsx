@@ -65,9 +65,7 @@ export default function AuthScreen() {
 
   const hasAllowedEmailDomain = (email: string, role: 'INSTRUCTOR' | 'APRENDIZ') => {
     const normalizedEmail = email.trim().toLowerCase();
-    return role === 'INSTRUCTOR'
-      ? normalizedEmail.endsWith('@soy.sena.edu.co')
-      : normalizedEmail.endsWith('@gmail.com');
+    return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(normalizedEmail);
   };
 
   
@@ -122,7 +120,7 @@ useEffect(() => {
       const destination =
         user.role === 'INSTRUCTOR'
           ? '/instructor/inicio'
-          : user.role === 'ADMIN'
+          : user.role === 'ADMIN' || user.role === 'SUPERADMIN'
           ? '/admin'
           : '/aprendiz';
       router.replace(destination as any);
@@ -147,7 +145,7 @@ useEffect(() => {
 
     if (!hasAllowedEmailDomain(loginCorreo, loginRole)) {
       setFeedback({
-        text: loginRole === 'APRENDIZ' ? 'El aprendiz debe iniciar sesión con un correo @gmail.com.' : 'El instructor debe iniciar sesión con un correo @soy.sena.edu.co.',
+        text: 'Por favor ingresa un correo electrónico válido.',
         type: 'error',
       });
       return;
@@ -407,12 +405,12 @@ useEffect(() => {
                     )}
 
                     <View style={styles.fieldGroup}>
-                      <Text style={styles.labelLight}>{loginRole === 'APRENDIZ' ? 'Gmail' : 'Correo @soy.sena.edu.co'}</Text>
+                      <Text style={styles.labelLight}>Correo Electrónico</Text>
                       <View style={styles.borderedInputWrapper}>
                         <Ionicons name="mail" size={18} color="#475569" style={styles.fieldIcon} />
                         <TextInput
                           style={styles.borderedInput}
-                          placeholder={loginRole === 'APRENDIZ' ? 'aprendiz@gmail.com' : 'instructor@soy.sena.edu.co'}
+                          placeholder="usuario@correo.com"
                           placeholderTextColor="#94A3B8"
                           keyboardType="email-address"
                           autoCapitalize="none"
