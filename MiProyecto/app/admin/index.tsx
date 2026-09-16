@@ -49,9 +49,9 @@ export default function AdminDashboard() {
   ];
 
   const quickActions = [
-    { title: 'Registrar usuario', icon: 'person-add-outline' as const, route: '/admin/usuarios' },
-    { title: 'Nueva ficha', icon: 'add-circle-outline' as const, route: '/admin/fichas' },
-    { title: 'Tomar asistencia', icon: 'checkmark-done-outline' as const, route: '/admin/asistencia' },
+    { title: 'Gestionar fichas', icon: 'folder-open-outline' as const, route: '/admin/fichas' },
+    { title: 'Asignar instructores', icon: 'briefcase-outline' as const, route: '/admin/instructores' },
+    { title: 'Calificaciones', icon: 'bar-chart-outline' as const, route: '/admin/calificaciones' },
     { title: 'Ver reportes', icon: 'analytics-outline' as const, route: '/admin/reportes' },
   ];
 

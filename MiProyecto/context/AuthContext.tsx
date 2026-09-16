@@ -1,19 +1,20 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { router } from 'expo-router';
-import { authService, User } from '../services/authService';
+import { authService, User, RegisterData } from '../services/authService';
 
 type AuthContextType = {
   user: User | null;
   isLoading: boolean;
-  login: (correo: string, contrasenia: string) => Promise<{ success: boolean; message?: string }>;
+  login: (credentials: { correo: string; contrasenia: string; role: 'INSTRUCTOR' | 'APRENDIZ'; documento?: string }) => Promise<{ success: boolean; message?: string }>;
    setSession: (user: User) => void;
-  register: (nombre: string, correo: string, contrasenia: string, confirmContrasenia: string) => Promise<{ success: boolean; message?: string }>;
+  register: (data: RegisterData) => Promise<{ success: boolean; message?: string }>;
   logout: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const ROLE_ROUTES: Record<User['role'], string> = {
+  SUPERADMIN: '/admin',
   ADMIN: '/admin',
   INSTRUCTOR: '/instructor/inicio',
   APRENDIZ: '/aprendiz',
@@ -42,8 +43,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })();
   }, []);
 
-  const login = async (correo: string, contrasenia: string) => {
-    const result = await authService.login(correo, contrasenia);
+  const login = async (credentials: { correo: string; contrasenia: string; role: 'INSTRUCTOR' | 'APRENDIZ'; documento?: string }) => {
+    const result = await authService.login(credentials);
 
     if (!result.success || !result.user) {
       return { success: false, message: result.message };
@@ -58,8 +59,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { success: true };
   };
 
-  const register = async (nombre: string, correo: string, contrasenia: string, confirmContrasenia: string) => {
-    return authService.register(nombre, correo, contrasenia, confirmContrasenia);
+  const register = async (data: RegisterData) => {
+    return authService.register(data);
   };
 
   const logout = async () => {

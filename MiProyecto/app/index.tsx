@@ -36,6 +36,8 @@ export default function AuthScreen() {
 
   // Login Form State
   const [loginCorreo, setLoginCorreo] = useState('');
+  const [loginRole, setLoginRole] = useState<'INSTRUCTOR' | 'APRENDIZ'>('APRENDIZ');
+  const [loginDocumento, setLoginDocumento] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [showLoginPassword, setShowLoginPassword] = useState(false);
@@ -43,6 +45,11 @@ export default function AuthScreen() {
   // Register Form State
   const [regNombre, setRegNombre] = useState('');
   const [regCorreo, setRegCorreo] = useState('');
+  const [regRole, setRegRole] = useState<'INSTRUCTOR' | 'APRENDIZ'>('APRENDIZ');
+  const [regTipoDocumento, setRegTipoDocumento] = useState('');
+  const [regDocumento, setRegDocumento] = useState('');
+  const [regFicha, setRegFicha] = useState('');
+  const [regPrograma, setRegPrograma] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regConfirmPassword, setRegConfirmPassword] = useState('');
   const [showRegPassword, setShowRegPassword] = useState(false);
@@ -55,6 +62,13 @@ export default function AuthScreen() {
   // Validación de la contraseña en tiempo real para Registro
   const passValidation = validatePassword(regPassword);
   const passMatches = validatePasswordMatch(regPassword, regConfirmPassword);
+
+  const hasAllowedEmailDomain = (email: string, role: 'INSTRUCTOR' | 'APRENDIZ') => {
+    const normalizedEmail = email.trim().toLowerCase();
+    return role === 'INSTRUCTOR'
+      ? normalizedEmail.endsWith('@soy.sena.edu.co')
+      : normalizedEmail.endsWith('@gmail.com');
+  };
 
   
 
@@ -126,13 +140,26 @@ useEffect(() => {
 
   const handleLogin = async () => {
     setFeedback(null);
-    if (!loginCorreo || !loginPassword) {
+    if (!loginCorreo || !loginPassword || (loginRole === 'APRENDIZ' && !loginDocumento)) {
       setFeedback({ text: 'Por favor completa todos los campos.', type: 'error' });
       return;
     }
 
+    if (!hasAllowedEmailDomain(loginCorreo, loginRole)) {
+      setFeedback({
+        text: loginRole === 'APRENDIZ' ? 'El aprendiz debe iniciar sesión con un correo @gmail.com.' : 'El instructor debe iniciar sesión con un correo @soy.sena.edu.co.',
+        type: 'error',
+      });
+      return;
+    }
+
     setIsSubmitting(true);
-    const res = await login(loginCorreo, loginPassword);
+    const res = await login({
+      correo: loginCorreo.trim(),
+      contrasenia: loginPassword,
+      role: loginRole,
+      documento: loginRole === 'APRENDIZ' ? loginDocumento.trim() : undefined,
+    });
     setIsSubmitting(false);
 
     if (!res.success) {
@@ -144,8 +171,19 @@ useEffect(() => {
 
   const handleRegister = async () => {
     setFeedback(null);
-    if (!regNombre.trim() || !regCorreo.trim() || !regPassword || !regConfirmPassword) {
+    const instructorDataComplete = regRole === 'INSTRUCTOR' && regNombre.trim() && regCorreo.trim();
+    const aprendizDataComplete = regRole === 'APRENDIZ' && regTipoDocumento && regDocumento.trim() && regFicha.trim() && regPrograma.trim();
+
+    if (!regCorreo.trim() || !regPassword || !regConfirmPassword || (!instructorDataComplete && !aprendizDataComplete)) {
       setFeedback({ text: 'Por favor completa todos los campos del formulario.', type: 'error' });
+      return;
+    }
+
+    if (!hasAllowedEmailDomain(regCorreo, regRole)) {
+      setFeedback({
+        text: regRole === 'APRENDIZ' ? 'El aprendiz debe registrarse con un correo @gmail.com.' : 'El instructor debe registrarse con un correo @soy.sena.edu.co.',
+        type: 'error',
+      });
       return;
     }
 
@@ -160,14 +198,29 @@ useEffect(() => {
     }
 
     setIsSubmitting(true);
-    const res = await register(regNombre.trim(), regCorreo.trim(), regPassword, regConfirmPassword);
+    const res = await register({
+      nombre: regNombre.trim() || 'Aprendiz AIMS',
+      correo: regCorreo.trim(),
+      contrasenia: regPassword,
+      confirmContrasenia: regConfirmPassword,
+      role: regRole,
+      tipoDocumento: regRole === 'APRENDIZ' ? regTipoDocumento : undefined,
+      documento: regRole === 'APRENDIZ' ? regDocumento.trim() : undefined,
+      ficha: regRole === 'APRENDIZ' ? regFicha.trim() : undefined,
+      programa: regRole === 'APRENDIZ' ? regPrograma.trim() : undefined,
+    });
 
     if (!res.success) {
       setIsSubmitting(false);
       setFeedback({ text: res.message || 'Error al registrar la cuenta.', type: 'error' });
     } else {
       setFeedback({ text: '¡Cuenta creada con éxito! Entrando al sistema...', type: 'success' });
-      const loginRes = await login(regCorreo.trim(), regPassword);
+      const loginRes = await login({
+        correo: regCorreo.trim(),
+        contrasenia: regPassword,
+        role: regRole,
+        documento: regRole === 'APRENDIZ' ? regDocumento.trim() : undefined,
+      });
       setIsSubmitting(false);
       if (!loginRes.success) {
         setLoginCorreo(regCorreo.trim());
@@ -244,13 +297,9 @@ useEffect(() => {
             {(isLoading || isSubmitting) && (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#C59427" />
-<<<<<<< HEAD
                 <Text style={styles.loadingText}>
                   {isLoading ? 'Verificando sesión...' : 'Procesando solicitud...'}
                 </Text>
-=======
-                <Text style={styles.loadingText}>Procesando solicitud...</Text>
->>>>>>> 73ee7842ad18e133f6032a127c51fc3148683cdd
               </View>
             )}
 
@@ -322,14 +371,48 @@ useEffect(() => {
 
                     <Text style={styles.cardTitleLight}>INICIO DE SESIÓN</Text>
 
-                    {/* Correo / Matrícula */}
+                    <Text style={styles.labelLight}>Tipo de cuenta</Text>
+                    <View style={styles.roleSelector}>
+                      <TouchableOpacity
+                        style={[styles.roleOption, loginRole === 'APRENDIZ' && styles.roleOptionActive]}
+                        onPress={() => setLoginRole('APRENDIZ')}
+                      >
+                        <Ionicons name="school-outline" size={17} color={loginRole === 'APRENDIZ' ? '#FFFFFF' : '#475569'} />
+                        <Text style={[styles.roleOptionText, loginRole === 'APRENDIZ' && styles.roleOptionTextActive]}>Aprendiz</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.roleOption, loginRole === 'INSTRUCTOR' && styles.roleOptionActive]}
+                        onPress={() => setLoginRole('INSTRUCTOR')}
+                      >
+                        <Ionicons name="briefcase-outline" size={17} color={loginRole === 'INSTRUCTOR' ? '#FFFFFF' : '#475569'} />
+                        <Text style={[styles.roleOptionText, loginRole === 'INSTRUCTOR' && styles.roleOptionTextActive]}>Instructor</Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {loginRole === 'APRENDIZ' && (
+                      <View style={styles.fieldGroup}>
+                        <Text style={styles.labelLight}>Documento</Text>
+                        <View style={styles.borderedInputWrapper}>
+                          <Ionicons name="card-outline" size={18} color="#475569" style={styles.fieldIcon} />
+                          <TextInput
+                            style={styles.borderedInput}
+                            placeholder="Número de documento"
+                            placeholderTextColor="#94A3B8"
+                            keyboardType="numeric"
+                            value={loginDocumento}
+                            onChangeText={setLoginDocumento}
+                          />
+                        </View>
+                      </View>
+                    )}
+
                     <View style={styles.fieldGroup}>
-                      <Text style={styles.labelLight}>Correo Institucional / Matrícula</Text>
+                      <Text style={styles.labelLight}>{loginRole === 'APRENDIZ' ? 'Gmail' : 'Correo @soy.sena.edu.co'}</Text>
                       <View style={styles.borderedInputWrapper}>
                         <Ionicons name="mail" size={18} color="#475569" style={styles.fieldIcon} />
                         <TextInput
                           style={styles.borderedInput}
-                          placeholder="usuario@sena.edu.co o @gmail.com"
+                          placeholder={loginRole === 'APRENDIZ' ? 'aprendiz@gmail.com' : 'instructor@soy.sena.edu.co'}
                           placeholderTextColor="#94A3B8"
                           keyboardType="email-address"
                           autoCapitalize="none"
@@ -433,29 +516,108 @@ useEffect(() => {
 
                     <Text style={styles.cardTitleDark}>REGISTRO DE CUENTA</Text>
 
-                    {/* Nombre Completo */}
-                    <View style={styles.fieldGroup}>
-                      <Text style={styles.labelDark}>Nombre Completo</Text>
-                      <View style={styles.whiteInputWrapper}>
-                        <Ionicons name="person" size={18} color="#475569" style={styles.fieldIcon} />
-                        <TextInput
-                          style={styles.whiteInput}
-                          placeholder="Valentina Torres"
-                          placeholderTextColor="#94A3B8"
-                          value={regNombre}
-                          onChangeText={setRegNombre}
-                        />
-                      </View>
+                    <Text style={styles.labelDark}>Tipo de cuenta</Text>
+                    <View style={styles.roleSelectorDark}>
+                      <TouchableOpacity
+                        style={[styles.roleOption, regRole === 'APRENDIZ' && styles.roleOptionActive]}
+                        onPress={() => setRegRole('APRENDIZ')}
+                      >
+                        <Ionicons name="school-outline" size={17} color={regRole === 'APRENDIZ' ? '#FFFFFF' : '#475569'} />
+                        <Text style={[styles.roleOptionText, regRole === 'APRENDIZ' && styles.roleOptionTextActive]}>Aprendiz</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.roleOption, regRole === 'INSTRUCTOR' && styles.roleOptionActive]}
+                        onPress={() => setRegRole('INSTRUCTOR')}
+                      >
+                        <Ionicons name="briefcase-outline" size={17} color={regRole === 'INSTRUCTOR' ? '#FFFFFF' : '#475569'} />
+                        <Text style={[styles.roleOptionText, regRole === 'INSTRUCTOR' && styles.roleOptionTextActive]}>Instructor</Text>
+                      </TouchableOpacity>
                     </View>
 
-                    {/* Correo Institucional / Personal */}
+                    {regRole === 'INSTRUCTOR' ? (
+                      <View style={styles.fieldGroup}>
+                        <Text style={styles.labelDark}>Nombre Completo</Text>
+                        <View style={styles.whiteInputWrapper}>
+                          <Ionicons name="person" size={18} color="#475569" style={styles.fieldIcon} />
+                          <TextInput
+                            style={styles.whiteInput}
+                            placeholder="Nombre del instructor"
+                            placeholderTextColor="#94A3B8"
+                            value={regNombre}
+                            onChangeText={setRegNombre}
+                          />
+                        </View>
+                      </View>
+                    ) : (
+                      <>
+                        <View style={styles.fieldGroup}>
+                          <Text style={styles.labelDark}>Tipo de documento</Text>
+                          <View style={styles.whiteInputWrapper}>
+                            <Ionicons name="card-outline" size={18} color="#475569" style={styles.fieldIcon} />
+                            <TextInput
+                              style={styles.whiteInput}
+                              placeholder="CC, TI, CE..."
+                              placeholderTextColor="#94A3B8"
+                              value={regTipoDocumento}
+                              onChangeText={setRegTipoDocumento}
+                              autoCapitalize="characters"
+                            />
+                          </View>
+                        </View>
+
+                        <View style={styles.fieldGroup}>
+                          <Text style={styles.labelDark}>Número de documento</Text>
+                          <View style={styles.whiteInputWrapper}>
+                            <Ionicons name="finger-print-outline" size={18} color="#475569" style={styles.fieldIcon} />
+                            <TextInput
+                              style={styles.whiteInput}
+                              placeholder="Documento registrado en la ficha"
+                              placeholderTextColor="#94A3B8"
+                              keyboardType="numeric"
+                              value={regDocumento}
+                              onChangeText={setRegDocumento}
+                            />
+                          </View>
+                        </View>
+
+                        <View style={styles.fieldGroup}>
+                          <Text style={styles.labelDark}>Ficha</Text>
+                          <View style={styles.whiteInputWrapper}>
+                            <Ionicons name="bookmark-outline" size={18} color="#475569" style={styles.fieldIcon} />
+                            <TextInput
+                              style={styles.whiteInput}
+                              placeholder="Número de ficha asignada"
+                              placeholderTextColor="#94A3B8"
+                              keyboardType="numeric"
+                              value={regFicha}
+                              onChangeText={setRegFicha}
+                            />
+                          </View>
+                        </View>
+
+                        <View style={styles.fieldGroup}>
+                          <Text style={styles.labelDark}>Programa de formación</Text>
+                          <View style={styles.whiteInputWrapper}>
+                            <Ionicons name="school-outline" size={18} color="#475569" style={styles.fieldIcon} />
+                            <TextInput
+                              style={styles.whiteInput}
+                              placeholder="Programa registrado en la ficha"
+                              placeholderTextColor="#94A3B8"
+                              value={regPrograma}
+                              onChangeText={setRegPrograma}
+                            />
+                          </View>
+                        </View>
+                      </>
+                    )}
+
                     <View style={styles.fieldGroup}>
-                      <Text style={styles.labelDark}>Correo Institucional o Personal</Text>
+                      <Text style={styles.labelDark}>{regRole === 'APRENDIZ' ? 'Gmail' : 'Correo @soy.sena.edu.co'}</Text>
                       <View style={styles.whiteInputWrapper}>
                         <Ionicons name="mail" size={18} color="#475569" style={styles.fieldIcon} />
                         <TextInput
                           style={styles.whiteInput}
-                          placeholder="aprendiz@soy.sena.edu.co o instructor@sena.edu.co"
+                          placeholder={regRole === 'APRENDIZ' ? 'aprendiz@gmail.com' : 'instructor@soy.sena.edu.co'}
                           placeholderTextColor="#94A3B8"
                           keyboardType="email-address"
                           autoCapitalize="none"
@@ -466,7 +628,7 @@ useEffect(() => {
                       <View style={styles.domainHelperBox}>
                         <Ionicons name="information-circle-outline" size={15} color="#C59427" style={{ marginRight: 6 }} />
                         <Text style={styles.domainHelperText}>
-                          SENA: <Text style={styles.boldDomain}>@sena.edu.co</Text> (Instructor), <Text style={styles.boldDomain}>@soy.sena.edu.co</Text> o <Text style={styles.boldDomain}>@gmail.com</Text> (Aprendiz)
+                          Instructor: <Text style={styles.boldDomain}>@soy.sena.edu.co</Text> · Aprendiz: <Text style={styles.boldDomain}>@gmail.com</Text>
                         </Text>
                       </View>
                       {regCorreo.length > 0 && isDisposableEmail(regCorreo) && (
@@ -806,6 +968,41 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     marginBottom: 6,
+  },
+  roleSelector: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 14,
+  },
+  roleSelectorDark: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 14,
+  },
+  roleOption: {
+    flex: 1,
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 8,
+  },
+  roleOptionActive: {
+    backgroundColor: '#C59427',
+    borderColor: '#C59427',
+  },
+  roleOptionText: {
+    color: '#475569',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  roleOptionTextActive: {
+    color: '#FFFFFF',
   },
   borderedInputWrapper: {
     flexDirection: 'row',

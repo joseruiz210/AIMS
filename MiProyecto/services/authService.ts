@@ -1,17 +1,36 @@
 import { saveToken, getToken, removeToken, saveUserData, getUserData, removeUserData } from '../utils/storage';
-import { validatePassword, validateEmail, verifyEmailDomainExistence } from '../utils/validation';
+import { validatePassword, verifyEmailDomainExistence } from '../utils/validation';
 
 export interface User {
   id: string;
   nombre: string;
   correo: string;
-  role: 'ADMIN' | 'INSTRUCTOR' | 'APRENDIZ';
+  role: 'SUPERADMIN' | 'ADMIN' | 'INSTRUCTOR' | 'APRENDIZ';
 }
 export interface AuthResponse {
   success: boolean;
   token?: string;
   user?: User;
   message?: string;
+}
+
+export interface LoginCredentials {
+  correo: string;
+  contrasenia: string;
+  role: 'INSTRUCTOR' | 'APRENDIZ';
+  documento?: string;
+}
+
+export interface RegisterData {
+  nombre: string;
+  correo: string;
+  contrasenia: string;
+  confirmContrasenia: string;
+  role: 'INSTRUCTOR' | 'APRENDIZ';
+  tipoDocumento?: string;
+  documento?: string;
+  ficha?: string;
+  programa?: string;
 }
 
 // Configuración de URL base para la API Backend
@@ -24,7 +43,7 @@ export const authService = {
   /**
    * Iniciar sesión de usuario y obtener JWT
    */
-  async login(correo: string, contrasenia: string): Promise<AuthResponse> {
+  async login({ correo, contrasenia, role, documento }: LoginCredentials): Promise<AuthResponse> {
     const emailCheck = await verifyEmailDomainExistence(correo);
     if (!emailCheck.isValidFormat || !emailCheck.isNotDisposable || !emailCheck.domainExists) {
       return { success: false, message: emailCheck.message };
@@ -37,7 +56,7 @@ export const authService = {
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: correo, password: contrasenia }),
+        body: JSON.stringify({ email: correo, password: contrasenia, role, documento }),
       });
       const data = await response.json();
 
@@ -56,7 +75,7 @@ export const authService = {
   /**
    * Registrar nuevo usuario con validación de contraseña
    */
-  async register(nombre: string, correo: string, contrasenia: string, confirmContrasenia: string): Promise<AuthResponse> {
+  async register({ nombre, correo, contrasenia, confirmContrasenia, role, tipoDocumento, documento, ficha, programa }: RegisterData): Promise<AuthResponse> {
     if (!nombre.trim()) {
       return { success: false, message: 'El nombre completo es requerido.' };
     }
@@ -85,7 +104,17 @@ export const authService = {
       const response = await fetch(`${API_BASE_URL}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firstName, lastName, email: correo, password: contrasenia }),
+        body: JSON.stringify({
+          firstName,
+          lastName,
+          email: correo,
+          password: contrasenia,
+          role,
+          documentType: tipoDocumento,
+          documentNumber: documento,
+          ficha,
+          programa,
+        }),
       });
       const data = await response.json();
 

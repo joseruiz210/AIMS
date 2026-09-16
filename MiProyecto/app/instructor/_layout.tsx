@@ -7,7 +7,6 @@ import { useAuth } from '../../context/AuthContext';
 import LogoutModal from '../../components/LogoutModal';
 
 const NAVY_DARK = '#0F1026';
-const NAVY_LIGHT = '#1A183B';
 const GOLD = '#D4AF37';
 const GOLD_LIGHT = 'rgba(212, 175, 55, 0.15)';
 const BG_PAGE = '#F8FAFC';
@@ -49,8 +48,6 @@ export default function InstructorLayout() {
     { name: 'Calificaciones', path: '/instructor/calificaciones', icon: 'bar-chart-outline' },
     { name: 'Observaciones', path: '/instructor/observaciones', icon: 'chatbubbles-outline' },
     { name: 'Reportes', path: '/instructor/reportes', icon: 'document-text-outline' },
-    { name: 'Mensajes', path: '/instructor/mensajes', icon: 'mail-outline' },
-    { name: 'Configuración', path: '/instructor/configuracion', icon: 'settings-outline' },
   ];
 
   const MenuItem = ({ name, path, icon }: MenuItemType) => {
@@ -101,13 +98,6 @@ export default function InstructorLayout() {
           </Pressable>
           
           <View style={styles.mobileHeaderRight}>
-            <Pressable 
-              style={styles.headerIconWrap}
-              onPress={() => router.push('/instructor/notificaciones')}
-            >
-              <Ionicons name="notifications-outline" size={22} color={NAVY_DARK} />
-              <View style={styles.bellDot} />
-            </Pressable>
             <Ionicons name="person-circle" size={30} color={NAVY_DARK} />
           </View>
         </View>
@@ -155,7 +145,7 @@ export default function InstructorLayout() {
               color={pathname === '/instructor/aprendices' ? GOLD : '#FFFFFF'}
             />
             <Text style={[pathname === '/instructor/aprendices' ? styles.mobileNavTextActive : styles.mobileNavText]}>
-              Usuarios
+              Aprendices
             </Text>
           </Pressable>
 
@@ -166,7 +156,7 @@ export default function InstructorLayout() {
               color={pathname === '/instructor/fichas' ? GOLD : '#FFFFFF'}
             />
             <Text style={[pathname === '/instructor/fichas' ? styles.mobileNavTextActive : styles.mobileNavText]}>
-              Programas
+              Fichas
             </Text>
           </Pressable>
 
@@ -233,13 +223,6 @@ export default function InstructorLayout() {
         {/* Header bar on top right for User profile */}
         <View style={styles.desktopHeader}>
           <View style={styles.headerUserSection}>
-            <Pressable 
-              style={styles.iconBtn}
-              onPress={() => router.push('/instructor/notificaciones')}
-            >
-              <Ionicons name="notifications-outline" size={24} color={NAVY_DARK} />
-              <View style={styles.bellDot} />
-            </Pressable>
             <View style={styles.userInfoGroup}>
               <Ionicons name="person-circle" size={32} color={NAVY_DARK} />
               <Text style={styles.userName}>{userName}</Text>

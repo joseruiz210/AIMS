@@ -26,11 +26,6 @@ const proximasClases = [
   { hora: '09:00 - 11:00', materia: 'POO', instructor: 'Carmen López', aula: '102' },
 ];
 
-const notificacionesRecientes = [
-  { id: '1', titulo: 'Nueva calificación en ADSO', hora: 'Hace 10 min', leida: false },
-  { id: '2', titulo: 'Recordatorio de Asistencia mañana', hora: 'Hace 2 horas', leida: true },
-];
-
 export default function AprendizHome() {
   const { width } = useWindowDimensions();
   const isDesktop = width >= 1024;
@@ -39,17 +34,9 @@ export default function AprendizHome() {
   const [selectedClase, setSelectedClase] = useState<typeof proximasClases[0] | null>(null);
   const [claseModalVisible, setClaseModalVisible] = useState(false);
 
-  const [selectedNotif, setSelectedNotif] = useState<typeof notificacionesRecientes[0] | null>(null);
-  const [notifModalVisible, setNotifModalVisible] = useState(false);
-
   const handleOpenClase = (clase: typeof proximasClases[0]) => {
     setSelectedClase(clase);
     setClaseModalVisible(true);
-  };
-
-  const handleOpenNotif = (notif: typeof notificacionesRecientes[0]) => {
-    setSelectedNotif(notif);
-    setNotifModalVisible(true);
   };
 
   const pad = isDesktop ? 28 : 16;
@@ -63,13 +50,6 @@ export default function AprendizHome() {
           <Text style={styles.name}>Maria Torres</Text>
         </View>
         <View style={styles.headerActions}>
-          <Pressable
-            style={({ hovered }: any) => [styles.bellWrap, hovered && styles.bellWrapHover]}
-            onPress={() => router.push('/aprendiz/notificaciones' as any)}
-          >
-            <Ionicons name="notifications-outline" size={22} color={NAVY} />
-            <View style={styles.bellBadge} />
-          </Pressable>
         </View>
       </View>
 
@@ -145,34 +125,6 @@ export default function AprendizHome() {
         ))}
       </View>
 
-      {/* Notificaciones recientes */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionLabel}>NOTIFICACIONES RECIENTES</Text>
-          <Pressable onPress={() => router.push('/aprendiz/notificaciones' as any)}>
-            <Text style={styles.sectionLink}>Ver todas →</Text>
-          </Pressable>
-        </View>
-        {notificacionesRecientes.map((notif, i) => (
-          <Pressable
-            key={i}
-            style={({ hovered }: any) => [
-              styles.notifRow,
-              !notif.leida && styles.notifRowUnread,
-              hovered && styles.notifRowHover,
-            ]}
-            onPress={() => handleOpenNotif(notif)}
-          >
-            <View style={[styles.notifDot, !notif.leida && styles.notifDotActive]} />
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.notifTitle, !notif.leida && styles.notifTitleBold]}>{notif.titulo}</Text>
-              <Text style={styles.notifTime}>{notif.hora}</Text>
-            </View>
-            <Ionicons name="chevron-forward-outline" size={18} color="#94A3B8" />
-          </Pressable>
-        ))}
-      </View>
-
       {/* Clase Modal */}
       {selectedClase && (
         <ActionModal
@@ -181,7 +133,7 @@ export default function AprendizHome() {
           title="Detalle de Clase"
           subtitle={selectedClase.materia}
           iconName="calendar-outline"
-          confirmText="Ir al horario completo"
+          confirmText="Cerrar detalle"
           fields={[
             { label: 'Competencia', placeholder: selectedClase.materia },
             { label: 'Instructor', placeholder: selectedClase.instructor },
@@ -191,21 +143,6 @@ export default function AprendizHome() {
         />
       )}
 
-      {/* Notif Modal */}
-      {selectedNotif && (
-        <ActionModal
-          visible={notifModalVisible}
-          onClose={() => setNotifModalVisible(false)}
-          title={selectedNotif.titulo}
-          subtitle={selectedNotif.hora}
-          iconName="notifications-outline"
-          confirmText="Entendido"
-          fields={[
-            { label: 'Notificación', placeholder: selectedNotif.titulo },
-            { label: 'Recibida', placeholder: selectedNotif.hora },
-          ]}
-        />
-      )}
     </ScrollView>
   );
 }

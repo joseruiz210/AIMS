@@ -22,6 +22,7 @@ const RED = '#E74C3C';
 const YELLOW = '#F1C40F';
 
 type AttendanceState = 'presente' | 'ausente' | 'excusa';
+type AutoSaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
 interface ApprenticeAttendance {
   id: string;
@@ -34,79 +35,14 @@ interface ApprenticeAttendance {
   history: { date: string; status: AttendanceState }[];
 }
 
-const INITIAL_APPRENTICES: ApprenticeAttendance[] = [
-  {
-    id: '1',
-    name: 'Valentina Torres',
-    doc: '1020345678',
-    ficha: '2845671',
-    initials: 'VT',
-    status: 'presente',
-    history: [
-      { date: 'Jul 1', status: 'presente' },
-      { date: 'Jul 2', status: 'presente' },
-      { date: 'Jul 3', status: 'presente' },
-      { date: 'Jul 4', status: 'ausente' },
-    ],
-  },
-  {
-    id: '2',
-    name: 'Carlos Mendoza',
-    doc: '1020345679',
-    ficha: '2845671',
-    initials: 'CM',
-    status: 'ausente',
-    history: [
-      { date: 'Jul 1', status: 'presente' },
-      { date: 'Jul 2', status: 'ausente' },
-      { date: 'Jul 3', status: 'ausente' },
-      { date: 'Jul 4', status: 'presente' },
-    ],
-  },
-  {
-    id: '3',
-    name: 'Laura Jiménez',
-    doc: '1020345680',
-    ficha: '2845671',
-    initials: 'LJ',
-    status: 'presente',
-    history: [
-      { date: 'Jul 1', status: 'presente' },
-      { date: 'Jul 2', status: 'presente' },
-      { date: 'Jul 3', status: 'presente' },
-      { date: 'Jul 4', status: 'excusa' },
-    ],
-  },
-  {
-    id: '4',
-    name: 'Andrés Reyes',
-    doc: '1020345681',
-    ficha: '2845671',
-    initials: 'AR',
-    status: 'excusa',
-    note: 'Cita médica certificada',
-    history: [
-      { date: 'Jul 1', status: 'presente' },
-      { date: 'Jul 2', status: 'ausente' },
-      { date: 'Jul 3', status: 'ausente' },
-      { date: 'Jul 4', status: 'presente' },
-    ],
-  },
-  {
-    id: '5',
-    name: 'María Castillo',
-    doc: '1020345682',
-    ficha: '2845671',
-    initials: 'MC',
-    status: 'presente',
-    history: [
-      { date: 'Jul 1', status: 'presente' },
-      { date: 'Jul 2', status: 'presente' },
-      { date: 'Jul 3', status: 'presente' },
-      { date: 'Jul 4', status: 'presente' },
-    ],
-  },
-];
+const toLocalIsoDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const AUTO_SAVE_DEBOUNCE_MS = 800;
 
 export default function AsistenciaAnimatedScreen() {
   const { width } = useWindowDimensions();
@@ -118,14 +54,15 @@ export default function AsistenciaAnimatedScreen() {
   const [fichaNumero, setFichaNumero] = useState<string>('2670142');
   const [programaNombre, setProgramaNombre] = useState<string>('ADSO');
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [loadingDate, setLoadingDate] = useState(false);
+  const dateRequestId = useRef(0);
 
   const dateOptions = React.useMemo(() => {
     const today = new Date();
     return [0, 1, 2, 3].map(offset => {
       const d = new Date(today);
       d.setDate(today.getDate() - offset);
-      const iso = d.toISOString().split('T')[0];
+      const iso = toLocalIsoDate(d);
       const dayName = offset === 0 ? 'Hoy' : offset === 1 ? 'Ayer' : d.toLocaleDateString('es-CO', { weekday: 'short' });
       const dayNum = d.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' });
       return {
@@ -136,11 +73,17 @@ export default function AsistenciaAnimatedScreen() {
     });
   }, []);
 
-  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState<string>(toLocalIsoDate(new Date()));
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'todos' | AttendanceState>('todos');
   const [viewMode, setViewMode] = useState<'uno-por-uno' | 'tarjetas' | 'matriz'>('uno-por-uno');
-  
+
+  // Tema de la sesión: obligatorio para poder autoguardar
+  const [tema, setTema] = useState('');
+  const [autoSaveStatus, setAutoSaveStatus] = useState<AutoSaveStatus>('idle');
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const skipNextAutoSave = useRef(false);
+
   // Step-by-Step Index state for "Uno por Uno" mode
   const [currentIndex, setCurrentIndex] = useState(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -157,31 +100,52 @@ export default function AsistenciaAnimatedScreen() {
   }, []);
 
   const fetchAttendanceForDate = async (currentFichaId: string, isoDate: string, currentList?: ApprenticeAttendance[]) => {
-    try {
-      const prevRecords = await asistenciaService.getAsistenciasByFicha(currentFichaId, isoDate);
-      const prevMap = new Map<string, string>();
-      prevRecords.forEach(r => prevMap.set(r.aprendizId, r.estado));
+    const prevRecords = await asistenciaService.getAsistenciasByFicha(currentFichaId, isoDate);
+    const prevMap = new Map<string, string>();
+    prevRecords.forEach(r => prevMap.set(r.aprendizId, r.estado));
 
-      setApprentices(prev => {
-        const base = currentList || prev;
-        return base.map(a => {
-          const prevStatus = prevMap.get(a.id);
-          let st: AttendanceState = 'presente';
-          if (prevStatus === 'AUSENTE') st = 'ausente';
-          else if (prevStatus === 'EXCUSA') st = 'excusa';
-          return { ...a, status: st };
-        });
+    // Si ya existe una sesión guardada para esta fecha, recuperamos su tema.
+    // Si no existe, se limpia para que el instructor defina uno nuevo antes
+    // de que se dispare el autoguardado.
+    const temaExistente = prevRecords.find(r => r.tema)?.tema || '';
+    skipNextAutoSave.current = true;
+    setTema(temaExistente);
+    setAutoSaveStatus('idle');
+
+    setApprentices(prev => {
+      const base = currentList || prev;
+      return base.map(a => {
+        const prevStatus = prevMap.get(a.id);
+        let st: AttendanceState = 'presente';
+        if (prevStatus === 'AUSENTE') st = 'ausente';
+        else if (prevStatus === 'EXCUSA' || prevStatus === 'EXCUSADO') st = 'excusa';
+        return { ...a, status: st };
       });
-    } catch (err) {
-      console.error('Error al obtener asistencias por fecha:', err);
-    }
+    });
   };
 
   const handleSelectDate = async (isoDate: string) => {
+    const requestId = ++dateRequestId.current;
     setSelectedDate(isoDate);
+    setCurrentIndex(0);
+    fadeAnim.setValue(1);
+    scaleAnim.setValue(1);
+
     if (fichaId) {
-      await fetchAttendanceForDate(fichaId, isoDate);
-      showToast(`Sesión: ${isoDate}`);
+      setLoadingDate(true);
+      try {
+        await fetchAttendanceForDate(fichaId, isoDate);
+        if (requestId === dateRequestId.current) {
+          showToast(`Sesión: ${isoDate}`);
+        }
+      } catch (err: any) {
+        console.error('Error al obtener asistencias por fecha:', err);
+        showToast(`⚠️ ${err.message || 'No se pudo cargar la fecha seleccionada'}`);
+      } finally {
+        if (requestId === dateRequestId.current) {
+          setLoadingDate(false);
+        }
+      }
     }
   };
 
@@ -230,14 +194,45 @@ export default function AsistenciaAnimatedScreen() {
     }
   };
 
-  const handleSaveAttendance = async () => {
-    if (!fichaId || apprentices.length === 0) return;
-    setSaving(true);
+  // ---- Autoguardado ----
+  // Cualquier cambio en la lista de aprendices o en el tema dispara un
+  // guardado con debounce, en vez del botón manual "Guardar en BD".
+  // No se guarda nada mientras no haya un tema definido: eso evita crear
+  // sesiones vacías en la BD apenas se abre la pantalla.
+  useEffect(() => {
+    if (loading || !fichaId || apprentices.length === 0) return;
+
+    if (skipNextAutoSave.current) {
+      // Este cambio vino de cargar datos desde la BD (cambio de fecha /
+      // carga inicial), no de una acción del instructor: no reprogramar guardado.
+      skipNextAutoSave.current = false;
+      return;
+    }
+
+    if (!tema.trim()) {
+      setAutoSaveStatus('idle');
+      return;
+    }
+
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(() => {
+      runAutoSave();
+    }, AUTO_SAVE_DEBOUNCE_MS);
+
+    return () => {
+      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apprentices, tema]);
+
+  const runAutoSave = async () => {
+    if (!fichaId || apprentices.length === 0 || !tema.trim()) return;
+    setAutoSaveStatus('saving');
     try {
       const payload = {
         fichaId,
         fecha: selectedDate,
-        tema: `Sesión de Formación - ${programaNombre}`,
+        tema: tema.trim(),
         asistencias: apprentices.map(a => ({
           aprendizId: a.id,
           estado: a.status === 'presente' ? 'PRESENTE' : a.status === 'ausente' ? 'AUSENTE' : 'EXCUSA',
@@ -246,12 +241,11 @@ export default function AsistenciaAnimatedScreen() {
       };
 
       await asistenciaService.registrarAsistencia(payload);
-      showToast('✅ Asistencia guardada exitosamente en PostgreSQL');
+      setAutoSaveStatus('saved');
     } catch (err: any) {
-      console.error('Error guardando asistencia en BD:', err);
-      showToast('⚠️ ' + (err.message || 'Error al registrar asistencia'));
-    } finally {
-      setSaving(false);
+      console.error('Error en autoguardado de asistencia:', err);
+      setAutoSaveStatus('error');
+      showToast('⚠️ ' + (err.message || 'No se pudo autoguardar la asistencia'));
     }
   };
 
@@ -372,6 +366,17 @@ export default function AsistenciaAnimatedScreen() {
   const currentFocusStudent = apprentices[currentIndex];
   const isFinished = currentIndex >= total;
 
+  const autoSaveLabel =
+    autoSaveStatus === 'saving'
+      ? 'Guardando...'
+      : autoSaveStatus === 'saved'
+      ? 'Guardado'
+      : autoSaveStatus === 'error'
+      ? 'Error al guardar'
+      : !tema.trim()
+      ? 'Escribe el tema para guardar'
+      : 'Sin cambios';
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       {/* Toast Banner Notification */}
@@ -434,14 +439,45 @@ export default function AsistenciaAnimatedScreen() {
         </View>
       </View>
 
+      {/* Tema de la sesión + estado de autoguardado (reemplaza el botón "Guardar en BD") */}
+      <View style={styles.temaBar}>
+        <Ionicons name="book-outline" size={18} color={NAVY} style={{ marginRight: 8 }} />
+        <TextInput
+          style={styles.temaInput}
+          placeholder="Tema de la sesión de hoy (obligatorio para guardar)"
+          placeholderTextColor="#999999"
+          value={tema}
+          onChangeText={setTema}
+        />
+        <View style={styles.autoSaveBadge}>
+          {autoSaveStatus === 'saving' && <ActivityIndicator size="small" color={NAVY} style={{ marginRight: 6 }} />}
+          {autoSaveStatus === 'saved' && <Ionicons name="checkmark-circle" size={16} color={GREEN} style={{ marginRight: 4 }} />}
+          {autoSaveStatus === 'error' && <Ionicons name="alert-circle" size={16} color={RED} style={{ marginRight: 4 }} />}
+          <Text
+            style={[
+              styles.autoSaveBadgeText,
+              autoSaveStatus === 'saved' && { color: GREEN },
+              autoSaveStatus === 'error' && { color: RED },
+            ]}
+          >
+            {autoSaveLabel}
+          </Text>
+        </View>
+      </View>
+
       {/* Quick Date Selector & Mass Actions */}
       <View style={styles.quickActionBar}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dateScroll}>
           {dateOptions.map((d, i) => (
             <Pressable
               key={i}
-              style={[styles.dateChip, selectedDate === d.iso && styles.dateChipActive]}
+              style={[
+                styles.dateChip,
+                selectedDate === d.iso && styles.dateChipActive,
+                loadingDate && styles.dateChipDisabled,
+              ]}
               onPress={() => handleSelectDate(d.iso)}
+              disabled={loadingDate}
             >
               <Text style={[styles.dateChipText, selectedDate === d.iso && styles.dateChipTextActive]}>
                 {d.label}
@@ -451,21 +487,6 @@ export default function AsistenciaAnimatedScreen() {
         </ScrollView>
 
         <View style={styles.massBtnGroup}>
-          <Pressable 
-            style={[styles.btnSaveDb, saving && { opacity: 0.7 }]} 
-            onPress={handleSaveAttendance}
-            disabled={saving}
-          >
-            {saving ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <Ionicons name="cloud-upload-outline" size={16} color="#FFFFFF" />
-            )}
-            <Text style={styles.btnSaveDbText}>
-              {saving ? 'Guardando...' : 'Guardar en BD'}
-            </Text>
-          </Pressable>
-
           <Pressable style={styles.btnMassPresent} onPress={handleMarkAllPresent}>
             <Ionicons name="flash-outline" size={16} color="#FFFFFF" />
             <Text style={styles.btnMassPresentText}>Todos Presentes</Text>
@@ -895,6 +916,41 @@ const styles = StyleSheet.create({
   toggleTextActive: {
     color: '#FFFFFF',
   },
+  // Tema de la sesión + badge de autoguardado
+  temaBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    borderWidth: 1,
+    borderColor: '#DDDDDD',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 14,
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  temaInput: {
+    flex: 1,
+    minWidth: 180,
+    fontSize: 14,
+    color: '#000000',
+  },
+  autoSaveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#DDDDDD',
+  },
+  autoSaveBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666666',
+  },
   quickActionBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -916,6 +972,9 @@ const styles = StyleSheet.create({
   dateChipActive: {
     backgroundColor: GOLD,
   },
+  dateChipDisabled: {
+    opacity: 0.55,
+  },
   dateChipText: {
     fontSize: 13,
     color: '#4A4A4A',
@@ -929,25 +988,6 @@ const styles = StyleSheet.create({
     gap: 8,
     alignItems: 'center',
     flexWrap: 'wrap',
-  },
-  btnSaveDb: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#0F2027',
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 8,
-    gap: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  btnSaveDbText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '700',
   },
   btnMassPresent: {
     flexDirection: 'row',
