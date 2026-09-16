@@ -1,992 +1,403 @@
-import * as WebBrowser from 'expo-web-browser';
-import * as Google from 'expo-auth-session/providers/google';
-import * as AuthSession from 'expo-auth-session';
-
-import React, { useEffect, useState, useCallback } from 'react';
-import { Modal, FlatList, TouchableWithoutFeedback } from 'react-native';
-import { 
-  View, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  StyleSheet, 
+import React from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
   SafeAreaView,
-  KeyboardAvoidingView,
   Platform,
   Image,
-  ScrollView,
-  ActivityIndicator
 
-
+  useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useAuth } from '../context/AuthContext';
 import { router } from 'expo-router';
-import { authService } from '../services/authService';
-import { fichasService, type Ficha } from '../services/fichasService';
-import { validatePassword, validatePasswordMatch, isDisposableEmail } from '../utils/validation';
+import { useAuth } from '../context/AuthContext';
 
-WebBrowser.maybeCompleteAuthSession();
+export default function LandingPage() {
+  const { user } = useAuth();
+  const { width } = useWindowDimensions();
+  const isDesktop = width >= 860;
 
 
-
-export default function AuthScreen() {
-  const { user, isLoading, login, register, logout, setSession } = useAuth();
-  // Screen state: 'login' (default) | 'register'
-  const [currentScreen, setCurrentScreen] = useState<'login' | 'register'>('login');
-
-  // Login Form State
-  const [loginCorreo, setLoginCorreo] = useState('');
-  const [loginRole, setLoginRole] = useState<'INSTRUCTOR' | 'APRENDIZ'>('APRENDIZ');
-  const [loginDocumento, setLoginDocumento] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
-  const [showLoginPassword, setShowLoginPassword] = useState(false);
-
-  // Register Form State
-  const [regNombre, setRegNombre] = useState('');
-  const [regCorreo, setRegCorreo] = useState('');
-  const [regRole, setRegRole] = useState<'INSTRUCTOR' | 'APRENDIZ'>('APRENDIZ');
-  const [regTipoDocumento, setRegTipoDocumento] = useState('');
-  const [regDocumento, setRegDocumento] = useState('');
-  const [regFicha, setRegFicha] = useState('');
-  const [regPrograma, setRegPrograma] = useState('');
-  const [regPassword, setRegPassword] = useState('');
-  const [regConfirmPassword, setRegConfirmPassword] = useState('');
-  const [showRegPassword, setShowRegPassword] = useState(false);
-  const [showRegConfirmPassword, setShowRegConfirmPassword] = useState(false);
-
-  // Feedback Messages
-  const [feedback, setFeedback] = useState<{ text: string; type: 'error' | 'success' } | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Campos académicos para Aprendices
-  const [regFichaNumero, setRegFichaNumero] = useState('');
-  const [regSede, setRegSede] = useState('');
-  const [regTrimestre, setRegTrimestre] = useState('');
-  const [fichaEncontrada, setFichaEncontrada] = useState<Ficha | null>(null);
-  const [buscandoFicha, setBuscandoFicha] = useState(false);
-  const [fichasDisponibles, setFichasDisponibles] = useState<Ficha[]>([]);
-  const [mostrarSelectorFicha, setMostrarSelectorFicha] = useState(false);
-
-  // Detectar si el correo corresponde a un APRENDIZ
-  const esAprendiz = regCorreo.includes('@gmail.com') || regCorreo.includes('@soy.sena.edu.co') || regCorreo.includes('@formacionsena.edu.co');
-
-  const buscarFichas = useCallback(async (texto: string) => {
-    if (!texto.trim() || texto.trim().length < 3) {
-      setFichasDisponibles([]);
-      setFichaEncontrada(null);
-      return;
-    }
-    setBuscandoFicha(true);
-    try {
-      const fichas = await fichasService.getFichas({ search: texto.trim() });
-      setFichasDisponibles(fichas);
-      const exacta = fichas.find((f) => f.numero.toLowerCase() === texto.trim().toLowerCase());
-      setFichaEncontrada(exacta || null);
-    } catch {
-      setFichasDisponibles([]);
-    } finally {
-      setBuscandoFicha(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!esAprendiz) {
-      setRegFichaNumero('');
-      setRegSede('');
-      setRegTrimestre('');
-      setFichaEncontrada(null);
-    }
-  }, [esAprendiz]);
-
-  // Validación de la contraseña en tiempo real para Registro
-  const passValidation = validatePassword(regPassword);
-  const passMatches = validatePasswordMatch(regPassword, regConfirmPassword);
-
-  const hasAllowedEmailDomain = (email: string, role: 'INSTRUCTOR' | 'APRENDIZ') => {
-    const normalizedEmail = email.trim().toLowerCase();
-    return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(normalizedEmail);
+  const goToLogin = () => {
+    router.push({ pathname: '/auth', params: { mode: 'login' } });
   };
 
-  
-
- const [request, response, promptAsync] = Google.useAuthRequest({
-  webClientId:
-    '801203695881-vjkbm79n28utn02fkiei3tmrieqmkd37.apps.googleusercontent.com',
-  responseType: 'id_token',
-  scopes: ['openid', 'profile', 'email'],
-  redirectUri: AuthSession.makeRedirectUri(),
-});
-useEffect(() => {
-  const handleGoogleResponse = async () => {
-    if (response?.type === 'success') {
-      const token =
-        response.authentication?.idToken ??
-        response.params?.id_token ??
-        response.authentication?.accessToken ??
-        response.params?.access_token;
-
-      if (!token) {
-        setFeedback({
-          text: 'No se pudo obtener el token de Google.',
-          type: 'error',
-        });
-        return;
-      }
-
-      const res = await authService.googleLogin(token);
-
-      if (res.success && res.user) {
-        setSession(res.user);
-      } else {
-        setFeedback({
-          text: res.message || 'Error al iniciar sesión con Google.',
-          type: 'error',
-        });
-      }
-    } else if (response?.type === 'error') {
-      setFeedback({
-        text: 'Google canceló o rechazó la autenticación.',
-        type: 'error',
-      });
-    }
+  const goToRegister = () => {
+    router.push({ pathname: '/auth', params: { mode: 'register' } });
   };
 
-  handleGoogleResponse();
-}, [response, setSession]);
 
-  useEffect(() => {
-    if (user) {
-      const destination =
-        user.role === 'INSTRUCTOR'
-          ? '/instructor/inicio'
-          : user.role === 'ADMIN' || user.role === 'SUPERADMIN'
-          ? '/admin'
-          : '/aprendiz';
-      router.replace(destination as any);
-    }
-  }, [user]);
 
-  const handleMagicLink = async () => {
-  if (!loginCorreo) {
-    setFeedback({ text: 'Ingresa tu correo primero para recibir el enlace.', type: 'error' });
-    return;
-  }
-  const res = await authService.sendMagicLink(loginCorreo);
-  setFeedback({ text: res.message || '', type: res.success ? 'success' : 'error' });
-};
-
-  const handleLogin = async () => {
-    setFeedback(null);
-    if (!loginCorreo || !loginPassword || (loginRole === 'APRENDIZ' && !loginDocumento)) {
-      setFeedback({ text: 'Por favor completa todos los campos.', type: 'error' });
-      return;
-    }
-
-    if (!hasAllowedEmailDomain(loginCorreo, loginRole)) {
-      setFeedback({
-        text: 'Por favor ingresa un correo electrónico válido.',
-        type: 'error',
-      });
-      return;
-    }
-
-    setIsSubmitting(true);
-    const res = await login({
-      correo: loginCorreo.trim(),
-      contrasenia: loginPassword,
-      role: loginRole,
-      documento: loginRole === 'APRENDIZ' ? loginDocumento.trim() : undefined,
-    });
-    setIsSubmitting(false);
-
-    if (!res.success) {
-      setFeedback({ text: res.message || 'Error al iniciar sesión', type: 'error' });
-    } else {
-      setFeedback({ text: res.message || '¡Sesión iniciada correctamente!', type: 'success' });
-    }
-  };
-
-  const handleRegister = async () => {
-    setFeedback(null);
-    const instructorDataComplete = regRole === 'INSTRUCTOR' && regNombre.trim() && regCorreo.trim();
-    const aprendizDataComplete = regRole === 'APRENDIZ' && regTipoDocumento && regDocumento.trim() && regFicha.trim() && regPrograma.trim();
-
-    if (!regCorreo.trim() || !regPassword || !regConfirmPassword || (!instructorDataComplete && !aprendizDataComplete)) {
-      setFeedback({ text: 'Por favor completa todos los campos del formulario.', type: 'error' });
-      return;
-    }
-
-    if (!hasAllowedEmailDomain(regCorreo, regRole)) {
-      setFeedback({
-        text: regRole === 'APRENDIZ' ? 'El aprendiz debe registrarse con un correo @gmail.com.' : 'El instructor debe registrarse con un correo @soy.sena.edu.co.',
-        type: 'error',
-      });
-      return;
-    }
-
-    if (!passValidation.isValid) {
-      setFeedback({ text: 'La contraseña no cumple con los requisitos de seguridad: ' + passValidation.errors.join(', '), type: 'error' });
-      return;
-    }
-
-    if (!passMatches) {
-      setFeedback({ text: 'Las contraseñas ingresadas no coinciden.', type: 'error' });
-      return;
-    }
-
-    setIsSubmitting(true);
-    const res = await register({
-      nombre: regNombre.trim() || 'Aprendiz AIMS',
-      correo: regCorreo.trim(),
-      contrasenia: regPassword,
-      confirmContrasenia: regConfirmPassword,
-      role: regRole,
-      tipoDocumento: regRole === 'APRENDIZ' ? regTipoDocumento : undefined,
-      documento: regRole === 'APRENDIZ' ? regDocumento.trim() : undefined,
-      ficha: regRole === 'APRENDIZ' ? regFicha.trim() : undefined,
-      programa: regRole === 'APRENDIZ' ? regPrograma.trim() : undefined,
-    });
-
-    if (!res.success) {
-      setIsSubmitting(false);
-      setFeedback({ text: res.message || 'Error al registrar la cuenta.', type: 'error' });
-    } else {
-      setFeedback({ text: '¡Cuenta creada con éxito! Entrando al sistema...', type: 'success' });
-      const loginRes = await login({
-        correo: regCorreo.trim(),
-        contrasenia: regPassword,
-        role: regRole,
-        documento: regRole === 'APRENDIZ' ? regDocumento.trim() : undefined,
-      });
-      setIsSubmitting(false);
-      if (!loginRes.success) {
-        setLoginCorreo(regCorreo.trim());
-        setFeedback({ text: '¡Cuenta creada! Ya puedes iniciar sesión con tus credenciales.', type: 'success' });
-        setCurrentScreen('login');
-      }
-    }
-  };
   return (
     <View style={styles.outerContainer}>
-      {/* Dark Academia Deep Midnight Navy Gradient */}
+      {/* Background Gradient Dark Academia & Deep Midnight */}
       <LinearGradient
-        colors={['#020308', '#070C20', '#0E1738', '#141E47', '#050816']}
-        locations={[0, 0.25, 0.55, 0.8, 1]}
+        colors={['#020308', '#050B1C', '#0A122E', '#060B1E', '#020308']}
+        locations={[0, 0.22, 0.55, 0.82, 1]}
         style={StyleSheet.absoluteFill}
       />
 
-      {/* Dark Academia Satin Gold & Sapphire Ambient Glow Orbs */}
-      <View style={[styles.glowOrb, styles.goldSatinSpotlight]} />
-      <View style={[styles.glowOrb, styles.sapphireGlowCenter]} />
-      <View style={[styles.glowOrb, styles.amberGoldGlowBottom]} />
-      <View style={[styles.glowOrb, styles.radialCenterHalo]} />
+      {/* Ambient Glows */}
+      <View style={[styles.glowOrb, styles.goldGlowTop]} />
+      <View style={[styles.glowOrb, styles.blueGlowCenter]} />
+      <View style={[styles.glowOrb, styles.amberGlowBottom]} />
+      <View style={[styles.glowOrb, styles.cyanGlowSide]} />
 
-      {/* Academic Constellation Star Dust Dots */}
-      <View style={[styles.constellationDot, { top: '12%', left: '18%' }]} />
-      <View style={[styles.constellationDot, { top: '28%', right: '15%' }]} />
-      <View style={[styles.constellationDot, { top: '55%', left: '10%' }]} />
-      <View style={[styles.constellationDot, { top: '78%', right: '22%' }]} />
-      <View style={[styles.constellationDot, { top: '85%', left: '30%' }]} />
-
-      {/* Floating Academic & Tech Constellation Seals */}
-      <View style={[styles.techNode, styles.techNodeGold, { top: '14%', right: '7%' }]}>
-        <Ionicons name="book-outline" size={20} color="#D4AF37" />
-      </View>
-      <View style={[styles.techNode, styles.techNodeBlue, { top: '38%', right: '4%' }]}>
-        <Ionicons name="git-network-outline" size={22} color="#60A5FA" />
-      </View>
-      <View style={[styles.techNode, styles.techNodeGold, { top: '72%', right: '8%' }]}>
-        <Ionicons name="school-outline" size={20} color="#E5C158" />
-      </View>
-      <View style={[styles.techNode, styles.techNodeBlue, { top: '20%', left: '5%' }]}>
-        <Ionicons name="hardware-chip-outline" size={20} color="#60A5FA" />
-      </View>
-      <View style={[styles.techNode, styles.techNodeGold, { top: '66%', left: '6%' }]}>
-        <Ionicons name="code-slash-outline" size={20} color="#D4AF37" />
-      </View>
+      {/* Constellation Star Sparkles */}
+      <View style={[styles.sparkleDot, { top: '8%', left: '15%' }]} />
+      <View style={[styles.sparkleDot, { top: '16%', right: '20%' }]} />
+      <View style={[styles.sparkleDot, { top: '34%', left: '8%' }]} />
+      <View style={[styles.sparkleDot, { top: '55%', right: '12%' }]} />
+      <View style={[styles.sparkleDot, { top: '78%', left: '22%' }]} />
+      <View style={[styles.sparkleDot, { top: '88%', right: '28%' }]} />
 
       <SafeAreaView style={styles.safeArea}>
-        {/* Top Header Bar */}
-        <View style={styles.headerBar}>
-          <View style={styles.headerLeft}>
-            <Image 
-              source={require('../assets/images/logo.jpeg')} 
-              style={styles.headerLogo} 
-              resizeMode="contain" 
+        {/* Navigation Bar */}
+        <View style={styles.navbar}>
+          <View style={styles.navBrand}>
+            <Image
+              source={require('../assets/images/logo.jpeg')}
+              style={styles.logoImage}
+              resizeMode="contain"
             />
-            <View style={styles.headerTextGroup}>
-              <Text style={styles.headerTitle}>ACADEMIC INTELLIGENT</Text>
-              <Text style={styles.headerSubtitle}>MANAGEMENT SYSTEM</Text>
+            <View style={styles.brandTextGroup}>
+              <View style={styles.brandTitleRow}>
+                <Text style={styles.brandLogoText}>AIMS</Text>
+                <View style={styles.brandBadge}>
+                  <Text style={styles.brandBadgeText}>SYSTEM</Text>
+                </View>
+              </View>
+              <Text style={styles.brandSubtitle}>ACADEMIC INTELLIGENT MANAGEMENT</Text>
             </View>
           </View>
-          <Text style={styles.headerRightText}>AIMS</Text>
-        </View>
 
-        <KeyboardAvoidingView 
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.flexContainer}
-        >
-          <ScrollView 
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-          >
-            {/* Loading Indicator */}
-            {(isLoading || isSubmitting) && (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#C59427" />
-                <Text style={styles.loadingText}>
-                  {isLoading ? 'Verificando sesión...' : 'Procesando solicitud...'}
-                </Text>
-              </View>
-            )}
+          {/* Desktop Nav Links */}
+          {isDesktop && (
+            <View style={styles.navLinks}>
+              {/* Removed Links */}
+            </View>
+          )}
 
-            {/* Banner de Feedback Error/Éxito */}
-            {feedback && !isLoading && !isSubmitting && (
-              <View style={[styles.feedbackBanner, feedback.type === 'error' ? styles.feedbackError : styles.feedbackSuccess]}>
-                <Ionicons 
-                  name={feedback.type === 'error' ? 'alert-circle-outline' : 'checkmark-circle-outline'} 
-                  size={20} 
-                  color={feedback.type === 'error' ? '#EF4444' : '#10B981'} 
-                />
-                <Text style={[styles.feedbackText, feedback.type === 'error' ? styles.feedbackTextError : styles.feedbackTextSuccess]}>
-                  {feedback.text}
-                </Text>
-              </View>
-            )}
-
-            {/* ================= USUARIO AUTENTICADO ================= */}
+          {/* Auth Actions Header */}
+          <View style={styles.navAuthGroup}>
             {user ? (
-              <View style={styles.lightCard}>
-                <View style={styles.lightLogoContainer}>
-                  <Image 
-                    source={require('../assets/images/logo.jpeg')} 
-                    style={styles.lightLogoImg} 
-                    resizeMode="contain" 
-                  />
-                  <Text style={styles.lightLogoText}>AIMS</Text>
-                </View>
-
-                <Text style={styles.cardTitleLight}>¡Bienvenido/a!</Text>
-                <Text style={styles.userNameText}>{user.nombre}</Text>
-                <Text style={styles.userEmailText}>{user.correo}</Text>
-
-                <TouchableOpacity 
-                  style={styles.primaryActionButton} 
-                  activeOpacity={0.85} 
-                  onPress={() => {
-                    const destination =
-                      user.role === 'INSTRUCTOR'
-                        ? '/instructor/inicio'
-                        : user.role === 'ADMIN'
-                        ? '/admin'
-                        : '/aprendiz';
-                    router.replace(destination as any);
-                  }}
-                >
-                  <Ionicons name="enter-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-                  <Text style={styles.primaryActionText}>INGRESAR AL SISTEMA</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.logoutButton} activeOpacity={0.85} onPress={logout}>
-                  <Ionicons name="log-out-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-                  <Text style={styles.logoutButtonText}>CERRAR SESIÓN</Text>
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity
+                style={styles.btnPrimaryNav}
+                activeOpacity={0.85}
+                onPress={() => {
+                  if (user.role === 'ADMIN') router.push('/admin');
+                  else if (user.role === 'INSTRUCTOR') router.push('/instructor/inicio');
+                  else router.push('/aprendiz');
+                }}
+              >
+                <Ionicons name="person-circle-outline" size={18} color="#0B1228" style={{ marginRight: 6 }} />
+                <Text style={styles.btnPrimaryNavText}>MI PANEL</Text>
+              </TouchableOpacity>
             ) : (
               <>
-                {/* ================= INICIO DE SESIÓN (DEFAULT) ================= */}
-                {currentScreen === 'login' && (
-                  <View style={styles.lightCard}>
-                    <View style={styles.lightLogoContainer}>
-                      <Image 
-                        source={require('../assets/images/logo.jpeg')} 
-                        style={styles.lightLogoImg} 
-                        resizeMode="contain" 
-                      />
-                      <Text style={styles.lightLogoText}>AIMS</Text>
-                    </View>
+                <TouchableOpacity
+                  style={styles.btnSecondaryNav}
+                  activeOpacity={0.8}
+                  onPress={goToRegister}
+                >
+                  <Text style={styles.btnSecondaryNavText}>Crear Cuenta</Text>
+                </TouchableOpacity>
 
-                    <Text style={styles.cardTitleLight}>INICIO DE SESIÓN</Text>
-
-                    <Text style={styles.labelLight}>Tipo de cuenta</Text>
-                    <View style={styles.roleSelector}>
-                      <TouchableOpacity
-                        style={[styles.roleOption, loginRole === 'APRENDIZ' && styles.roleOptionActive]}
-                        onPress={() => setLoginRole('APRENDIZ')}
-                      >
-                        <Ionicons name="school-outline" size={17} color={loginRole === 'APRENDIZ' ? '#FFFFFF' : '#475569'} />
-                        <Text style={[styles.roleOptionText, loginRole === 'APRENDIZ' && styles.roleOptionTextActive]}>Aprendiz</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.roleOption, loginRole === 'INSTRUCTOR' && styles.roleOptionActive]}
-                        onPress={() => setLoginRole('INSTRUCTOR')}
-                      >
-                        <Ionicons name="briefcase-outline" size={17} color={loginRole === 'INSTRUCTOR' ? '#FFFFFF' : '#475569'} />
-                        <Text style={[styles.roleOptionText, loginRole === 'INSTRUCTOR' && styles.roleOptionTextActive]}>Instructor</Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    {loginRole === 'APRENDIZ' && (
-                      <View style={styles.fieldGroup}>
-                        <Text style={styles.labelLight}>Documento</Text>
-                        <View style={styles.borderedInputWrapper}>
-                          <Ionicons name="card-outline" size={18} color="#475569" style={styles.fieldIcon} />
-                          <TextInput
-                            style={styles.borderedInput}
-                            placeholder="Número de documento"
-                            placeholderTextColor="#94A3B8"
-                            keyboardType="numeric"
-                            value={loginDocumento}
-                            onChangeText={setLoginDocumento}
-                          />
-                        </View>
-                      </View>
-                    )}
-
-                    <View style={styles.fieldGroup}>
-                      <Text style={styles.labelLight}>Correo Electrónico</Text>
-                      <View style={styles.borderedInputWrapper}>
-                        <Ionicons name="mail" size={18} color="#475569" style={styles.fieldIcon} />
-                        <TextInput
-                          style={styles.borderedInput}
-                          placeholder="usuario@correo.com"
-                          placeholderTextColor="#94A3B8"
-                          keyboardType="email-address"
-                          autoCapitalize="none"
-                          value={loginCorreo}
-                          onChangeText={setLoginCorreo}
-                        />
-                      </View>
-                    </View>
-
-                    {/* Contraseña */}
-                    <View style={styles.fieldGroup}>
-                      <Text style={styles.labelLight}>Contraseña</Text>
-                      <View style={styles.borderedInputWrapper}>
-                        <Ionicons name="lock-closed" size={18} color="#475569" style={styles.fieldIcon} />
-                        <TextInput
-                          style={styles.borderedInput}
-                          placeholder="••••••••••••"
-                          placeholderTextColor="#94A3B8"
-                          secureTextEntry={!showLoginPassword}
-                          value={loginPassword}
-                          onChangeText={setLoginPassword}
-                        />
-                        <TouchableOpacity onPress={() => setShowLoginPassword(!showLoginPassword)}>
-                          <Ionicons name={showLoginPassword ? "eye-off-outline" : "eye-outline"} size={18} color="#64748B" />
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-
-                    {/* Options Row: Checkbox & Forgot Password */}
-                    <View style={styles.optionsRow}>
-                      <TouchableOpacity 
-                        style={styles.checkboxRow} 
-                        activeOpacity={0.7}
-                        onPress={() => setRememberMe(!rememberMe)}
-                      >
-                        <Ionicons 
-                          name={rememberMe ? "checkbox" : "square-outline"} 
-                          size={18} 
-                          color={rememberMe ? "#C59427" : "#64748B"} 
-                        />
-                        <Text style={styles.rememberText}>Recordar mis datos</Text>
-                      </TouchableOpacity>
-
-                     <TouchableOpacity activeOpacity={0.7} onPress={() => router.push('../forgot-password')}>
-  <Text style={styles.forgotText}>¿Olvidaste tu contraseña?</Text>
-</TouchableOpacity>
-                    </View>
-
-                    {/* Submit Login Button */}
-                    <TouchableOpacity style={styles.goldButton} activeOpacity={0.85} onPress={handleLogin}>
-                      <Text style={styles.goldButtonText}>INICIAR SESIÓN →</Text>
-                    </TouchableOpacity>
-
-                    {/* Social Login Separator */}
-                    <View style={styles.dividerRow}>
-                      <View style={styles.dividerLine} />
-                      <Text style={styles.dividerText}>O inicia sesión con:</Text>
-                      <View style={styles.dividerLine} />
-                    </View>
-
-                    {/* Social Buttons (Outlook & Google) */}
-                    <View style={styles.socialRow}>
-                    <TouchableOpacity style={styles.socialButton} activeOpacity={0.8} onPress={handleMagicLink}>
-  <Ionicons name="mail" size={22} color="#0078D4" />
-</TouchableOpacity>
-                      
-                      <TouchableOpacity
-                        style={styles.socialButton}
-                        activeOpacity={0.8}
-                        disabled={!request}
-                        onPress={() => promptAsync()}
-                      >
-                        <Ionicons name="logo-google" size={22} color="#EA4335" />
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* Switch to Register Button */}
-                    <View style={styles.switchContainer}>
-                      <Text style={styles.switchTextLight}>¿No tienes una cuenta? </Text>
-                      <TouchableOpacity onPress={() => { setFeedback(null); setCurrentScreen('register'); }}>
-                        <Text style={styles.goldLink}>Regístrate</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                )}
-
-                {/* ================= REGISTRO DE CUENTA ================= */}
-                {currentScreen === 'register' && (
-                  <View style={styles.darkCard}>
-                    <View style={styles.cardHeaderLogo}>
-                      <Image 
-                        source={require('../assets/images/logo.jpeg')} 
-                        style={styles.cardLogoImg} 
-                        resizeMode="contain" 
-                      />
-                      <View>
-                        <Text style={styles.cardLogoTitle}>ACADEMIC INTELLIGENT</Text>
-                        <Text style={styles.cardLogoSubtitle}>MANAGEMENT SYSTEM</Text>
-                      </View>
-                    </View>
-
-                    <Text style={styles.cardTitleDark}>REGISTRO DE CUENTA</Text>
-
-                    <Text style={styles.labelDark}>Tipo de cuenta</Text>
-                    <View style={styles.roleSelectorDark}>
-                      <TouchableOpacity
-                        style={[styles.roleOption, regRole === 'APRENDIZ' && styles.roleOptionActive]}
-                        onPress={() => setRegRole('APRENDIZ')}
-                      >
-                        <Ionicons name="school-outline" size={17} color={regRole === 'APRENDIZ' ? '#FFFFFF' : '#475569'} />
-                        <Text style={[styles.roleOptionText, regRole === 'APRENDIZ' && styles.roleOptionTextActive]}>Aprendiz</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.roleOption, regRole === 'INSTRUCTOR' && styles.roleOptionActive]}
-                        onPress={() => setRegRole('INSTRUCTOR')}
-                      >
-                        <Ionicons name="briefcase-outline" size={17} color={regRole === 'INSTRUCTOR' ? '#FFFFFF' : '#475569'} />
-                        <Text style={[styles.roleOptionText, regRole === 'INSTRUCTOR' && styles.roleOptionTextActive]}>Instructor</Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    {regRole === 'INSTRUCTOR' ? (
-                      <View style={styles.fieldGroup}>
-                        <Text style={styles.labelDark}>Nombre Completo</Text>
-                        <View style={styles.whiteInputWrapper}>
-                          <Ionicons name="person" size={18} color="#475569" style={styles.fieldIcon} />
-                          <TextInput
-                            style={styles.whiteInput}
-                            placeholder="Nombre del instructor"
-                            placeholderTextColor="#94A3B8"
-                            value={regNombre}
-                            onChangeText={setRegNombre}
-                          />
-                        </View>
-                      </View>
-                    ) : (
-                      <>
-                        <View style={styles.fieldGroup}>
-                          <Text style={styles.labelDark}>Tipo de documento</Text>
-                          <View style={styles.whiteInputWrapper}>
-                            <Ionicons name="card-outline" size={18} color="#475569" style={styles.fieldIcon} />
-                            <TextInput
-                              style={styles.whiteInput}
-                              placeholder="CC, TI, CE..."
-                              placeholderTextColor="#94A3B8"
-                              value={regTipoDocumento}
-                              onChangeText={setRegTipoDocumento}
-                              autoCapitalize="characters"
-                            />
-                          </View>
-                        </View>
-
-                        <View style={styles.fieldGroup}>
-                          <Text style={styles.labelDark}>Número de documento</Text>
-                          <View style={styles.whiteInputWrapper}>
-                            <Ionicons name="finger-print-outline" size={18} color="#475569" style={styles.fieldIcon} />
-                            <TextInput
-                              style={styles.whiteInput}
-                              placeholder="Documento registrado en la ficha"
-                              placeholderTextColor="#94A3B8"
-                              keyboardType="numeric"
-                              value={regDocumento}
-                              onChangeText={setRegDocumento}
-                            />
-                          </View>
-                        </View>
-
-                        <View style={styles.fieldGroup}>
-                          <Text style={styles.labelDark}>Ficha</Text>
-                          <View style={styles.whiteInputWrapper}>
-                            <Ionicons name="bookmark-outline" size={18} color="#475569" style={styles.fieldIcon} />
-                            <TextInput
-                              style={styles.whiteInput}
-                              placeholder="Número de ficha asignada"
-                              placeholderTextColor="#94A3B8"
-                              keyboardType="numeric"
-                              value={regFicha}
-                              onChangeText={setRegFicha}
-                            />
-                          </View>
-                        </View>
-
-                        <View style={styles.fieldGroup}>
-                          <Text style={styles.labelDark}>Programa de formación</Text>
-                          <View style={styles.whiteInputWrapper}>
-                            <Ionicons name="school-outline" size={18} color="#475569" style={styles.fieldIcon} />
-                            <TextInput
-                              style={styles.whiteInput}
-                              placeholder="Programa registrado en la ficha"
-                              placeholderTextColor="#94A3B8"
-                              value={regPrograma}
-                              onChangeText={setRegPrograma}
-                            />
-                          </View>
-                        </View>
-                      </>
-                    )}
-
-                    <View style={styles.fieldGroup}>
-                      <Text style={styles.labelDark}>{regRole === 'APRENDIZ' ? 'Gmail' : 'Correo @soy.sena.edu.co'}</Text>
-                      <View style={styles.whiteInputWrapper}>
-                        <Ionicons name="mail" size={18} color="#475569" style={styles.fieldIcon} />
-                        <TextInput
-                          style={styles.whiteInput}
-                          placeholder={regRole === 'APRENDIZ' ? 'aprendiz@gmail.com' : 'instructor@soy.sena.edu.co'}
-                          placeholderTextColor="#94A3B8"
-                          keyboardType="email-address"
-                          autoCapitalize="none"
-                          value={regCorreo}
-                          onChangeText={setRegCorreo}
-                        />
-                      </View>
-                      <View style={styles.domainHelperBox}>
-                        <Ionicons name="information-circle-outline" size={15} color="#C59427" style={{ marginRight: 6 }} />
-                        <Text style={styles.domainHelperText}>
-                          Instructor: <Text style={styles.boldDomain}>@soy.sena.edu.co</Text> · Aprendiz: <Text style={styles.boldDomain}>@gmail.com</Text>
-                        </Text>
-                      </View>
-                      {regCorreo.length > 0 && isDisposableEmail(regCorreo) && (
-                        <Text style={[styles.matchText, styles.matchError]}>
-                          ⚠️ No se permiten correos temporales/desechables (ej. yopmail, mailinator)
-                        </Text>
-                      )}
-                    </View>
-
-
-                    {/* Contraseña */}
-                    <View style={styles.fieldGroup}>
-                      <Text style={styles.labelDark}>Contraseña</Text>
-                      <View style={styles.whiteInputWrapper}>
-                        <Ionicons name="lock-closed" size={18} color="#475569" style={styles.fieldIcon} />
-                        <TextInput
-                          style={styles.whiteInput}
-                          placeholder="••••••••••••"
-                          placeholderTextColor="#94A3B8"
-                          secureTextEntry={!showRegPassword}
-                          value={regPassword}
-                          onChangeText={setRegPassword}
-                        />
-                        <TouchableOpacity onPress={() => setShowRegPassword(!showRegPassword)}>
-                          <Ionicons name={showRegPassword ? "eye-off-outline" : "eye-outline"} size={18} color="#64748B" />
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-
-                    {/* VALIDACIÓN DE CONTRASEÑA EN TIEMPO REAL */}
-                    {regPassword.length > 0 && (
-                      <View style={styles.passValidationBox}>
-                        <View style={styles.passHeaderRow}>
-                          <Text style={styles.passValidationTitle}>Fortaleza de Contraseña:</Text>
-                          <Text style={[styles.passStrengthLabel, { color: passValidation.strengthColor }]}>
-                            {passValidation.strengthText}
-                          </Text>
-                        </View>
-
-                        {/* Barra de Progreso de Fortaleza */}
-                        <View style={styles.strengthBarBackground}>
-                          <View 
-                            style={[
-                              styles.strengthBarFill, 
-                              { 
-                                width: `${(passValidation.score / 5) * 100}%`, 
-                                backgroundColor: passValidation.strengthColor 
-                              }
-                            ]} 
-                          />
-                        </View>
-
-                        {/* Lista de Requisitos */}
-                        <View style={styles.reqList}>
-                          <View style={styles.reqItem}>
-                            <Ionicons 
-                              name={passValidation.requirements.minLength ? "checkmark-circle" : "ellipse-outline"} 
-                              size={14} 
-                              color={passValidation.requirements.minLength ? "#10B981" : "#94A3B8"} 
-                            />
-                            <Text style={[styles.reqText, passValidation.requirements.minLength && styles.reqTextSuccess]}>
-                              Mínimo 8 caracteres
-                            </Text>
-                          </View>
-
-                          <View style={styles.reqItem}>
-                            <Ionicons 
-                              name={passValidation.requirements.hasUppercase ? "checkmark-circle" : "ellipse-outline"} 
-                              size={14} 
-                              color={passValidation.requirements.hasUppercase ? "#10B981" : "#94A3B8"} 
-                            />
-                            <Text style={[styles.reqText, passValidation.requirements.hasUppercase && styles.reqTextSuccess]}>
-                              Al menos una mayúscula (A-Z)
-                            </Text>
-                          </View>
-
-                          <View style={styles.reqItem}>
-                            <Ionicons 
-                              name={passValidation.requirements.hasLowercase ? "checkmark-circle" : "ellipse-outline"} 
-                              size={14} 
-                              color={passValidation.requirements.hasLowercase ? "#10B981" : "#94A3B8"} 
-                            />
-                            <Text style={[styles.reqText, passValidation.requirements.hasLowercase && styles.reqTextSuccess]}>
-                              Al menos una minúscula (a-z)
-                            </Text>
-                          </View>
-
-                          <View style={styles.reqItem}>
-                            <Ionicons 
-                              name={passValidation.requirements.hasNumber ? "checkmark-circle" : "ellipse-outline"} 
-                              size={14} 
-                              color={passValidation.requirements.hasNumber ? "#10B981" : "#94A3B8"} 
-                            />
-                            <Text style={[styles.reqText, passValidation.requirements.hasNumber && styles.reqTextSuccess]}>
-                              Al menos un número (0-9)
-                            </Text>
-                          </View>
-
-                          <View style={styles.reqItem}>
-                            <Ionicons 
-                              name={passValidation.requirements.hasSpecialChar ? "checkmark-circle" : "ellipse-outline"} 
-                              size={14} 
-                              color={passValidation.requirements.hasSpecialChar ? "#10B981" : "#94A3B8"} 
-                            />
-                            <Text style={[styles.reqText, passValidation.requirements.hasSpecialChar && styles.reqTextSuccess]}>
-                              Al menos un símbolo (!@#$%^&*)
-                            </Text>
-                          </View>
-                        </View>
-                      </View>
-                    )}
-
-                    {/* Confirmar Contraseña */}
-                    <View style={styles.fieldGroup}>
-                      <Text style={styles.labelDark}>Confirmar Contraseña</Text>
-                      <View style={styles.whiteInputWrapper}>
-                        <Ionicons name="lock-closed" size={18} color="#475569" style={styles.fieldIcon} />
-                        <TextInput
-                          style={styles.whiteInput}
-                          placeholder="••••••••••••"
-                          placeholderTextColor="#94A3B8"
-                          secureTextEntry={!showRegConfirmPassword}
-                          value={regConfirmPassword}
-                          onChangeText={setRegConfirmPassword}
-                        />
-                        <TouchableOpacity onPress={() => setShowRegConfirmPassword(!showRegConfirmPassword)}>
-                          <Ionicons name={showRegConfirmPassword ? "eye-off-outline" : "eye-outline"} size={18} color="#64748B" />
-                        </TouchableOpacity>
-                      </View>
-                      {regConfirmPassword.length > 0 && (
-                        <Text style={[styles.matchText, passMatches ? styles.matchSuccess : styles.matchError]}>
-                          {passMatches ? '✓ Las contraseñas coinciden' : '✗ Las contraseñas no coinciden'}
-                        </Text>
-                      )}
-                    </View>
-
-                    {/* ─── CAMPOS ACADÉMICOS (solo si el correo es APRENDIZ) ─── */}
-                    {esAprendiz && (
-                      <>
-                        <View style={styles.academicSectionHeader}>
-                          <Ionicons name="school-outline" size={16} color="#C59427" />
-                          <Text style={styles.academicSectionTitle}>Datos Académicos (Opcional)</Text>
-                        </View>
-
-                        {/* Número de Ficha con búsqueda */}
-                        <View style={styles.fieldGroup}>
-                          <Text style={styles.labelDark}>Número de Ficha</Text>
-                          <View style={styles.fichaInputRow}>
-                            <View style={[styles.whiteInputWrapper, { flex: 1 }]}>
-                              <Ionicons name="id-card-outline" size={18} color="#475569" style={styles.fieldIcon} />
-                              <TextInput
-                                style={styles.whiteInput}
-                                placeholder="Ej: 2693551"
-                                placeholderTextColor="#94A3B8"
-                                keyboardType="number-pad"
-                                value={regFichaNumero}
-                                onChangeText={(t) => {
-                                  setRegFichaNumero(t);
-                                  buscarFichas(t);
-                                }}
-                              />
-                              {buscandoFicha && <ActivityIndicator size="small" color="#C59427" />}
-                            </View>
-                            <TouchableOpacity
-                              style={styles.fichaSearchBtn}
-                              onPress={() => setMostrarSelectorFicha(true)}
-                            >
-                              <Ionicons name="search-outline" size={18} color="#FFF" />
-                            </TouchableOpacity>
-                          </View>
-                          {fichaEncontrada && (
-                            <View style={styles.fichaFoundBadge}>
-                              <Ionicons name="checkmark-circle" size={14} color="#10B981" />
-                              <Text style={styles.fichaFoundText}>
-                                {fichaEncontrada.numero} — {fichaEncontrada.programaNombre}
-                              </Text>
-                            </View>
-                          )}
-                          {regFichaNumero.length >= 3 && !fichaEncontrada && !buscandoFicha && (
-                            <Text style={[styles.matchText, styles.matchError]}>
-                              ⚠ Ficha no encontrada, puedes continuar igual y el admin la asignará
-                            </Text>
-                          )}
-                        </View>
-
-                        {/* Sede */}
-                        <View style={styles.fieldGroup}>
-                          <Text style={styles.labelDark}>Sede del Centro de Formación</Text>
-                          <View style={styles.whiteInputWrapper}>
-                            <Ionicons name="location-outline" size={18} color="#475569" style={styles.fieldIcon} />
-                            <TextInput
-                              style={styles.whiteInput}
-                              placeholder="Ej: Sede Cazucá"
-                              placeholderTextColor="#94A3B8"
-                              value={regSede}
-                              onChangeText={setRegSede}
-                            />
-                          </View>
-                        </View>
-
-                        {/* Trimestre */}
-                        <View style={styles.fieldGroup}>
-                          <Text style={styles.labelDark}>Trimestre Actual</Text>
-                          <View style={styles.trimestreRow}>
-                            {['1','2','3','4','5','6'].map((t) => (
-                              <TouchableOpacity
-                                key={t}
-                                style={[
-                                  styles.trimestreChip,
-                                  regTrimestre === t && styles.trimestreChipActive,
-                                ]}
-                                onPress={() => setRegTrimestre(t)}
-                              >
-                                <Text style={[
-                                  styles.trimestreChipText,
-                                  regTrimestre === t && styles.trimestreChipTextActive,
-                                ]}>
-                                  {t}°
-                                </Text>
-                              </TouchableOpacity>
-                            ))}
-                          </View>
-                        </View>
-                      </>
-                    )}
-
-                    {/* Modal Selector de Fichas */}
-                    <Modal
-                      visible={mostrarSelectorFicha}
-                      transparent
-                      animationType="slide"
-                      onRequestClose={() => setMostrarSelectorFicha(false)}
-                    >
-                      <TouchableWithoutFeedback onPress={() => setMostrarSelectorFicha(false)}>
-                        <View style={styles.modalOverlay}>
-                          <TouchableWithoutFeedback>
-                            <View style={styles.modalSheet}>
-                              <View style={styles.modalHeader}>
-                                <Text style={styles.modalTitle}>Seleccionar Ficha</Text>
-                                <TouchableOpacity onPress={() => setMostrarSelectorFicha(false)}>
-                                  <Ionicons name="close-circle" size={24} color="#64748B" />
-                                </TouchableOpacity>
-                              </View>
-                              <View style={styles.modalSearchBox}>
-                                <Ionicons name="search-outline" size={16} color="#94A3B8" />
-                                <TextInput
-                                  style={styles.modalSearchInput}
-                                  placeholder="Buscar por número de ficha..."
-                                  placeholderTextColor="#94A3B8"
-                                  keyboardType="number-pad"
-                                  onChangeText={(t) => buscarFichas(t)}
-                                  autoFocus
-                                />
-                              </View>
-                              {buscandoFicha && (
-                                <ActivityIndicator color="#C59427" style={{ marginTop: 12 }} />
-                              )}
-                              <FlatList
-                                data={fichasDisponibles}
-                                keyExtractor={(item) => item.id}
-                                ListEmptyComponent={!buscandoFicha ? (
-                                  <Text style={styles.modalEmpty}>Escribe al menos 3 dígitos para buscar</Text>
-                                ) : null}
-                                renderItem={({ item }) => (
-                                  <TouchableOpacity
-                                    style={styles.modalFichaItem}
-                                    onPress={() => {
-                                      setRegFichaNumero(item.numero);
-                                      setFichaEncontrada(item);
-                                      setMostrarSelectorFicha(false);
-                                    }}
-                                  >
-                                    <Ionicons name="document-text-outline" size={18} color="#C59427" />
-                                    <View style={{ flex: 1, marginLeft: 10 }}>
-                                      <Text style={styles.modalFichaNumero}>Ficha {item.numero}</Text>
-                                      <Text style={styles.modalFichaPrograma}>{item.programaNombre}</Text>
-                                      {item.instructorNombre && (
-                                        <Text style={styles.modalFichaInstructor}>{item.instructorNombre}</Text>
-                                      )}
-                                    </View>
-                                    <View style={[
-                                      styles.estadoBadge,
-                                      { backgroundColor: item.estado === 'Activo' ? '#10B981' : '#94A3B8' }
-                                    ]}>
-                                      <Text style={styles.estadoBadgeText}>{item.estado || 'Activo'}</Text>
-                                    </View>
-                                  </TouchableOpacity>
-                                )}
-                              />
-                            </View>
-                          </TouchableWithoutFeedback>
-                        </View>
-                      </TouchableWithoutFeedback>
-                    </Modal>
-
-                    {/* Submit Register Button */}
-                    <TouchableOpacity style={styles.goldButton} activeOpacity={0.85} onPress={handleRegister}>
-                      <Text style={styles.goldButtonText}>CREAR CUENTA →</Text>
-                    </TouchableOpacity>
-
-                    {/* Switch back to Login */}
-                    <View style={styles.switchContainer}>
-                      <Text style={styles.switchTextDark}>¿Ya tienes una cuenta? </Text>
-                      <TouchableOpacity onPress={() => { setFeedback(null); setCurrentScreen('login'); }}>
-                        <Text style={styles.goldLink}>Inicia Sesión</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                )}
+                <TouchableOpacity
+                  style={styles.btnPrimaryNav}
+                  activeOpacity={0.85}
+                  onPress={goToLogin}
+                >
+                  <Text style={styles.btnPrimaryNavText}>Iniciar Sesión</Text>
+                  <Ionicons name="arrow-forward" size={16} color="#0B1228" style={{ marginLeft: 6 }} />
+                </TouchableOpacity>
               </>
             )}
-          </ScrollView>
-        </KeyboardAvoidingView>
-
-        {/* Footer Bar */}
-        <View style={styles.footerBar}>
-          <Text style={styles.footerText}>© 2026 AIMS - Academic Intelligent Management System</Text>
+          </View>
         </View>
+
+        {/* Main Content Area */}
+        <ScrollView
+          style={styles.scrollContainer}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* HERO SECTION INSPIRADA EN EL TEMPLATE */}
+          <View style={[styles.heroContainer, !isDesktop && styles.heroContainerMobile]}>
+            {/* Left Hero Column */}
+            <View style={[styles.heroLeft, !isDesktop && styles.heroLeftMobile]}>
+              <View style={styles.statusPill}>
+                <View style={styles.pulseDot} />
+                <Text style={styles.statusPillText}>Sistema de Gestión Académica</Text>
+              </View>
+
+              <Text style={styles.heroTitle}>
+                Bienvenido(a)<Text style={styles.heroTitleDot}>.</Text>
+              </Text>
+
+              <Text style={styles.heroSubtitle}>
+                Una plataforma diseñada para facilitar la consulta de tu información. Los aprendices pueden ver su historial académico y asistencias, mientras que los instructores pueden gestionar calificaciones fácilmente.
+              </Text>
+
+
+
+              {/* Action Buttons */}
+              <View style={styles.heroCtaGroup}>
+                <TouchableOpacity
+                  style={styles.btnGoldPrimary}
+                  activeOpacity={0.85}
+                  onPress={goToRegister}
+                >
+                  <LinearGradient
+                    colors={['#D4AF37', '#F3E5AB', '#AA7C11']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.btnGradient}
+                  >
+                    <Text style={styles.btnGoldText}>CREAR CUENTA</Text>
+                    <Ionicons name="sparkles" size={16} color="#0A0F26" style={{ marginLeft: 6 }} />
+                  </LinearGradient>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.btnOutlineSecondary}
+                  activeOpacity={0.8}
+                  onPress={goToLogin}
+                >
+                  <Text style={styles.btnOutlineText}>Iniciar Sesión</Text>
+                  <Ionicons name="log-in-outline" size={18} color="#E2E8F0" style={{ marginLeft: 6 }} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Micro stats counter */}
+              <View style={styles.statsBar}>
+                <View style={styles.statItem}>
+                  <Text style={styles.statNumber}>100%</Text>
+                  <Text style={styles.statLabel}>En Línea</Text>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                  <Text style={styles.statNumber}>Roles</Text>
+                  <Text style={styles.statLabel}>Aprendices • Instructores</Text>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                  <Text style={styles.statNumber}>Fácil</Text>
+                  <Text style={styles.statLabel}>Acceso Rápido</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Right Hero Column: Decorative Topographic Waves + Landing Card */}
+            <View style={[styles.heroRight, !isDesktop && styles.heroRightMobile]}>
+              {/* Synthetic Concentric Topographic Curves (Inspired by template) */}
+              <View style={styles.topographicContainer}>
+                <View style={[styles.topoRing, styles.topoRing1]} />
+                <View style={[styles.topoRing, styles.topoRing2]} />
+                <View style={[styles.topoRing, styles.topoRing3]} />
+                <View style={[styles.topoRing, styles.topoRing4]} />
+                <View style={[styles.topoRing, styles.topoRing5]} />
+                <View style={[styles.topoRing, styles.topoRing6]} />
+                <View style={[styles.topoRing, styles.topoRing7]} />
+              </View>
+
+              {/* Floating Academic Hologram Card */}
+              <View style={styles.floatingCard}>
+                <View style={styles.floatingCardHeader}>
+                  <View style={styles.floatingIconBadge}>
+                    <Ionicons name="school" size={24} color="#D4AF37" />
+                  </View>
+                  <View>
+                    <Text style={styles.floatingCardTag}>AIMS</Text>
+                    <Text style={styles.floatingCardTitle}>Portal Educativo.</Text>
+                  </View>
+                </View>
+
+                <Text style={styles.floatingCardText}>
+                  Acceso centralizado para el seguimiento de asistencias, calificaciones, fichas de formación y evaluación automatizada con inteligencia artificial.
+                </Text>
+
+                <View style={styles.floatingBadgesRow}>
+                  <View style={styles.featurePill}>
+                    <Ionicons name="calendar-outline" size={14} color="#10B981" />
+                    <Text style={styles.featurePillText}>Asistencias</Text>
+                  </View>
+                  <View style={styles.featurePill}>
+                    <Ionicons name="document-text-outline" size={14} color="#60A5FA" />
+                    <Text style={styles.featurePillText}>Calificaciones</Text>
+                  </View>
+                  <View style={styles.featurePill}>
+                    <Ionicons name="person-outline" size={14} color="#D4AF37" />
+                    <Text style={styles.featurePillText}>Historial</Text>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.floatingCardButton}
+                  activeOpacity={0.85}
+                  onPress={goToLogin}
+                >
+                  <Text style={styles.floatingCardButtonText}>ENTRAR AL PORTAL</Text>
+                  <Ionicons name="arrow-forward-circle" size={18} color="#D4AF37" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+
+          {/* FEATURES SECTION (3 COLUMNS) */}
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionBadge}>CARACTERÍSTICAS DEL SISTEMA</Text>
+              <Text style={styles.sectionTitle}>Todo lo que tu formación necesita</Text>
+              <Text style={styles.sectionDescription}>
+                AIMS integra las herramientas pedagógicas y administrativas en una suite moderna y ágil.
+              </Text>
+            </View>
+
+            <View style={[styles.cardsGrid, !isDesktop && styles.cardsGridMobile]}>
+              {/* Card 1 */}
+              <View style={styles.featureCard}>
+                <View style={[styles.cardIconBox, styles.cardIconGold]}>
+                  <Ionicons name="calendar-outline" size={26} color="#D4AF37" />
+                </View>
+                <Text style={styles.cardHeading}>Control de Asistencias</Text>
+                <Text style={styles.cardBody}>
+                  Registro automático y seguro en tiempo real, alertas de inasistencias y reportes consolidados por ficha de formación.
+                </Text>
+
+              </View>
+
+              {/* Card 2 */}
+              <View style={styles.featureCard}>
+                <View style={[styles.cardIconBox, styles.cardIconBlue]}>
+                  <Ionicons name="sparkles-outline" size={26} color="#60A5FA" />
+                </View>
+                <Text style={styles.cardHeading}>Calificaciones</Text>
+                <Text style={styles.cardBody}>
+                  Asistencia inteligente para instructores en la retroalimentación cualitativa y cuantitativa de evidencias y talleres.
+                </Text>
+
+              </View>
+
+              {/* Card 3 */}
+              <View style={styles.featureCard}>
+                <View style={[styles.cardIconBox, styles.cardIconGold]}>
+                  <Ionicons name="people-outline" size={26} color="#D4AF37" />
+                </View>
+                <Text style={styles.cardHeading}>Gestión de Fichas</Text>
+                <Text style={styles.cardBody}>
+                  Monitoreo de instructores líderes, asignación de competencias, sedes y trimestres con sincronización continua.
+                </Text>
+
+              </View>
+            </View>
+          </View>
+
+          {/* CALL TO ACTION BANNER */}
+          <View style={styles.ctaBannerWrapper}>
+            <LinearGradient
+              colors={['#0F1838', '#14204F', '#090D24']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.ctaBanner}
+            >
+              <View style={styles.ctaTextGroup}>
+                <Text style={styles.ctaTitle}>¿Listo para comenzar?</Text>
+                <Text style={styles.ctaSubtitle}>
+                  Ingresa con tus credenciales de SENA o comunícate con tu administrador de centro.
+                </Text>
+              </View>
+              <View style={styles.ctaButtonsGroup}>
+                <TouchableOpacity
+                  style={styles.btnGoldPrimary}
+                  activeOpacity={0.85}
+                  onPress={goToLogin}
+                >
+                  <LinearGradient
+                    colors={['#D4AF37', '#F3E5AB', '#AA7C11']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.btnGradient}
+                  >
+                    <Text style={styles.btnGoldText}>ACCEDER AHORA</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.btnOutlineSecondary}
+                  activeOpacity={0.8}
+                  onPress={goToRegister}
+                >
+                  <Text style={styles.btnOutlineText}>Crear Cuenta Nueva</Text>
+                </TouchableOpacity>
+              </View>
+            </LinearGradient>
+          </View>
+
+          {/* FOOTER */}
+          <View style={styles.footer}>
+            <View style={[styles.footerMain, !isDesktop && styles.footerMainMobile]}>
+              <View style={styles.footerBrandCol}>
+                <View style={styles.navBrand}>
+                  <Image
+                    source={require('../assets/images/logo.jpeg')}
+                    style={styles.footerLogo}
+                    resizeMode="contain"
+                  />
+                  <View style={styles.brandTextGroup}>
+                    <Text style={styles.footerBrandTitle}>AIMS</Text>
+                    <Text style={styles.footerBrandSubtitle}>Academic Intelligent Management</Text>
+                  </View>
+                </View>
+                <Text style={styles.footerBio}>
+                  Plataforma integral de gestión educativa y analítica académica institucional para la comunidad formativa.
+                </Text>
+              </View>
+
+              <View style={styles.footerLinksRow}>
+                <View style={styles.footerCol}>
+                  <Text style={styles.footerColHeading}>Accesos Rápidos</Text>
+                  <TouchableOpacity onPress={goToLogin}>
+                    <Text style={styles.footerColLink}>Iniciar Sesión</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={goToRegister}>
+                    <Text style={styles.footerColLink}>Registrar Aprendiz</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => router.push('/forgot-password')}>
+                    <Text style={styles.footerColLink}>Recuperar Clave</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.footerCol}>
+                  <Text style={styles.footerColHeading}>Roles del Sistema</Text>
+                  <Text style={styles.footerColLink}>Aprendices</Text>
+                  <Text style={styles.footerColLink}>Instructores</Text>
+                  <Text style={styles.footerColLink}>Administradores</Text>
+                </View>
+
+                <View style={styles.footerCol}>
+                  <Text style={styles.footerColHeading}>Soporte</Text>
+                  <Text style={styles.footerColLink}>soporte@sena.edu.co</Text>
+                  <Text style={styles.footerColLink}>Centro de Formación</Text>
+                  <Text style={styles.footerColLink}>Términos y Privacidad</Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.footerBottom}>
+              <Text style={styles.footerBottomText}>
+                © 2026 AIMS - Sistema de Gestión Académica. Todos los derechos reservados.
+              </Text>
+              <View style={styles.footerSecurityBadge}>
+                <Ionicons name="lock-closed" size={12} color="#10B981" />
+                <Text style={styles.footerSecurityText}>Conexión Segura</Text>
+              </View>
+            </View>
+          </View>
+        </ScrollView>
       </SafeAreaView>
     </View>
   );
@@ -997,758 +408,753 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#020308',
   },
-  /* ─── CAMPOS ACADÉMICOS ─── */
-  academicSectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 12,
-    marginBottom: 6,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    backgroundColor: 'rgba(197,148,39,0.12)',
-    borderRadius: 8,
-    borderLeftWidth: 3,
-    borderLeftColor: '#C59427',
-  },
-  academicSectionTitle: {
-    color: '#C59427',
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  fichaInputRow: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'center',
-  },
-  fichaSearchBtn: {
-    backgroundColor: '#C59427',
-    borderRadius: 12,
-    padding: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fichaFoundBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: 'rgba(16,185,129,0.12)',
-    borderRadius: 8,
-  },
-  fichaFoundText: {
-    color: '#10B981',
-    fontSize: 12,
-    fontWeight: '600',
-    flex: 1,
-  },
-  trimestreRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 4,
-  },
-  trimestreChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
-  },
-  trimestreChipActive: {
-    backgroundColor: '#C59427',
-    borderColor: '#C59427',
-  },
-  trimestreChipText: {
-    color: '#94A3B8',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  trimestreChipTextActive: {
-    color: '#FFF',
-  },
-  /* ─── MODAL SELECTOR FICHAS ─── */
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'flex-end',
-  },
-  modalSheet: {
-    backgroundColor: '#0F172A',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingTop: 16,
-    paddingHorizontal: 16,
-    paddingBottom: 32,
-    maxHeight: '70%',
-    borderTopWidth: 3,
-    borderTopColor: '#C59427',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  modalTitle: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  modalSearchBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1E293B',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 8,
-    marginBottom: 10,
-  },
-  modalSearchInput: {
-    flex: 1,
-    color: '#FFF',
-    fontSize: 14,
-  },
-  modalEmpty: {
-    color: '#64748B',
-    textAlign: 'center',
-    marginTop: 20,
-    fontSize: 13,
-  },
-  modalFichaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1E293B',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(197,148,39,0.2)',
-  },
-  modalFichaNumero: {
-    color: '#FFF',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  modalFichaPrograma: {
-    color: '#94A3B8',
-    fontSize: 12,
-    marginTop: 2,
-  },
-  modalFichaInstructor: {
-    color: '#C59427',
-    fontSize: 11,
-    marginTop: 2,
-  },
-  estadoBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-  },
-  estadoBadgeText: {
-    color: '#FFF',
-    fontSize: 10,
-    fontWeight: '700',
-  },
   safeArea: {
     flex: 1,
   },
-  /* AMBIENT GLOW ORBS (DARK ACADEMIA SATIN GOLD & SAPPHIRE) */
+
+  /* Ambient Glows */
   glowOrb: {
     position: 'absolute',
     borderRadius: 999,
   },
-  goldSatinSpotlight: {
+  goldGlowTop: {
+    width: 600,
+    height: 600,
+    backgroundColor: '#D4AF37',
+    opacity: 0.12,
+    top: -240,
+    left: '10%',
+  },
+  blueGlowCenter: {
+    width: 550,
+    height: 550,
+    backgroundColor: '#1E3A8A',
+    opacity: 0.2,
+    top: '25%',
+    right: -150,
+  },
+  amberGlowBottom: {
     width: 500,
     height: 500,
-    backgroundColor: '#D4AF37',
-    opacity: 0.16,
-    top: -160,
-    left: '50%',
-    transform: [{ translateX: -250 }],
-  },
-  sapphireGlowCenter: {
-    width: 440,
-    height: 440,
-    backgroundColor: '#1E3A8A',
-    opacity: 0.22,
-    top: '30%',
-    right: -110,
-  },
-  amberGoldGlowBottom: {
-    width: 380,
-    height: 380,
     backgroundColor: '#C59427',
-    opacity: 0.18,
-    bottom: -90,
-    left: -70,
+    opacity: 0.14,
+    bottom: -150,
+    left: -100,
   },
-  radialCenterHalo: {
-    width: 320,
-    height: 320,
-    backgroundColor: '#60A5FA',
-    opacity: 0.07,
-    top: '35%',
-    left: '20%',
+  cyanGlowSide: {
+    width: 400,
+    height: 400,
+    backgroundColor: '#0284C7',
+    opacity: 0.08,
+    top: '60%',
+    right: '25%',
   },
 
-  /* CONSTELLATION STAR DUST DOTS */
-  constellationDot: {
+  /* Star Dust Sparks */
+  sparkleDot: {
     position: 'absolute',
-    width: 4,
-    height: 4,
+    width: 3.5,
+    height: 3.5,
     borderRadius: 2,
     backgroundColor: '#D4AF37',
-    opacity: 0.45,
-    zIndex: 1,
+    opacity: 0.4,
   },
 
-  /* FLOATING ACADEMIC & TECH NODES */
-  techNode: {
-    position: 'absolute',
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: 'rgba(10, 15, 36, 0.75)',
-    borderWidth: 1.5,
-    justifyContent: 'center',
+  /* Top Navbar */
+  navbar: {
+    flexDirection: 'row',
     alignItems: 'center',
-    zIndex: 2,
-    elevation: 6,
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: 'rgba(2, 3, 8, 0.75)',
+    zIndex: 20,
+    flexWrap: 'wrap',
+    gap: 8,
+    ...Platform.select({
+      web: {
+        backdropFilter: 'blur(12px)',
+      },
+    }),
+  },
+  navBrand: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  logoImage: {
+    width: 42,
+    height: 42,
+    borderRadius: 8,
+    marginRight: 12,
+  },
+  brandTextGroup: {
+    justifyContent: 'center',
+  },
+  brandTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  brandLogoText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 2.5,
+  },
+  brandBadge: {
+    backgroundColor: 'rgba(212, 175, 55, 0.18)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(212, 175, 55, 0.35)',
+  },
+  brandBadgeText: {
+    color: '#D4AF37',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  brandSubtitle: {
+    color: '#94A3B8',
+    fontSize: 9,
+    letterSpacing: 1.2,
+    marginTop: 2,
+  },
+  navLinks: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 26,
+  },
+  navItem: {
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+  },
+  navItemActive: {
+    borderBottomWidth: 2,
+    borderBottomColor: '#D4AF37',
+  },
+  navItemText: {
+    color: '#94A3B8',
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
+  navItemTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  navAuthGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  btnSecondaryNav: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+  },
+  btnSecondaryNavText: {
+    color: '#E2E8F0',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  btnPrimaryNav: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 18,
+    borderRadius: 18,
+    backgroundColor: '#D4AF37',
+  },
+  btnPrimaryNavText: {
+    color: '#0A0F26',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+
+  /* Scroll container */
+  scrollContainer: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 0,
+  },
+
+  /* HERO SECTION */
+  heroContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 40,
+    paddingTop: 50,
+    paddingBottom: 60,
+    maxWidth: 1280,
+    alignSelf: 'center',
+    width: '100%',
+  },
+  heroContainerMobile: {
+    flexDirection: 'column',
+    paddingHorizontal: 20,
+    paddingTop: 30,
+    paddingBottom: 40,
+  },
+  heroLeft: {
+    flex: 1.1,
+    paddingRight: 40,
+  },
+  heroLeftMobile: {
+    paddingRight: 0,
+    marginBottom: 40,
+    width: '100%',
+  },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(212, 175, 55, 0.12)',
+    borderColor: 'rgba(212, 175, 55, 0.3)',
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginBottom: 20,
+  },
+  pulseDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#10B981',
+    marginRight: 8,
+  },
+  statusPillText: {
+    color: '#F3E5AB',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+  },
+  heroTitle: {
+    color: '#FFFFFF',
+    fontSize: 64,
+    fontWeight: '900',
+    letterSpacing: -1,
+    lineHeight: 72,
+    marginBottom: 16,
+  },
+  heroTitleDot: {
+    color: '#D4AF37',
+  },
+  heroSubtitle: {
+    color: '#94A3B8',
+    fontSize: 15,
+    lineHeight: 24,
+    marginBottom: 28,
+    maxWidth: 540,
+  },
+
+  /* Search bar (as in template) */
+  searchBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(212, 175, 55, 0.35)',
+    borderRadius: 28,
+    paddingHorizontal: 18,
+    height: 54,
+    marginBottom: 26,
+    maxWidth: 500,
+    ...Platform.select({
+      web: {
+        backdropFilter: 'blur(8px)',
+      },
+    }),
+  },
+  searchInput: {
+    flex: 1,
+    color: '#FFFFFF',
+    fontSize: 13,
+  },
+  searchButton: {
+    padding: 6,
+  },
+
+  /* CTA Buttons */
+  heroCtaGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginBottom: 36,
+  },
+  btnGoldPrimary: {
+    borderRadius: 24,
+    overflow: 'hidden',
+    shadowColor: '#D4AF37',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  btnGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 26,
+  },
+  btnGoldText: {
+    color: '#0A0F26',
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  btnOutlineSecondary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 13,
+    paddingHorizontal: 22,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  btnOutlineText: {
+    color: '#E2E8F0',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
+  /* Stats Bar */
+  statsBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 20,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+    maxWidth: 500,
+  },
+  statItem: {
+    justifyContent: 'center',
+  },
+  statNumber: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  statLabel: {
+    color: '#94A3B8',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  statDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+  },
+
+  /* HERO RIGHT: CONCENTRIC RINGS & FLOATING CARD */
+  heroRight: {
+    flex: 0.9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    minHeight: 460,
+    width: '100%',
+  },
+  heroRightMobile: {
+    minHeight: 400,
+  },
+  topographicContainer: {
+    position: 'absolute',
+    width: 440,
+    height: 440,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  topoRing: {
+    position: 'absolute',
+    borderRadius: 220,
+    borderWidth: 1.2,
+  },
+  topoRing1: {
+    width: 420,
+    height: 420,
+    borderColor: 'rgba(59, 130, 246, 0.15)',
+    transform: [{ scaleX: 1.1 }],
+  },
+  topoRing2: {
+    width: 360,
+    height: 360,
+    borderColor: 'rgba(99, 102, 241, 0.25)',
+    transform: [{ scaleY: 1.08 }, { rotate: '15deg' }],
+  },
+  topoRing3: {
+    width: 300,
+    height: 300,
+    borderColor: 'rgba(168, 85, 247, 0.35)',
+    transform: [{ scaleX: 1.15 }, { rotate: '-10deg' }],
+  },
+  topoRing4: {
+    width: 240,
+    height: 240,
+    borderColor: 'rgba(212, 175, 55, 0.45)',
+    transform: [{ scaleY: 1.1 }, { rotate: '25deg' }],
+  },
+  topoRing5: {
+    width: 180,
+    height: 180,
+    borderColor: 'rgba(236, 72, 153, 0.4)',
+    transform: [{ scaleX: 1.2 }, { rotate: '-20deg' }],
+  },
+  topoRing6: {
+    width: 120,
+    height: 120,
+    borderColor: 'rgba(96, 165, 250, 0.5)',
+    transform: [{ scaleY: 1.15 }],
+  },
+  topoRing7: {
+    width: 60,
+    height: 60,
+    borderColor: 'rgba(212, 175, 55, 0.7)',
+  },
+
+  /* Floating Card Overlapping Waves */
+  floatingCard: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: 'rgba(10, 15, 36, 0.88)',
+    borderRadius: 22,
+    padding: 28,
+    borderWidth: 1.5,
+    borderColor: 'rgba(212, 175, 55, 0.35)',
+    borderTopWidth: 4,
+    borderTopColor: '#D4AF37',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.6,
+    shadowRadius: 28,
+    elevation: 16,
+    ...Platform.select({
+      web: {
+        backdropFilter: 'blur(16px)',
+      },
+    }),
+  },
+  floatingCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 14,
+  },
+  floatingIconBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: 'rgba(212, 175, 55, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(212, 175, 55, 0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  floatingCardTag: {
+    color: '#D4AF37',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+  },
+  floatingCardTitle: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '800',
+  },
+  floatingCardText: {
+    color: '#94A3B8',
+    fontSize: 12,
+    lineHeight: 18,
+    marginBottom: 18,
+  },
+  floatingBadgesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 22,
+  },
+  featurePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  featurePillText: {
+    color: '#E2E8F0',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  floatingCardButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(212, 175, 55, 0.12)',
+    borderWidth: 1.2,
+    borderColor: 'rgba(212, 175, 55, 0.4)',
+    borderRadius: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+  },
+  floatingCardButtonText: {
+    color: '#F3E5AB',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+
+  /* SECTION: CARDS */
+  sectionContainer: {
+    paddingHorizontal: 30,
+    paddingVertical: 50,
+    maxWidth: 1280,
+    alignSelf: 'center',
+    width: '100%',
+  },
+  sectionHeader: {
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  sectionBadge: {
+    color: '#D4AF37',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.8,
+    marginBottom: 8,
+  },
+  sectionTitle: {
+    color: '#FFFFFF',
+    fontSize: 32,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  sectionDescription: {
+    color: '#94A3B8',
+    fontSize: 14,
+    textAlign: 'center',
+    maxWidth: 600,
+  },
+  cardsGrid: {
+    flexDirection: 'row',
+    gap: 24,
+    justifyContent: 'center',
+  },
+  cardsGridMobile: {
+    flexDirection: 'column',
+  },
+  featureCard: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 20, 45, 0.65)',
+    borderRadius: 20,
+    padding: 28,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderTopWidth: 3,
+    borderTopColor: 'rgba(212, 175, 55, 0.5)',
     ...Platform.select({
       web: {
         backdropFilter: 'blur(10px)',
       },
     }),
   },
-  techNodeGold: {
-    borderColor: 'rgba(212, 175, 55, 0.45)',
-    boxShadow: '0px 4px 10px rgba(212, 175, 55, 0.3)',
-  },
-  techNodeBlue: {
-    borderColor: 'rgba(96, 165, 250, 0.45)',
-    boxShadow: '0px 4px 10px rgba(59, 130, 246, 0.3)',
-  },
-
-  headerBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 28,
-    paddingTop: 18,
-    paddingBottom: 10,
-    zIndex: 10,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  headerLogo: {
-    width: 38,
-    height: 38,
-    marginRight: 10,
-  },
-  headerTextGroup: {
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
-  headerSubtitle: {
-    color: '#94A3B8',
-    fontSize: 8,
-    letterSpacing: 1,
-  },
-  headerRightText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '800',
-    letterSpacing: 2,
-  },
-  flexContainer: {
-    flex: 1,
-    zIndex: 10,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 20,
-    paddingHorizontal: 16,
-  },
-
-  /* LIGHT CARD (INICIO DE SESIÓN) */
-  lightCard: {
-    width: '100%',
-    maxWidth: 420,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 22,
-    padding: 32,
-    borderTopWidth: 4,
-    borderTopColor: '#D4AF37',
-    boxShadow: '0px 16px 28px rgba(2, 3, 8, 0.4)',
-    elevation: 14,
-  },
-  lightLogoContainer: {
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  lightLogoImg: {
-    width: 54,
-    height: 54,
-  },
-  lightLogoText: {
-    color: '#0F172A',
-    fontSize: 14,
-    fontWeight: '800',
-    letterSpacing: 2,
-    marginTop: 4,
-  },
-  cardTitleLight: {
-    color: '#0F172A',
-    fontSize: 22,
-    fontWeight: '800',
-    textAlign: 'center',
-    marginBottom: 22,
-    letterSpacing: 1.5,
-  },
-  labelLight: {
-    color: '#1E293B',
-    fontSize: 12,
-    fontWeight: '600',
-    marginBottom: 6,
-  },
-  roleSelector: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 14,
-  },
-  roleSelectorDark: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 14,
-  },
-  roleOption: {
-    flex: 1,
-    minHeight: 42,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-    backgroundColor: '#F8FAFC',
-    paddingHorizontal: 8,
-  },
-  roleOptionActive: {
-    backgroundColor: '#C59427',
-    borderColor: '#C59427',
-  },
-  roleOptionText: {
-    color: '#475569',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  roleOptionTextActive: {
-    color: '#FFFFFF',
-  },
-  borderedInputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+  cardIconBox: {
+    width: 52,
+    height: 52,
     borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: '#CBD5E1',
-    paddingHorizontal: 14,
-    height: 48,
-  },
-  borderedInput: {
-    flex: 1,
-    color: '#0F172A',
-    fontSize: 13,
-    height: '100%',
-  },
-  optionsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 4,
+    justifyContent: 'center',
     marginBottom: 20,
   },
-  checkboxRow: {
+  cardIconGold: {
+    backgroundColor: 'rgba(212, 175, 55, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(212, 175, 55, 0.35)',
+  },
+  cardIconBlue: {
+    backgroundColor: 'rgba(96, 165, 250, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(96, 165, 250, 0.35)',
+  },
+  cardHeading: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 10,
+  },
+  cardBody: {
+    color: '#94A3B8',
+    fontSize: 13,
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  cardLinkRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
+    marginTop: 'auto',
   },
-  rememberText: {
-    color: '#475569',
+  cardLinkText: {
+    color: '#D4AF37',
     fontSize: 12,
-    marginLeft: 6,
-  },
-  forgotText: {
-    color: '#475569',
-    fontSize: 12,
-    textDecorationLine: 'underline',
+    fontWeight: '700',
   },
 
-  /* DARK CARD (REGISTRO) */
-  darkCard: {
+  /* CTA BANNER WRAPPER */
+  ctaBannerWrapper: {
+    paddingHorizontal: 30,
+    paddingVertical: 20,
+    maxWidth: 1280,
+    alignSelf: 'center',
     width: '100%',
-    maxWidth: 420,
-    backgroundColor: '#0F142D',
-    borderRadius: 22,
-    padding: 32,
-    boxShadow: '0px 16px 28px rgba(0, 0, 0, 0.5)',
-    elevation: 14,
+  },
+  ctaBanner: {
+    borderRadius: 24,
+    padding: 36,
     borderWidth: 1.5,
     borderColor: 'rgba(212, 175, 55, 0.3)',
-    borderTopWidth: 4,
-    borderTopColor: '#D4AF37',
-  },
-  cardHeaderLogo: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 20,
   },
-  cardLogoImg: {
-    width: 44,
-    height: 44,
-    marginRight: 10,
-  },
-  cardLogoTitle: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-  },
-  cardLogoSubtitle: {
-    color: '#94A3B8',
-    fontSize: 8,
-    letterSpacing: 0.8,
-  },
-  cardTitleDark: {
-    color: '#FFFFFF',
-    fontSize: 22,
-    fontWeight: '800',
-    textAlign: 'center',
-    marginBottom: 22,
-    letterSpacing: 1.5,
-  },
-  fieldGroup: {
-    marginBottom: 14,
-  },
-  labelDark: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
-    marginBottom: 6,
-  },
-  whiteInputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    height: 48,
-  },
-  fieldIcon: {
-    marginRight: 10,
-  },
-  whiteInput: {
+  ctaTextGroup: {
     flex: 1,
-    color: '#0F172A',
-    fontSize: 13,
-    height: '100%',
+    minWidth: 280,
   },
-
-  /* BUTTONS & FOOTERS */
-  goldButton: {
-    backgroundColor: '#C59427',
-    borderRadius: 24,
-    height: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 6,
-    boxShadow: '0px 4px 8px rgba(197, 148, 39, 0.35)',
-    elevation: 4,
-  },
-  goldButtonText: {
+  ctaTitle: {
     color: '#FFFFFF',
+    fontSize: 26,
+    fontWeight: '800',
+    marginBottom: 8,
+  },
+  ctaSubtitle: {
+    color: '#CBD5E1',
     fontSize: 14,
-    fontWeight: '800',
-    letterSpacing: 1,
+    lineHeight: 22,
   },
-  switchContainer: {
+  ctaButtonsGroup: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 20,
-  },
-  switchTextDark: {
-    color: '#FFFFFF',
-    fontSize: 12,
-  },
-  switchTextLight: {
-    color: '#475569',
-    fontSize: 12,
-  },
-  goldLink: {
-    color: '#C59427',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-
-  /* SOCIAL SECTION */
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 18,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#E2E8F0',
-  },
-  dividerText: {
-    color: '#64748B',
-    fontSize: 11,
-    marginHorizontal: 10,
-  },
-  socialRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 16,
-  },
-  socialButton: {
-    width: 60,
-    height: 44,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    gap: 14,
+    flexWrap: 'wrap',
   },
 
   /* FOOTER */
-  footerBar: {
-    paddingVertical: 12,
-    alignItems: 'center',
-    zIndex: 10,
+  footer: {
+    marginTop: 'auto',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: '#020308',
+    paddingHorizontal: 30,
+    paddingTop: 48,
+    paddingBottom: 0,
   },
-  footerText: {
-    color: '#64748B',
-    fontSize: 11,
-  },
-  /* JWT & VALIDATION FEEDBACK STYLES */
-  loadingContainer: {
-    padding: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingText: {
-    color: '#D4AF37',
-    fontSize: 12,
-    marginTop: 8,
-  },
-  feedbackBanner: {
+  footerMain: {
     flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 16,
-    borderWidth: 1,
-  },
-  feedbackError: {
-    backgroundColor: '#FEF2F2',
-    borderColor: '#FCA5A5',
-  },
-  feedbackSuccess: {
-    backgroundColor: '#ECFDF5',
-    borderColor: '#6EE7B7',
-  },
-  feedbackText: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginLeft: 8,
-    flex: 1,
-  },
-  feedbackTextError: {
-    color: '#991B1B',
-  },
-  feedbackTextSuccess: {
-    color: '#065F46',
-  },
-
-  /* SESSION AUTHENTICATED PANEL */
-  authBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#D1FAE5',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
+    justifyContent: 'space-between',
+    maxWidth: 1280,
     alignSelf: 'center',
-    marginBottom: 14,
+    width: '100%',
+    marginBottom: 40,
+    gap: 40,
   },
-  authBadgeText: {
-    color: '#065F46',
-    fontSize: 11,
-    fontWeight: '700',
-    marginLeft: 6,
+  footerMainMobile: {
+    flexDirection: 'column',
   },
-  userNameText: {
-    fontSize: 20,
+  footerBrandCol: {
+    flex: 1.2,
+    maxWidth: 380,
+  },
+  footerLogo: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    marginRight: 10,
+  },
+  footerBrandTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
     fontWeight: '800',
-    color: '#0F172A',
-    textAlign: 'center',
-    marginTop: 4,
+    letterSpacing: 2,
   },
-  userEmailText: {
-    fontSize: 13,
+  footerBrandSubtitle: {
+    color: '#94A3B8',
+    fontSize: 8,
+    letterSpacing: 1,
+  },
+  footerBio: {
     color: '#64748B',
-    textAlign: 'center',
-    marginBottom: 16,
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 14,
   },
-  tokenCard: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    marginBottom: 20,
+  footerLinksRow: {
+    flex: 2,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    flexWrap: 'wrap',
+    gap: 24,
   },
-  tokenLabel: {
-    fontSize: 11,
+  footerCol: {
+    minWidth: 140,
+  },
+  footerColHeading: {
+    color: '#FFFFFF',
+    fontSize: 13,
     fontWeight: '700',
-    color: '#475569',
-    marginBottom: 4,
-  },
-  tokenValue: {
-    fontSize: 10,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    color: '#0F172A',
-    backgroundColor: '#E2E8F0',
-    padding: 6,
-    borderRadius: 6,
-  },
-  primaryActionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#0F2027',
-    borderRadius: 24,
-    height: 48,
-    marginBottom: 12,
-  },
-  primaryActionText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
-  logoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#EF4444',
-    borderRadius: 24,
-    height: 48,
-  },
-  logoutButtonText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
-
-  /* LIVE PASSWORD VALIDATION STYLES */
-  passValidationBox: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 12,
-    padding: 12,
     marginBottom: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
+    letterSpacing: 0.5,
   },
-  passHeaderRow: {
+  footerColLink: {
+    color: '#94A3B8',
+    fontSize: 12,
+    marginBottom: 10,
+  },
+  footerBottom: {
+    maxWidth: 1280,
+    alignSelf: 'center',
+    width: '100%',
+    paddingTop: 24,
+    paddingBottom: 20,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.06)',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    flexWrap: 'wrap',
+    gap: 12,
   },
-  passValidationTitle: {
-    color: '#CBD5E1',
+  footerBottomText: {
+    color: '#64748B',
     fontSize: 11,
   },
-  passStrengthLabel: {
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  strengthBarBackground: {
-    height: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 3,
-    overflow: 'hidden',
-    marginBottom: 10,
-  },
-  strengthBarFill: {
-    height: '100%',
-    borderRadius: 3,
-  },
-  reqList: {
-    gap: 4,
-  },
-  reqItem: {
+  footerSecurityBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
-  reqText: {
-    fontSize: 11,
+  footerSecurityText: {
     color: '#94A3B8',
-  },
-  reqTextSuccess: {
-    color: '#10B981',
-    fontWeight: '600',
-  },
-  matchText: {
     fontSize: 11,
-    marginTop: 4,
-    fontWeight: '600',
-  },
-  matchSuccess: {
-    color: '#10B981',
-  },
-  matchError: {
-    color: '#F87171',
-  },
-  domainHelperBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1E293B',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    marginTop: 6,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  domainHelperText: {
-    fontSize: 11,
-    color: '#CBD5E1',
-    flex: 1,
-    lineHeight: 15,
-  },
-  boldDomain: {
-    fontWeight: '700',
-    color: '#F1F5F9',
   },
 });
