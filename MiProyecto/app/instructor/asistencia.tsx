@@ -461,6 +461,15 @@ export default function AsistenciaAnimatedScreen() {
             style={[styles.toggleBtn, viewMode === 'matriz' && styles.toggleBtnActive]}
             onPress={() => setViewMode('matriz')}
           >
+            <Ionicons
+              name="grid-outline"
+              size={15}
+              color={viewMode === 'matriz' ? '#FFFFFF' : NAVY}
+            />
+            <Text style={[styles.toggleText, viewMode === 'matriz' && styles.toggleTextActive]}>
+              Matriz
+            </Text>
+          </Pressable>
         </View>
       </View>
 
