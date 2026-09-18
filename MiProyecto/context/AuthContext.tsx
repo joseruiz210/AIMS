@@ -2,12 +2,10 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { router } from 'expo-router';
 import { authService, User, RegisterData } from '../services/authService';
 
-import { notificationsUtil } from '../utils/notifications';
-
 type AuthContextType = {
   user: User | null;
   isLoading: boolean;
-  login: (credentials: { correo: string; contrasenia: string; role: 'INSTRUCTOR' | 'APRENDIZ'; documento?: string }) => Promise<{ success: boolean; message?: string }>;
+  login: (credentials: { correo: string; contrasenia: string }) => Promise<{ success: boolean; message?: string }>;
    setSession: (user: User) => void;
   register: (data: RegisterData) => Promise<{ success: boolean; message?: string }>;
   logout: () => Promise<void>;
@@ -33,19 +31,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Al abrir la app, revisa si ya había sesión guardada
   useEffect(() => {
+    let isMounted = true;
     (async () => {
-      const { user: storedUser } = await authService.checkSession();
-      if (storedUser) {
-        const normalizedUser = normalizeUser(storedUser);
-        setUser(normalizedUser);
-        const destination = ROLE_ROUTES[normalizedUser.role] ?? '/(tabs)';
-        router.replace(destination as any);
+      try {
+        const { user: storedUser } = await authService.checkSession();
+        if (isMounted && storedUser) {
+          const normalizedUser = normalizeUser(storedUser);
+          setUser(normalizedUser);
+        }
+      } catch {
+        // error al verificar sesión previa
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
-      setIsLoading(false);
     })();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  const login = async (credentials: { correo: string; contrasenia: string; role: 'INSTRUCTOR' | 'APRENDIZ'; documento?: string }) => {
+  const login = async (credentials: { correo: string; contrasenia: string }) => {
     const result = await authService.login(credentials);
 
     if (!result.success || !result.user) {

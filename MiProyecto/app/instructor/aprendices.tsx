@@ -1,5 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Pressable,
+  TextInput,
+  ActivityIndicator,
+  useWindowDimensions,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { fichasService } from '../../services/fichasService';
 
@@ -21,6 +30,8 @@ interface Apprentice {
 }
 
 export default function AprendicesScreenPremium() {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
   const [loading, setLoading] = useState(true);
   const [aprendices, setAprendices] = useState<Apprentice[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -80,7 +91,11 @@ export default function AprendicesScreenPremium() {
   });
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[styles.contentContainer, isMobile && { paddingHorizontal: 14, paddingVertical: 14 }]}
+      showsVerticalScrollIndicator={false}
+    >
       {/* Title */}
       <View style={styles.headerRow}>
         <View>
