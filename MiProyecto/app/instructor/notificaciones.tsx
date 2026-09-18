@@ -1,33 +1,64 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Pressable } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Pressable, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { comunicadosService, ComunicadoItem } from '../../services/comunicadosService';
 
 const NAVY = '#0F1026';
-const GOLD = '#cfa235';
+const GOLD = '#D4AF37';
 
 export default function NotificacionesScreen() {
   const [items, setItems] = useState<ComunicadoItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    loadNotificaciones();
+    let isMounted = true;
+    loadNotificaciones().finally(() => { if (!isMounted) return; });
+    return () => { isMounted = false; };
   }, []);
 
   const loadNotificaciones = async () => {
     setLoading(true);
+    setErrorMsg(null);
     try {
       const data = await comunicadosService.getComunicados();
       setItems(data);
-    } catch {
+    } catch (error: any) {
+      console.error('Error cargando notificaciones:', error);
+      setErrorMsg(error?.message || 'No se pudieron cargar las notificaciones. Verifica tu conexión.');
       setItems([]);
     } finally {
       setLoading(false);
     }
   };
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    setErrorMsg(null);
+    try {
+      const data = await comunicadosService.getComunicados();
+      setItems(data);
+    } catch (error: any) {
+      setErrorMsg(error?.message || 'No se pudieron cargar las notificaciones.');
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.contentContainer}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={GOLD}
+          colors={[GOLD, NAVY]}
+        />
+      }
+    >
       <View style={styles.headerRow}>
         <Text style={styles.pageTitle}>Notificaciones</Text>
         <Pressable style={styles.refreshBtn} onPress={loadNotificaciones}>
@@ -36,16 +67,29 @@ export default function NotificacionesScreen() {
         </Pressable>
       </View>
 
-      {loading ? (
-        <View style={{ padding: 40, alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={GOLD} />
-          <Text style={{ marginTop: 10, color: '#64748B' }}>Cargando notificaciones...</Text>
+      {errorMsg && (
+        <View style={styles.errorWrap}>
+          <Ionicons name="cloud-offline-outline" size={20} color="#DC2626" />
+          <Text style={styles.errorText}>{errorMsg}</Text>
+          <Pressable style={styles.retryBtn} onPress={loadNotificaciones}>
+            <Text style={styles.retryText}>Reintentar</Text>
+          </Pressable>
         </View>
-      ) : items.length === 0 ? (
+      )}
+
+      {loading ? (
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator size="large" color={GOLD} />
+          <Text style={styles.loadingText}>Cargando notificaciones...</Text>
+        </View>
+      ) : items.length === 0 && !errorMsg ? (
         <View style={styles.card}>
-          <Ionicons name="notifications-off-outline" size={40} color="#64748B" style={{ marginBottom: 8 }} />
+          <View style={styles.emptyIconWrap}>
+            <Ionicons name="notifications-off-outline" size={48} color={GOLD} />
+          </View>
           <Text style={styles.cardTitle}>Centro de Alertas y Avisos</Text>
           <Text style={styles.cardText}>No tienes notificaciones pendientes en este momento.</Text>
+          <Text style={styles.emptyHint}>Desliza hacia abajo para actualizar</Text>
         </View>
       ) : (
         <View style={styles.listContainer}>
@@ -79,12 +123,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     paddingVertical: 20,
     paddingBottom: 40,
+    gap: 14,
   },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
   },
   pageTitle: {
     fontSize: 26,
@@ -98,7 +142,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     paddingVertical: 8,
     paddingHorizontal: 14,
-    borderRadius: 8,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
@@ -107,24 +151,54 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 13,
   },
+  errorWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#FEF2F2',
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  errorText: { color: '#DC2626', flex: 1, fontSize: 13 },
+  retryBtn: { backgroundColor: '#DC2626', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
+  retryText: { color: '#FFFFFF', fontWeight: '700', fontSize: 12 },
+  loadingWrap: { padding: 40, alignItems: 'center', gap: 10 },
+  loadingText: { color: '#64748B' },
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 24,
+    borderRadius: 20,
+    padding: 40,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#E2E8F0',
+    gap: 8,
+  },
+  emptyIconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
   },
   cardTitle: {
     fontSize: 16,
     fontWeight: '700',
     color: NAVY,
-    marginBottom: 4,
   },
   cardText: {
     fontSize: 14,
     color: '#64748B',
     textAlign: 'center',
+  },
+  emptyHint: {
+    color: '#94A3B8',
+    fontSize: 12,
+    marginTop: 4,
+    fontStyle: 'italic',
   },
   listContainer: {
     gap: 12,
@@ -133,7 +207,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 14,
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 14,
     padding: 16,
     borderWidth: 1,
     borderColor: '#E2E8F0',
