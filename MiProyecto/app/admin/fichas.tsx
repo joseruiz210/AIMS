@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'expo-router';
 import {
   View,
   Text,
@@ -17,6 +18,7 @@ const NAVY = '#12103C';
 const GOLD = '#cfa235';
 
 export default function FichasScreenAdmin() {
+  const router = useRouter();
   const [search, setSearch] = useState('');
   const [fichas, setFichas] = useState<Ficha[]>([]);
   const [loading, setLoading] = useState(true);
@@ -236,6 +238,14 @@ export default function FichasScreenAdmin() {
                   <Text style={styles.aprendicesNum}>{item.aprendicesCount || 0}</Text>
                   <Text style={styles.aprendicesText}>Aprendices</Text>
                 </View>
+
+                <Pressable
+                  style={styles.cardAssignBtn}
+                  onPress={() => router.push('/admin/horarios')}
+                >
+                  <Ionicons name="time-outline" size={16} color={NAVY} style={{ marginRight: 6 }} />
+                  <Text style={styles.cardAssignText}>Horario</Text>
+                </Pressable>
 
                 <Pressable
                   style={styles.cardAssignBtn}

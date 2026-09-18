@@ -75,4 +75,15 @@ export const calificacionesService = {
     if (!response.ok) throw new Error(data.message || 'Error al registrar calificación');
     return data.data;
   },
+
+  async getAdminResumen(): Promise<any> {
+    try {
+      const response = await authService.fetchWithAuth(`${API_BASE_URL}/calificaciones/admin-resumen`);
+      const data = await response.json();
+      if (!response.ok || !data.data) return null;
+      return data.data;
+    } catch {
+      return null;
+    }
+  },
 };

@@ -169,7 +169,7 @@ export default function TareasAprendizScreen() {
         <View style={styles.summaryCard}>
           <Text style={styles.summaryLabel}>CALIFICADAS</Text>
           <Text style={[styles.summaryValue, { color: '#059669' }]}>{calificadas}</Text>
-          <Text style={styles.summarySubtext}>Aprobadas</Text>
+          <Text style={styles.summarySubtext}>Evaluadas</Text>
         </View>
 
         <View style={styles.summaryCard}>
@@ -332,12 +332,12 @@ export default function TareasAprendizScreen() {
         <View style={styles.modalBackdrop}>
           <View style={[styles.modalBox, !isDesktop && styles.modalBoxMobile]}>
             <View style={styles.modalHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, marginRight: 8 }}>
                 <View style={styles.modalIconWrap}>
                   <Ionicons name="cloud-upload-outline" size={18} color="#FFFFFF" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.modalTitle}>Entregar Evidencia</Text>
+                  <Text style={styles.modalTitle} numberOfLines={1}>Entregar Evidencia</Text>
                   <Text style={styles.modalSubtitle} numberOfLines={1}>
                     {activeEvidencia?.titulo}
                   </Text>
@@ -348,46 +348,46 @@ export default function TareasAprendizScreen() {
               </Pressable>
             </View>
 
-            <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
-              <View style={styles.modalBody}>
-                {submittedSuccess ? (
-                  <View style={styles.successBox}>
-                    <Ionicons name="checkmark-circle" size={48} color="#059669" />
-                    <Text style={styles.successTitle}>¡Entrega registrada y calificada!</Text>
-                    <Text style={styles.successSubtext}>
-                      Tu evidencia ha sido calificada con retroalimentación y nota asignada.
-                    </Text>
-                  </View>
-                ) : (
-                  <>
-                    <View style={styles.instructionNotice}>
-                      <Ionicons name="information-circle-outline" size={18} color={NAVY} style={{ marginRight: 8 }} />
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.instructionNoticeTitle}>Indicación del Instructor:</Text>
-                        <Text style={styles.instructionNoticeText}>{activeEvidencia?.descripcion}</Text>
-                      </View>
+            <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={styles.modalBody} showsVerticalScrollIndicator={true} keyboardShouldPersistTaps="handled">
+              {submittedSuccess ? (
+                <View style={styles.successBox}>
+                  <Ionicons name="checkmark-circle" size={48} color="#059669" />
+                  <Text style={styles.successTitle}>¡Entrega registrada y calificada!</Text>
+                  <Text style={styles.successSubtext}>
+                    Tu evidencia ha sido calificada con retroalimentación y nota asignada.
+                  </Text>
+                </View>
+              ) : (
+                <>
+                  <View style={styles.instructionNotice}>
+                    <Ionicons name="information-circle-outline" size={18} color={NAVY} style={{ marginRight: 8, marginTop: 2 }} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.instructionNoticeTitle}>Indicación del Instructor:</Text>
+                      <Text style={styles.instructionNoticeText}>{activeEvidencia?.descripcion}</Text>
                     </View>
+                  </View>
 
-                    <Text style={styles.modalFieldLabel}>ENLACE AL ARCHIVO O REPOSITORIO (Drive, GitHub, OneDrive, etc.):</Text>
-                    <TextInput
-                      style={styles.modalInput}
-                      value={archivoUrl}
-                      onChangeText={setArchivoUrl}
-                      placeholder="https://drive.google.com/file/... o https://github.com/..."
-                    />
+                  <Text style={styles.modalFieldLabel}>ENLACE AL ARCHIVO O REPOSITORIO (Drive, GitHub, OneDrive, etc.):</Text>
+                  <TextInput
+                    style={styles.modalInput}
+                    value={archivoUrl}
+                    onChangeText={setArchivoUrl}
+                    placeholder="https://drive.google.com/file/... o https://github.com/..."
+                    placeholderTextColor="#94A3B8"
+                  />
 
-                    <Text style={styles.modalFieldLabel}>COMENTARIOS ADICIONALES PARA EL INSTRUCTOR:</Text>
-                    <TextInput
-                      style={[styles.modalInput, styles.modalTextArea]}
-                      value={comentario}
-                      onChangeText={setComentario}
-                      placeholder="Escribe notas sobre tu entrega, dudas resueltas o aclaraciones..."
-                      multiline
-                      numberOfLines={3}
-                    />
-                  </>
-                )}
-              </View>
+                  <Text style={styles.modalFieldLabel}>COMENTARIOS ADICIONALES PARA EL INSTRUCTOR:</Text>
+                  <TextInput
+                    style={[styles.modalInput, styles.modalTextArea]}
+                    value={comentario}
+                    onChangeText={setComentario}
+                    placeholder="Escribe notas sobre tu entrega, dudas resueltas o aclaraciones..."
+                    placeholderTextColor="#94A3B8"
+                    multiline
+                    numberOfLines={3}
+                  />
+                </>
+              )}
             </ScrollView>
 
             {!submittedSuccess && (
@@ -407,7 +407,7 @@ export default function TareasAprendizScreen() {
                   {submitting ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                       <ActivityIndicator size="small" color="#FFFFFF" />
-                      <Text style={styles.submitBtnText}>Enviando entrega...</Text>
+                      <Text style={styles.submitBtnText}>Enviando...</Text>
                     </View>
                   ) : (
                     <>
@@ -427,12 +427,12 @@ export default function TareasAprendizScreen() {
         <View style={styles.modalBackdrop}>
           <View style={[styles.modalBox, !isDesktop && styles.modalBoxMobile]}>
             <View style={styles.modalHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, marginRight: 8 }}>
                 <View style={[styles.modalIconWrap, { backgroundColor: '#047857' }]}>
                   <Ionicons name="star" size={18} color="#FFFFFF" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.modalTitle}>Retroalimentación Docente</Text>
+                  <Text style={styles.modalTitle} numberOfLines={1}>Retroalimentación Docente</Text>
                   <Text style={styles.modalSubtitle} numberOfLines={1}>
                     {activeEvidencia?.titulo}
                   </Text>
@@ -443,38 +443,52 @@ export default function TareasAprendizScreen() {
               </Pressable>
             </View>
 
-            <View style={styles.modalBody}>
-              <View style={styles.feedbackScoreBox}>
-                <Text style={styles.feedbackScoreLabel}>CALIFICACIÓN FINAL:</Text>
-                <Text style={styles.feedbackScoreValue}>{activeEvidencia?.entrega?.nota?.toFixed(1) || '4.6'} / 5.0</Text>
-                <Text style={styles.feedbackScoreStatus}>✓ Competencia Aprobada</Text>
-                <Text style={styles.feedbackScoreValue}>
-                  {activeEvidencia?.entrega?.nota !== undefined
-                    ? Number(activeEvidencia.entrega.nota).toFixed(1)
-                    : '4.5'}{' '}
-                  / 5.0
-                </Text>
-                {Number(activeEvidencia?.entrega?.nota ?? 4.5) >= 3.5 ? (
-                  <Text style={[styles.feedbackScoreStatus, { color: '#047857' }]}>
-                    ✓ Competencia Aprobada (SENA)
-                  </Text>
-                ) : (
-                  <Text style={[styles.feedbackScoreStatus, { color: '#B91C1C' }]}>
-                    ✗ No Aprobada - Requiere Corrección
-                  </Text>
-                )}
-              </View>
+            <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={styles.modalBody} showsVerticalScrollIndicator={true}>
+              {(() => {
+                const notaNum = activeEvidencia?.entrega?.nota !== undefined
+                  ? Number(activeEvidencia.entrega.nota)
+                  : 4.5;
+                const isApproved = notaNum >= 3.5;
+
+                return (
+                  <View style={[
+                    styles.feedbackScoreBox,
+                    !isApproved && { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }
+                  ]}>
+                    <Text style={[
+                      styles.feedbackScoreLabel,
+                      !isApproved && { color: '#B91C1C' }
+                    ]}>CALIFICACIÓN FINAL:</Text>
+                    <Text style={[
+                      styles.feedbackScoreValue,
+                      !isApproved && { color: '#DC2626' }
+                    ]}>
+                      {notaNum.toFixed(1)} / 5.0
+                    </Text>
+                    {isApproved ? (
+                      <Text style={[styles.feedbackScoreStatus, { color: '#047857' }]}>
+                        ✓ Competencia Aprobada (SENA)
+                      </Text>
+                    ) : (
+                      <Text style={[styles.feedbackScoreStatus, { color: '#B91C1C' }]}>
+                        ✗ No Aprobada - Requiere Corrección
+                      </Text>
+                    )}
+                  </View>
+                );
+              })()}
 
               <View style={styles.feedbackTextBox}>
-                <Text style={styles.feedbackTextTitle}>Comentario del Instructor ({activeEvidencia?.instructor}):</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 6 }}>
                   <Ionicons name="sparkles" size={16} color={GOLD} />
-                  <Text style={styles.feedbackTextTitle}>Evaluación y Retroalimentación Pedagógica:</Text>
+                  <Text style={styles.feedbackTextTitle}>
+                    Retroalimentación {activeEvidencia?.instructor ? `(${activeEvidencia.instructor})` : 'del Instructor'}:
+                  </Text>
                 </View>
                 <Text style={styles.feedbackTextBody}>
                   {activeEvidencia?.entrega?.feedback ||
                     activeEvidencia?.entrega?.comentario ||
-                    'Excelente desarrollo de la evidencia. Se evidencia dominio conceptual, correcta aplicación de estándares y estructura técnica completa.'}
+                    'Evaluación completada para la evidencia.'}
                 </Text>
               </View>
 
@@ -487,7 +501,7 @@ export default function TareasAprendizScreen() {
                   </Text>
                 </View>
               ) : null}
-            </View>
+            </ScrollView>
 
             <View style={styles.modalFooter}>
               <Pressable
@@ -804,24 +818,41 @@ const styles = StyleSheet.create({
   // Modal styles
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
+    padding: 12,
+    ...Platform.select({
+      web: {
+        position: 'fixed' as any,
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 9999,
+      },
+    }),
   },
   modalBox: {
     width: '100%',
     maxWidth: 580,
+    maxHeight: '88%',
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
     overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 24,
   },
   modalBoxMobile: {
-    maxWidth: '96%',
+    width: '95%',
+    maxWidth: '95%',
+    maxHeight: '92%',
+    alignSelf: 'center',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -901,11 +932,13 @@ const styles = StyleSheet.create({
   modalFooter: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
+    alignItems: 'center',
     gap: 10,
     padding: 16,
     borderTopWidth: 1,
     borderTopColor: '#E2E8F0',
     backgroundColor: '#F8FAFC',
+    flexShrink: 0,
   },
   cancelBtn: {
     paddingVertical: 10,

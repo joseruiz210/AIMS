@@ -27,63 +27,7 @@ interface ClassDetail {
   icon: any;
 }
 
-const SUBJECT_DETAILS: Record<string, ClassDetail> = {
-  'Analisis de Datos': {
-    subject: 'Analisis de Datos',
-    code: 'COMP-220501096',
-    instructor: 'Roberto Vargas',
-    aula: 'Aula 201 • Piso 2',
-    sede: 'Sede Central',
-    color: '#3B82F6',
-    bg: '#EFF6FF',
-    textColor: '#1D4ED8',
-    icon: 'bar-chart-outline',
-  },
-  'Programación BD': {
-    subject: 'Programación BD',
-    code: 'COMP-220501097',
-    instructor: 'Ana Martínez',
-    aula: 'Lab. Base de Datos • Aula 305',
-    sede: 'Sede Central',
-    color: '#10B981',
-    bg: '#ECFDF5',
-    textColor: '#047857',
-    icon: 'server-outline',
-  },
-  'POO': {
-    subject: 'POO',
-    code: 'COMP-220501098',
-    instructor: 'Carmen López',
-    aula: 'Aula 102 • Piso 1',
-    sede: 'Sede Central',
-    color: '#F59E0B',
-    bg: '#FFFBEB',
-    textColor: '#B45309',
-    icon: 'code-slash-outline',
-  },
-  'Requisitos': {
-    subject: 'Requisitos',
-    code: 'COMP-220501099',
-    instructor: 'Juan Pérez',
-    aula: 'Aula 204 • Piso 2',
-    sede: 'Sede Central',
-    color: '#8B5CF6',
-    bg: '#F5F3FF',
-    textColor: '#6D28D9',
-    icon: 'document-text-outline',
-  },
-  'Seguridad Informática': {
-    subject: 'Seguridad Informática',
-    code: 'COMP-220501100',
-    instructor: 'Luis Gómez',
-    aula: 'Laboratorio de Redes',
-    sede: 'Edificio Tecnológico',
-    color: '#F43F5E',
-    bg: '#FFF1F2',
-    textColor: '#BE123C',
-    icon: 'shield-checkmark-outline',
-  },
-};
+const SUBJECT_DETAILS: Record<string, ClassDetail> = {};
 
 interface ScheduleRow {
   time: string;
@@ -95,35 +39,7 @@ interface ScheduleRow {
   viernes: string;
 }
 
-const scheduleData: ScheduleRow[] = [
-  {
-    time: '07:00 - 09:00',
-    block: 'Bloque 1',
-    lunes: 'Analisis de Datos',
-    martes: 'Programación BD',
-    miercoles: 'POO',
-    jueves: 'Requisitos',
-    viernes: 'Seguridad Informática',
-  },
-  {
-    time: '09:00 - 11:00',
-    block: 'Bloque 2',
-    lunes: 'Seguridad Informática',
-    martes: 'Analisis de Datos',
-    miercoles: 'Programación BD',
-    jueves: 'POO',
-    viernes: 'Programación BD',
-  },
-  {
-    time: '11:00 - 01:00',
-    block: 'Bloque 3',
-    lunes: 'Programación BD',
-    martes: 'Requisitos',
-    miercoles: 'Analisis de Datos',
-    jueves: 'Programación BD',
-    viernes: 'Requisitos',
-  },
-];
+const scheduleData: ScheduleRow[] = [];
 
 const DAYS: { key: DiaKey; label: string; short: string }[] = [
   { key: 'lunes', label: 'Lunes', short: 'LUN' },
@@ -169,7 +85,7 @@ export default function HorarioAprendiz() {
         <View>
           <Text style={styles.pageTitle}>Mi Horario de Formación</Text>
           <Text style={styles.pageSubtitle}>
-            Jornada Diurna (07:00 AM - 01:00 PM) • Trimestre I - 2026 • ADSO
+            Jornada de Formación • Horario Académico SENA
           </Text>
         </View>
 
@@ -200,8 +116,8 @@ export default function HorarioAprendiz() {
             <Text style={styles.summaryLabel}>TOTAL SEMANAL</Text>
             <Ionicons name="time-outline" size={16} color={GOLD} />
           </View>
-          <Text style={[styles.summaryValue, { color: NAVY }]}>30 Horas</Text>
-          <Text style={styles.summarySubtext}>6 horas diarias de formación</Text>
+          <Text style={[styles.summaryValue, { color: NAVY }]}>{scheduleData.length * 2} Horas</Text>
+          <Text style={styles.summarySubtext}>{scheduleData.length > 0 ? 'Horas programadas' : 'Sin horas asignadas'}</Text>
         </View>
 
         <View style={styles.summaryCard}>
@@ -209,17 +125,17 @@ export default function HorarioAprendiz() {
             <Text style={styles.summaryLabel}>MATERIAS ACTIVAS</Text>
             <Ionicons name="book-outline" size={16} color="#3B82F6" />
           </View>
-          <Text style={[styles.summaryValue, { color: '#2563EB' }]}>5</Text>
+          <Text style={[styles.summaryValue, { color: '#2563EB' }]}>{Object.keys(SUBJECT_DETAILS).length}</Text>
           <Text style={styles.summarySubtext}>Competencias técnicas</Text>
         </View>
 
         <View style={styles.summaryCard}>
           <View style={styles.summaryCardHeader}>
-            <Text style={styles.summaryLabel}>CLASES HOY (MIÉ)</Text>
+            <Text style={styles.summaryLabel}>CLASES HOY ({DAYS.find((d) => d.key === activeDay)?.short || 'HOY'})</Text>
             <Ionicons name="calendar-outline" size={16} color="#059669" />
           </View>
-          <Text style={[styles.summaryValue, { color: '#059669' }]}>3 Sesiones</Text>
-          <Text style={styles.summarySubtext}>POO • BD • Análisis Datos</Text>
+          <Text style={[styles.summaryValue, { color: '#059669' }]}>{agendaClasses.length} Sesiones</Text>
+          <Text style={styles.summarySubtext}>{agendaClasses.length > 0 ? 'Sesiones programadas' : 'Sin clases registradas'}</Text>
         </View>
 
         <View style={styles.summaryCard}>
@@ -228,41 +144,52 @@ export default function HorarioAprendiz() {
             <Ionicons name="business-outline" size={16} color={GOLD} />
           </View>
           <Text style={[styles.summaryValue, { color: GOLD }]}>Presencial</Text>
-          <Text style={styles.summarySubtext}>Sede Central • Aulas 102 a 305</Text>
+          <Text style={styles.summarySubtext}>Sede SENA CTMA</Text>
         </View>
       </View>
 
       {/* Subject Filter Pills */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScrollView}>
-        <View style={styles.filterRow}>
-          <Text style={styles.filterLabel}>Filtrar Materia:</Text>
-          {['Todas', 'Analisis de Datos', 'Programación BD', 'POO', 'Requisitos', 'Seguridad Informática'].map((subj) => {
-            const isSelected = selectedFilterSubject === subj;
-            const detail = SUBJECT_DETAILS[subj];
-            return (
-              <Pressable
-                key={subj}
-                style={[
-                  styles.filterPill,
-                  isSelected && styles.filterPillActive,
-                  isSelected && detail && { backgroundColor: detail.color, borderColor: detail.color },
-                ]}
-                onPress={() => setSelectedFilterSubject(subj)}
-              >
-                {detail ? (
-                  <View style={[styles.filterDot, { backgroundColor: isSelected ? '#FFFFFF' : detail.color }]} />
-                ) : null}
-                <Text style={[styles.filterPillText, isSelected && styles.filterPillTextActive]}>
-                  {subj}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </ScrollView>
+      {Object.keys(SUBJECT_DETAILS).length > 0 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScrollView}>
+          <View style={styles.filterRow}>
+            <Text style={styles.filterLabel}>Filtrar Materia:</Text>
+            {['Todas', ...Object.keys(SUBJECT_DETAILS)].map((subj) => {
+              const isSelected = selectedFilterSubject === subj;
+              const detail = SUBJECT_DETAILS[subj];
+              return (
+                <Pressable
+                  key={subj}
+                  style={[
+                    styles.filterPill,
+                    isSelected && styles.filterPillActive,
+                    isSelected && detail && { backgroundColor: detail.color, borderColor: detail.color },
+                  ]}
+                  onPress={() => setSelectedFilterSubject(subj)}
+                >
+                  {detail ? (
+                    <View style={[styles.filterDot, { backgroundColor: isSelected ? '#FFFFFF' : detail.color }]} />
+                  ) : null}
+                  <Text style={[styles.filterPillText, isSelected && styles.filterPillTextActive]}>
+                    {subj}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </ScrollView>
+      )}
 
       {/* View: Grid Mode */}
       {viewMode === 'grid' ? (
+        scheduleData.length === 0 ? (
+          <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 36, alignItems: 'center', borderWidth: 1, borderColor: '#D0D8E4', marginBottom: 20 }}>
+            <Ionicons name="calendar-outline" size={48} color="#94A3B8" style={{ marginBottom: 12 }} />
+            <Text style={{ fontSize: 16, fontWeight: '700', color: NAVY }}>Sin horario programado</Text>
+            <Text style={{ fontSize: 13, color: '#64748B', marginTop: 4, textAlign: 'center', maxWidth: 400 }}>
+              Aún no hay materias ni bloques de horario configurados para tu ficha de formación.
+            </Text>
+          </View>
+        ) : (
         <ScrollView horizontal={!isDesktop} showsHorizontalScrollIndicator={false}>
           <View style={[styles.gridTable, !isDesktop && { minWidth: 780 }]}>
             {/* Table Header */}
@@ -344,8 +271,9 @@ export default function HorarioAprendiz() {
                           </View>
 
                           <View style={styles.instructorTag}>
+                            <Ionicons name="person-outline" size={11} color="#475569" style={{ marginRight: 3 }} />
                             <Text style={styles.instructorShortText} numberOfLines={1}>
-                              👤 {detail.instructor}
+                              {detail.instructor}
                             </Text>
                           </View>
                         </Pressable>
@@ -361,6 +289,7 @@ export default function HorarioAprendiz() {
             ))}
           </View>
         </ScrollView>
+        )
       ) : (
         /* View: Agenda / Day by Day */
         <View style={styles.agendaContainer}>
@@ -963,10 +892,20 @@ const styles = StyleSheet.create({
   // Modal Styles
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
+    padding: 12,
+    ...Platform.select({
+      web: {
+        position: 'fixed' as any,
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 9999,
+      },
+    }),
   },
   modalBox: {
     width: '100%',
@@ -975,12 +914,15 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 20,
   },
   modalBoxMobile: {
-    maxWidth: '96%',
+    width: '95%',
+    maxWidth: '95%',
+    alignSelf: 'center',
   },
   modalHeader: {
     flexDirection: 'row',

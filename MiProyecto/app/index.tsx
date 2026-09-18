@@ -407,9 +407,15 @@ const styles = StyleSheet.create({
   outerContainer: {
     flex: 1,
     backgroundColor: '#020308',
+    width: '100%',
+    maxWidth: '100%',
+    overflow: 'hidden',
   },
   safeArea: {
     flex: 1,
+    width: '100%',
+    maxWidth: '100%',
+    overflow: 'hidden',
   },
 
   /* Ambient Glows */
@@ -769,9 +775,12 @@ const styles = StyleSheet.create({
     position: 'relative',
     minHeight: 460,
     width: '100%',
+    overflow: 'hidden',
   },
   heroRightMobile: {
     minHeight: 400,
+    width: '100%',
+    overflow: 'hidden',
   },
   topographicContainer: {
     position: 'absolute',
@@ -779,6 +788,7 @@ const styles = StyleSheet.create({
     height: 440,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   topoRing: {
     position: 'absolute',

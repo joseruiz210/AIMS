@@ -111,3 +111,67 @@ export async function removeUserData(): Promise<void> {
     console.error('Error al eliminar datos del usuario:', error);
   }
 }
+
+const REMEMBERED_AUTH_KEY = 'aims_remembered_auth_credentials';
+
+export interface RememberedAuth {
+  correo: string;
+  contrasenia?: string;
+  remember: boolean;
+}
+
+/**
+ * Guarda las credenciales recordadas del usuario para el inicio de sesión
+ */
+export async function saveRememberedAuth(data: RememberedAuth): Promise<void> {
+  try {
+    const jsonValue = JSON.stringify(data);
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(REMEMBERED_AUTH_KEY, jsonValue);
+      }
+    } else {
+      await SecureStore.setItemAsync(REMEMBERED_AUTH_KEY, jsonValue);
+    }
+  } catch (error) {
+    console.error('Error al guardar credenciales recordadas:', error);
+  }
+}
+
+/**
+ * Obtiene las credenciales recordadas si existen
+ */
+export async function getRememberedAuth(): Promise<RememberedAuth | null> {
+  try {
+    let jsonValue: string | null = null;
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined') {
+        jsonValue = localStorage.getItem(REMEMBERED_AUTH_KEY);
+      }
+    } else {
+      jsonValue = await SecureStore.getItemAsync(REMEMBERED_AUTH_KEY);
+    }
+    return jsonValue ? JSON.parse(jsonValue) : null;
+  } catch (error) {
+    console.error('Error al obtener credenciales recordadas:', error);
+    return null;
+  }
+}
+
+/**
+ * Elimina las credenciales recordadas
+ */
+export async function removeRememberedAuth(): Promise<void> {
+  try {
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(REMEMBERED_AUTH_KEY);
+      }
+    } else {
+      await SecureStore.deleteItemAsync(REMEMBERED_AUTH_KEY);
+    }
+  } catch (error) {
+    console.error('Error al eliminar credenciales recordadas:', error);
+  }
+}
+

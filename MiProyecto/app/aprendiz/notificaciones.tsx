@@ -11,6 +11,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import ActionModal from '../../components/ActionModal';
 import { comunicadosService } from '../../services/comunicadosService';
+import { authService } from '../../services/authService';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
 
 const NAVY = '#12103C';
 const GOLD = '#cfa235';
@@ -21,7 +24,7 @@ interface NotificacionItem {
   mensaje: string;
   hora: string;
   leida: boolean;
-  categoria: 'Académica' | 'Anuncio' | 'Asistencia';
+  categoria: 'Académica' | 'Anuncio' | 'Asistencia' | 'Horario';
 }
 
 export default function NotificacionesAprendizScreen() {
@@ -40,20 +43,54 @@ export default function NotificacionesAprendizScreen() {
   const loadNotificaciones = async () => {
     setLoading(true);
     try {
-      const data = await comunicadosService.getComunicados();
-      const mapped: NotificacionItem[] = data.map((item: any) => ({
-        id: item.id,
-        titulo: item.titulo || 'Comunicado Institucional',
-        mensaje: item.mensaje || '',
-        hora: item.fecha ? new Date(item.fecha).toLocaleDateString('es-CO') : 'Reciente',
-        leida: item.leidos ? item.leidos > 0 : false,
-        categoria: item.destinatario?.includes('ASISTENCIA')
-          ? 'Asistencia'
-          : item.destinatario?.includes('ACADEMICO')
-          ? 'Académica'
-          : 'Anuncio',
-      }));
-      setItems(mapped);
+      let notifs: NotificacionItem[] = [];
+      try {
+        const res = await authService.fetchWithAuth(`${API_BASE_URL}/notificaciones`);
+        const json = await res.json();
+        if (json.data && Array.isArray(json.data.notificaciones)) {
+          notifs = json.data.notificaciones.map((n: any) => ({
+            id: n.id,
+            titulo: n.titulo || 'Notificación',
+            mensaje: n.mensaje || '',
+            hora: n.createdAt
+              ? new Date(n.createdAt).toLocaleDateString('es-CO', {
+                  month: 'short',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })
+              : 'Reciente',
+            leida: !!n.leida,
+            categoria:
+              n.tipo === 'HORARIO'
+                ? 'Horario'
+                : n.tipo === 'CALIFICACION'
+                ? 'Académica'
+                : n.tipo === 'ASISTENCIA'
+                ? 'Asistencia'
+                : 'Anuncio',
+          }));
+        }
+      } catch {}
+
+      try {
+        const data = await comunicadosService.getComunicados();
+        const mapped: NotificacionItem[] = data.map((item: any) => ({
+          id: item.id,
+          titulo: item.titulo || 'Comunicado Institucional',
+          mensaje: item.mensaje || '',
+          hora: item.fecha ? new Date(item.fecha).toLocaleDateString('es-CO') : 'Reciente',
+          leida: item.leidos ? item.leidos > 0 : false,
+          categoria: item.destinatario?.includes('ASISTENCIA')
+            ? 'Asistencia'
+            : item.destinatario?.includes('ACADEMICO')
+            ? 'Académica'
+            : 'Anuncio',
+        }));
+        notifs = [...notifs, ...mapped];
+      } catch {}
+
+      setItems(notifs);
     } catch {
       setItems([]);
     } finally {
@@ -63,12 +100,14 @@ export default function NotificacionesAprendizScreen() {
 
   const handleMarkAllRead = () => {
     setItems(items.map((i) => ({ ...i, leida: true })));
+    authService.fetchWithAuth(`${API_BASE_URL}/notificaciones/read-all`, { method: 'PATCH' }).catch(() => {});
   };
 
   const handleOpenNotif = (notif: NotificacionItem) => {
     setSelectedNotif(notif);
     setModalVisible(true);
     setItems(items.map((i) => (i.id === notif.id ? { ...i, leida: true } : i)));
+    authService.fetchWithAuth(`${API_BASE_URL}/notificaciones/${notif.id}/read`, { method: 'PATCH' }).catch(() => {});
     comunicadosService.marcarLeido(notif.id).catch(() => {});
   };
 

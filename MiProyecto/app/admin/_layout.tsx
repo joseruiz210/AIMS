@@ -22,7 +22,9 @@ const GOLD_LIGHT = 'rgba(212, 175, 55, 0.15)';
 
 const menuItems = [
   { name: 'Inicio', path: '/admin', icon: 'home-outline' as const },
+  { name: 'Usuarios', path: '/admin/usuarios', icon: 'people-outline' as const },
   { name: 'Fichas', path: '/admin/fichas', icon: 'folder-open-outline' as const },
+  { name: 'Horarios', path: '/admin/horarios', icon: 'time-outline' as const },
   { name: 'Instructores', path: '/admin/instructores', icon: 'briefcase-outline' as const },
   { name: 'Calificaciones', path: '/admin/calificaciones', icon: 'bar-chart-outline' as const },
   { name: 'Reportes', path: '/admin/reportes', icon: 'document-text-outline' as const },
@@ -30,7 +32,9 @@ const menuItems = [
 
 const bottomNavItems = [
   { name: 'Inicio', path: '/admin', icon: 'home-outline' as const },
+  { name: 'Usuarios', path: '/admin/usuarios', icon: 'people-outline' as const },
   { name: 'Fichas', path: '/admin/fichas', icon: 'folder-open-outline' as const },
+  { name: 'Horarios', path: '/admin/horarios', icon: 'time-outline' as const },
   { name: 'Calificaciones', path: '/admin/calificaciones', icon: 'bar-chart-outline' as const },
   { name: 'Reportes', path: '/admin/reportes', icon: 'document-text-outline' as const },
 ];
@@ -95,8 +99,8 @@ function SidebarContent({
         <View style={styles.logoWrapper}>
           <Image
             source={require('../../assets/images/logo.jpeg')}
-            style={styles.logoImage}
             resizeMode="contain"
+            style={styles.logoImage}
           />
         </View>
         <View style={styles.roleBadge}>
@@ -106,7 +110,7 @@ function SidebarContent({
 
       {/* Menu */}
       <ScrollView style={styles.menuContainer} showsVerticalScrollIndicator={false}>
-        {[...(role === 'SUPERADMIN' ? [{ name: 'Usuarios', path: '/admin/usuarios', icon: 'people-outline' as const }] : []), ...menuItems].map((item) => (
+        {menuItems.map((item) => (
           <MenuItem key={item.name} name={item.name} path={item.path} icon={item.icon} />
         ))}
       </ScrollView>
