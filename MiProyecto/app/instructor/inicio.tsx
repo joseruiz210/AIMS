@@ -50,110 +50,124 @@ export default function InstructorInicioScreen() {
   const [menorAsistencia, setMenorAsistencia] = useState({ dia: 'Jueves', pct: 78 });
 
   useEffect(() => {
-    loadDashboardData();
-  }, []);
+    let isMounted = true;
 
-  const loadDashboardData = async () => {
-    setLoading(true);
-    try {
-      const { user } = await authService.checkSession();
-      if (user) {
-        const nombreCompleto =
-          (user as any).firstName
-            ? `${(user as any).firstName} ${(user as any).lastName || ''}`.trim()
-            : user.nombre || 'Instructor';
-        setUserName(nombreCompleto);
-        setUserEmail((user as any).email || user.correo || '');
-      }
-
-      const [fichasData, evidenciasData] = await Promise.all([
-        fichasService.getFichas(),
-        evidenciasService.getEvidenciasInstructor(),
-      ]);
-
-      setFichas(fichasData);
-      setEvidencias(evidenciasData);
-
-      // Calcular total de aprendices sumando matriculas
-      const aprendicesCount = fichasData.reduce(
-        (acc, f) => acc + (f.aprendicesCount || 0),
-        0
-      );
-      if (aprendicesCount > 0) {
-        setTotalAprendices(aprendicesCount);
-      }
-
-      if (fichasData.length > 0) {
-        const targetFicha = fichasData[0];
-
-        // 1. Cargar calificaciones reales desde PostgreSQL
-        try {
-          const califs = await calificacionesService.getCalificacionesByFicha(targetFicha.id);
-          if (califs && califs.length > 0) {
-            const notas = califs.map(c => c.overallNota).filter(n => n > 0);
-            if (notas.length > 0) {
-              const prom = Number((notas.reduce((a, b) => a + b, 0) / notas.length).toFixed(1));
-              setCalificacionPromedio(prom);
-            }
-          }
-        } catch (e) {
-          console.error(e);
+    const loadDashboardData = async () => {
+      setLoading(true);
+      try {
+        const { user } = await authService.checkSession();
+        if (!isMounted) return;
+        if (user) {
+          const nombreCompleto =
+            (user as any).firstName
+              ? `${(user as any).firstName} ${(user as any).lastName || ''}`.trim()
+              : user.nombre || 'Instructor';
+          setUserName(nombreCompleto);
+          setUserEmail((user as any).email || user.correo || '');
         }
 
-        // 2. Cargar asistencias reales desde PostgreSQL
-        try {
-          const asistenciasData = await asistenciaService.getAsistenciasByFicha(targetFicha.id);
-          if (asistenciasData && asistenciasData.length > 0) {
-            const presentes = asistenciasData.filter(a => a.estado === 'PRESENTE' || (a.estado as any) === 'EXCUSADO' || (a.estado as any) === 'EXCUSA').length;
-            const pct = Math.round((presentes / asistenciasData.length) * 100);
-            setAsistenciaPromedio(pct);
+        const [fichasData, evidenciasData] = await Promise.all([
+          fichasService.getFichas(),
+          evidenciasService.getEvidenciasInstructor(),
+        ]);
 
-            const byDateMap = new Map<string, { presentes: number; total: number }>();
-            asistenciasData.forEach(r => {
-              const d = r.fecha ? r.fecha.split('T')[0] : 'Hoy';
-              const cur = byDateMap.get(d) || { presentes: 0, total: 0 };
-              cur.total += 1;
-              if (r.estado === 'PRESENTE' || (r.estado as any) === 'EXCUSADO' || (r.estado as any) === 'EXCUSA') cur.presentes += 1;
-              byDateMap.set(d, cur);
-            });
+        if (!isMounted) return;
+        setFichas(fichasData);
+        setEvidencias(evidenciasData);
 
-            if (byDateMap.size >= 2) {
-              const sortedDates = Array.from(byDateMap.keys()).sort().slice(-5);
-              const dynamicBars = sortedDates.map(dateStr => {
-                const dt = new Date(dateStr);
-                const dayName = dt.toLocaleDateString('es-CO', { weekday: 'short' });
-                const info = byDateMap.get(dateStr)!;
-                const p = Math.round((info.presentes / info.total) * 100);
-                return {
-                  day: dayName.charAt(0).toUpperCase() + dayName.slice(1, 3),
-                  percentage: p,
-                  label: `${p}%`,
-                };
+        // Calcular total de aprendices sumando matriculas
+        const aprendicesCount = fichasData.reduce(
+          (acc, f) => acc + (f.aprendicesCount || 0),
+          0
+        );
+        if (aprendicesCount > 0) {
+          setTotalAprendices(aprendicesCount);
+        }
+
+        if (fichasData.length > 0) {
+          const targetFicha = fichasData[0];
+
+          // 1. Cargar calificaciones reales desde PostgreSQL
+          try {
+            const califs = await calificacionesService.getCalificacionesByFicha(targetFicha.id);
+            if (isMounted && califs && califs.length > 0) {
+              const notas = califs.map(c => c.overallNota).filter(n => n > 0);
+              if (notas.length > 0) {
+                const prom = Number((notas.reduce((a, b) => a + b, 0) / notas.length).toFixed(1));
+                setCalificacionPromedio(prom);
+              }
+            }
+          } catch (e) {
+            console.error(e);
+          }
+
+          // 2. Cargar asistencias reales desde PostgreSQL
+          try {
+            const asistenciasData = await asistenciaService.getAsistenciasByFicha(targetFicha.id);
+            if (isMounted && asistenciasData && asistenciasData.length > 0) {
+              const presentes = asistenciasData.filter(a => a.estado === 'PRESENTE' || (a.estado as any) === 'EXCUSADO' || (a.estado as any) === 'EXCUSA').length;
+              const pct = Math.round((presentes / asistenciasData.length) * 100);
+              setAsistenciaPromedio(pct);
+
+              const byDateMap = new Map<string, { presentes: number; total: number }>();
+              asistenciasData.forEach(r => {
+                const d = r.fecha ? r.fecha.split('T')[0] : 'Hoy';
+                const cur = byDateMap.get(d) || { presentes: 0, total: 0 };
+                cur.total += 1;
+                if (r.estado === 'PRESENTE' || (r.estado as any) === 'EXCUSADO' || (r.estado as any) === 'EXCUSA') cur.presentes += 1;
+                byDateMap.set(d, cur);
               });
-              setWeeklyAttendance(dynamicBars);
 
-              const sortedByPct = [...dynamicBars].sort((a, b) => b.percentage - a.percentage);
-              setMayorAsistencia({ dia: sortedByPct[0].day, pct: sortedByPct[0].percentage });
-              setMenorAsistencia({ dia: sortedByPct[sortedByPct.length - 1].day, pct: sortedByPct[sortedByPct.length - 1].percentage });
+              if (byDateMap.size >= 2) {
+                const sortedDates = Array.from(byDateMap.keys()).sort().slice(-5);
+                const dynamicBars = sortedDates.map(dateStr => {
+                  const dt = new Date(dateStr);
+                  const dayName = dt.toLocaleDateString('es-CO', { weekday: 'short' });
+                  const info = byDateMap.get(dateStr)!;
+                  const p = Math.round((info.presentes / info.total) * 100);
+                  return {
+                    day: dayName.charAt(0).toUpperCase() + dayName.slice(1, 3),
+                    percentage: p,
+                    label: `${p}%`,
+                  };
+                });
+                setWeeklyAttendance(dynamicBars);
+
+                const sortedByPct = [...dynamicBars].sort((a, b) => b.percentage - a.percentage);
+                setMayorAsistencia({ dia: sortedByPct[0].day, pct: sortedByPct[0].percentage });
+                setMenorAsistencia({ dia: sortedByPct[sortedByPct.length - 1].day, pct: sortedByPct[sortedByPct.length - 1].percentage });
+              }
             }
+          } catch (e) {
+            console.error(e);
           }
-        } catch (e) {
-          console.error(e);
+        }
+      } catch (error) {
+        console.warn('Error cargando dashboard instructor:', error);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
         }
       }
-    } catch (error) {
-      console.warn('Error cargando dashboard instructor:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+
+    loadDashboardData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const primaryFicha = fichas.length > 0 ? fichas[0] : null;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[styles.contentContainer, isMobile && styles.contentContainerMobile]}
+      showsVerticalScrollIndicator={false}
+    >
       {/* ─── BANNER DE BIENVENIDA INSTITUCIONAL SENA ─── */}
-      <View style={styles.welcomeCard}>
+      <View style={[styles.welcomeCard, isMobile && styles.welcomeCardMobile]}>
         <View style={styles.welcomePatternLeft} />
         <View style={styles.welcomePatternRight} />
 
@@ -484,23 +498,33 @@ export default function InstructorInicioScreen() {
 
       {/* ─── AVISO INSTITUCIONAL Y SOPORTE PEDAGÓGICO ─── */}
       <View style={styles.pedagogicalNoticeCard}>
-        <View style={styles.pedagogicalIconWrap}>
-          <Ionicons name="ribbon-outline" size={24} color={GOLD} />
+        <View style={styles.pedagogicalHeaderRow}>
+          <View style={styles.pedagogicalIconWrap}>
+            <Ionicons name="ribbon-outline" size={24} color={GOLD} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.pedagogicalTitle}>
+              Sistema de Evaluación y Rúbricas Formativas SENA
+            </Text>
+            <View style={styles.pedagogicalBadge}>
+              <Text style={styles.pedagogicalBadgeText}>Evaluación Integral ADSO</Text>
+            </View>
+          </View>
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.pedagogicalTitle}>
-            Sistema de Evaluación y Rúbricas Formativas SENA
-          </Text>
-          <Text style={styles.pedagogicalText}>
-            Cada evidencia entregada por los aprendices es valorada bajo la escala oficial de 0.0 a 5.0 (aprobatoria ≥ 3.5), generando retroalimentación detallada sobre fortalezas y recomendaciones. Puedes revisar las entregas en la sección de Actividades.
-          </Text>
-        </View>
+
+        <Text style={styles.pedagogicalText}>
+          Cada evidencia entregada por los aprendices es valorada bajo la escala oficial de 0.0 a 5.0 (aprobatoria ≥ 3.5), generando retroalimentación detallada sobre fortalezas y recomendaciones pedagógicas. Puedes revisar las entregas en la sección de Actividades.
+        </Text>
+
         <Pressable
-          style={styles.pedagogicalBtn}
+          style={({ hovered }: any) => [
+            styles.pedagogicalBtn,
+            hovered && styles.pedagogicalBtnHover,
+          ]}
           onPress={() => router.push('/instructor/actividades' as any)}
         >
           <Text style={styles.pedagogicalBtnText}>Ir a Actividades</Text>
-          <Ionicons name="arrow-forward" size={14} color="#0F1026" />
+          <Ionicons name="arrow-forward" size={16} color="#0F1026" />
         </Pressable>
       </View>
     </ScrollView>
@@ -517,13 +541,18 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     paddingBottom: 48,
   },
+  contentContainerMobile: {
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 40,
+  },
 
   // ─── BANNER DE BIENVENIDA ───
   welcomeCard: {
     backgroundColor: NAVY,
     borderRadius: 20,
-    padding: 28,
-    marginBottom: 24,
+    padding: 26,
+    marginBottom: 20,
     position: 'relative',
     overflow: 'hidden',
     shadowColor: '#0F1026',
@@ -531,6 +560,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 16,
     elevation: 5,
+  },
+  welcomeCardMobile: {
+    padding: 18,
+    borderRadius: 16,
+    marginBottom: 16,
   },
   welcomePatternLeft: {
     position: 'absolute',
@@ -640,8 +674,9 @@ const styles = StyleSheet.create({
   },
   welcomeActionsMobile: {
     width: '100%',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: 'column',
+    gap: 10,
+    marginTop: 16,
   },
   actionBtnPrimary: {
     flexDirection: 'row',
@@ -1093,52 +1128,85 @@ const styles = StyleSheet.create({
 
   // ─── AVISO PEDAGÓGICO ───
   pedagogicalNoticeCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
+    flexDirection: 'column',
+    alignItems: 'stretch',
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 20,
     borderWidth: 1,
-    borderColor: 'rgba(212, 175, 55, 0.25)',
+    borderColor: 'rgba(212, 175, 55, 0.35)',
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    elevation: 2,
-    flexWrap: 'wrap',
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
+    elevation: 3,
+    marginBottom: 20,
+    gap: 14,
+  },
+  pedagogicalHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   pedagogicalIconWrap: {
-    width: 46,
-    height: 46,
-    borderRadius: 14,
-    backgroundColor: 'rgba(212, 175, 55, 0.12)',
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: 'rgba(212, 175, 55, 0.14)',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(212, 175, 55, 0.25)',
   },
   pedagogicalTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '800',
     color: NAVY,
-    marginBottom: 4,
+    lineHeight: 22,
+  },
+  pedagogicalBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(212, 175, 55, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginTop: 4,
+  },
+  pedagogicalBadgeText: {
+    fontSize: 11,
+    color: '#B45309',
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   pedagogicalText: {
-    fontSize: 12,
-    color: '#64748B',
-    lineHeight: 18,
+    fontSize: 13.5,
+    color: '#475569',
+    lineHeight: 22,
+    letterSpacing: 0.1,
   },
   pedagogicalBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    justifyContent: 'center',
+    gap: 8,
     backgroundColor: GOLD,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 13,
+    borderRadius: 12,
+    shadowColor: GOLD,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 2,
+    marginTop: 4,
+  },
+  pedagogicalBtnHover: {
+    backgroundColor: '#C59E2E',
   },
   pedagogicalBtnText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
     color: '#0F1026',
+    letterSpacing: 0.3,
   },
 });
