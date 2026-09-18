@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Modal,
   Platform,
   useWindowDimensions,
+  RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,6 +25,7 @@ export default function FichasScreenInstructor() {
   const isMobile = width < 768;
   const [fichas, setFichas] = useState<Ficha[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   // State para modal de carga CSV
   const [uploadFicha, setUploadFicha] = useState<Ficha | null>(null);
@@ -34,19 +36,23 @@ export default function FichasScreenInstructor() {
   const [feedback, setFeedback] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
   async function loadFichas() {
-    setLoading(true);
     try {
       const data = await fichasService.getFichas();
       setFichas(data);
     } catch (error) {
       console.error('Error al cargar fichas:', error);
-    } finally {
-      setLoading(false);
     }
   }
 
   useEffect(() => {
-    loadFichas();
+    setLoading(true);
+    loadFichas().finally(() => setLoading(false));
+  }, []);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadFichas();
+    setRefreshing(false);
   }, []);
 
   const totalAprendices = fichas.reduce((acc, f) => acc + (f.aprendicesCount || 0), 0);
@@ -125,6 +131,14 @@ export default function FichasScreenInstructor() {
       style={styles.container}
       contentContainerStyle={[styles.contentContainer, isMobile && { paddingHorizontal: 14, paddingVertical: 14 }]}
       showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={GOLD}
+          colors={[GOLD, NAVY]}
+        />
+      }
     >
       {/* Title */}
       <View style={styles.topHeader}>
