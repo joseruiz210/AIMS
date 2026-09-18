@@ -61,6 +61,37 @@ function SidebarContent({
   onLogout: () => void;
 }) {
   const [logoutHover, setLogoutHover] = useState(false);
+<<<<<<< HEAD
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [userName, setUserName] = useState('Roberto Vargas');
+
+  useEffect(() => {
+    authService.checkSession().then(({ user }) => {
+      if (user) {
+        const nombre = (user as any).firstName
+          ? `${(user as any).firstName} ${(user as any).lastName || ''}`.trim()
+          : user.nombre || 'Roberto Vargas';
+        setUserName(nombre);
+      }
+    }).catch(() => {});
+  }, []);
+
+  const menuItems: MenuItemType[] = [
+    { name: 'Inicio', path: '/instructor/inicio', icon: 'home-outline' },
+    { name: 'Mis Fichas', path: '/instructor/fichas', icon: 'grid-outline' },
+    { name: 'Actividades', path: '/instructor/actividades', icon: 'folder-open-outline' },
+    { name: 'Aprendices', path: '/instructor/aprendices', icon: 'people-outline' },
+    { name: 'Asistencia', path: '/instructor/asistencia', icon: 'checkbox-outline' },
+    { name: 'Calificaciones', path: '/instructor/calificaciones', icon: 'bar-chart-outline' },
+    { name: 'Observaciones', path: '/instructor/observaciones', icon: 'chatbubbles-outline' },
+    { name: 'Reportes', path: '/instructor/reportes', icon: 'document-text-outline' },
+    { name: 'Mensajes', path: '/instructor/mensajes', icon: 'mail-outline' },
+    { name: 'Notificaciones', path: '/instructor/notificaciones', icon: 'notifications-outline' },
+    { name: 'Configuración', path: '/instructor/configuracion', icon: 'settings-outline' },
+  ];
+=======
+>>>>>>> a2470226edae0863cccfdcd982557dbbef0a094e
 
   const MenuItem = ({ name, path, icon }: MenuItemType) => {
     const isActive = pathname === path || (path === '/instructor/inicio' && pathname === '/instructor');

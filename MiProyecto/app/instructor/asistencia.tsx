@@ -13,7 +13,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { fichasService } from '../../services/fichasService';
+import { fichasService, Ficha } from '../../services/fichasService';
 import { asistenciaService } from '../../services/asistenciaService';
 
 const NAVY = '#12103C';
@@ -50,6 +50,7 @@ export default function AsistenciaAnimatedScreen() {
   const isMobile = width < 768;
   const isSmallPhone = width < 400;
 
+  const [fichas, setFichas] = useState<Ficha[]>([]);
   const [apprentices, setApprentices] = useState<ApprenticeAttendance[]>([]);
   const [fichaId, setFichaId] = useState<string>('');
   const [fichaNumero, setFichaNumero] = useState<string>('');
@@ -101,6 +102,42 @@ export default function AsistenciaAnimatedScreen() {
   useEffect(() => {
     loadApprenticesFromDb();
   }, []);
+
+  const handleSelectFicha = async (targetFicha: Ficha) => {
+    setFichaId(targetFicha.id);
+    setFichaNumero(targetFicha.numero);
+    setProgramaNombre(targetFicha.programaNombre || 'Formación SENA');
+    setCurrentIndex(0);
+    setLoadingDate(true);
+    try {
+      const detail = await fichasService.getFichaById(targetFicha.id);
+      if (detail && detail.matriculas && detail.matriculas.length > 0) {
+        const list: ApprenticeAttendance[] = detail.matriculas.map((m: any) => {
+          const a = m.aprendiz;
+          const fullName = `${a.firstName} ${a.lastName || ''}`.trim();
+          const initials = `${a.firstName?.[0] || 'A'}${a.lastName?.[0] || 'P'}`.toUpperCase();
+          return {
+            id: a.id,
+            name: fullName,
+            doc: a.documentNumber || a.phone || a.id.slice(0, 8),
+            ficha: targetFicha.numero,
+            initials,
+            status: 'presente',
+            history: [],
+          };
+        });
+        await fetchAttendanceForDate(targetFicha.id, selectedDate, list);
+      } else {
+        setApprentices([]);
+      }
+      showToast(`Ficha activa: ${targetFicha.numero}`);
+    } catch (err: any) {
+      console.error('Error al cambiar de ficha:', err);
+      showToast(`⚠️ Error al cargar la ficha ${targetFicha.numero}`);
+    } finally {
+      setLoadingDate(false);
+    }
+  };
 
   const fetchAttendanceForDate = async (currentFichaId: string, isoDate: string, currentList?: ApprenticeAttendance[]) => {
     const prevRecords = await asistenciaService.getAsistenciasByFicha(currentFichaId, isoDate);
@@ -156,9 +193,10 @@ export default function AsistenciaAnimatedScreen() {
   const loadApprenticesFromDb = async () => {
     setLoading(true);
     try {
-      const fichas = await fichasService.getFichas();
-      if (fichas.length > 0) {
-        const targetFicha = fichas[0];
+      const fichasData = await fichasService.getFichas();
+      setFichas(fichasData);
+      if (fichasData.length > 0) {
+        const targetFicha = fichasData[0];
         setFichaId(targetFicha.id);
         setFichaNumero(targetFicha.numero);
         setProgramaNombre(targetFicha.programaNombre || '');
@@ -176,15 +214,11 @@ export default function AsistenciaAnimatedScreen() {
             return {
               id: a.id,
               name: fullName,
-              doc: a.phone || a.id.slice(0, 8),
+              doc: a.documentNumber || a.phone || a.id.slice(0, 8),
               ficha: targetFicha.numero,
               initials,
               status: 'presente',
-              history: [
-                { date: dateOptions[3].shortLabel, status: 'presente' },
-                { date: dateOptions[2].shortLabel, status: 'presente' },
-                { date: dateOptions[1].shortLabel, status: 'presente' },
-              ],
+              history: [],
             };
           });
 
@@ -483,7 +517,35 @@ export default function AsistenciaAnimatedScreen() {
         </View>
       </View>
 
+<<<<<<< HEAD
+      {/* Selector de Ficha Activa para el Instructor */}
+      {fichas.length > 0 && (
+        <View style={styles.fichaSelectorBar}>
+          <Text style={styles.fichaSelectorLabel}>Ficha:</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+            {fichas.map(f => {
+              const isSelected = f.id === fichaId;
+              return (
+                <Pressable
+                  key={f.id}
+                  style={[styles.fichaChip, isSelected && styles.fichaChipActive]}
+                  onPress={() => handleSelectFicha(f)}
+                >
+                  <Ionicons name="school-outline" size={14} color={isSelected ? '#FFFFFF' : NAVY} />
+                  <Text style={[styles.fichaChipText, isSelected && styles.fichaChipTextActive]}>
+                    {f.numero || f.codigo} {f.programaNombre ? `(${f.programaNombre})` : ''}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
+
+      {/* Tema de la sesión + estado de autoguardado (reemplaza el botón "Guardar en BD") */}
+=======
       {/* Tema de la sesión + estado de autoguardado + botón Guardar en BD */}
+>>>>>>> 6597411ad521ddf784bf85f9c493596fb579613e
       <View style={styles.temaBar}>
         <Ionicons name="book-outline" size={18} color={NAVY} style={{ marginRight: 8 }} />
         <TextInput
@@ -1526,5 +1588,50 @@ const styles = StyleSheet.create({
   hoyCellText: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  fichaSelectorBar: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  fichaSelectorLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: NAVY,
+    marginRight: 10,
+  },
+  fichaChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+  },
+  fichaChipActive: {
+    backgroundColor: NAVY,
+    borderColor: NAVY,
+  },
+  fichaChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: NAVY,
+    marginLeft: 6,
+  },
+  fichaChipTextActive: {
+    color: '#FFFFFF',
   },
 });

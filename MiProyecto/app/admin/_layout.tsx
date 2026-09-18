@@ -26,8 +26,14 @@ const menuItems = [
   { name: 'Fichas', path: '/admin/fichas', icon: 'folder-open-outline' as const },
   { name: 'Horarios', path: '/admin/horarios', icon: 'time-outline' as const },
   { name: 'Instructores', path: '/admin/instructores', icon: 'briefcase-outline' as const },
+  { name: 'Aprendices', path: '/admin/aprendices', icon: 'school-outline' as const },
+  { name: 'Matrículas', path: '/admin/matriculas', icon: 'id-card-outline' as const },
+  { name: 'Programas', path: '/admin/programas', icon: 'library-outline' as const },
+  { name: 'Asistencia', path: '/admin/asistencia', icon: 'calendar-outline' as const },
   { name: 'Calificaciones', path: '/admin/calificaciones', icon: 'bar-chart-outline' as const },
+  { name: 'Comunicación', path: '/admin/comunicacion', icon: 'chatbubbles-outline' as const },
   { name: 'Reportes', path: '/admin/reportes', icon: 'document-text-outline' as const },
+  { name: 'Configuración', path: '/admin/configuracion', icon: 'settings-outline' as const },
 ];
 
 const bottomNavItems = [
