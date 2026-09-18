@@ -93,12 +93,14 @@ const GOLD = '#C59427';
 const NAVY = '#0B1220';
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: NAVY },
-  container: { flex: 1, backgroundColor: NAVY },
-  scrollContent: {  flexGrow: 1,
+  flex: { flex: 1, backgroundColor: NAVY, width: '100%', maxWidth: '100%', overflow: 'hidden' },
+  container: { flex: 1, backgroundColor: NAVY, width: '100%', maxWidth: '100%', overflow: 'hidden' },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
-    alignItems: 'center',   // 👈 centra horizontalmente en web
-    padding: 24,
+    alignItems: 'center',
+    padding: 20,
+    width: '100%',
   },
   circleTop: {
     position: 'absolute',
@@ -129,7 +131,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     alignItems: 'center',
     width: '100%',
-    maxWidth: 420,          // 👈 esto es lo que evita que se estire
+    maxWidth: 420,          // esto es lo que evita que se estire
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,

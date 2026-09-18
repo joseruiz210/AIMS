@@ -44,7 +44,7 @@ export default function InstructoresScreen() {
           nombre: fullName,
           especialidad: item.especialidad || 'Formación Técnica SENA',
           email: item.email,
-          status: item.isActive !== false ? 'Activo' : 'Inactivo',
+          status: (item.isActive !== false ? 'Activo' : 'Inactivo') as 'Activo' | 'Inactivo',
           fichasCount: item._count?.instructorFichas ?? (item.instructorFichas?.length || 0),
           aprendicesCount: item.aprendicesCount || 0,
         };

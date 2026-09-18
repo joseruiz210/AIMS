@@ -11,10 +11,14 @@ import { asistenciaService } from '../../services/asistenciaService';
 const NAVY = '#12103C';
 const GOLD = '#cfa235';
 
-const proximasClases = [
-  { hora: '07:00 - 09:00', materia: 'Analisis de Datos', instructor: 'Roberto Vargas', aula: '201' },
-  { hora: '09:00 - 11:00', materia: 'POO', instructor: 'Carmen López', aula: '102' },
-];
+interface ProximaClase {
+  hora: string;
+  materia: string;
+  instructor: string;
+  aula: string;
+}
+
+const proximasClases: ProximaClase[] = [];
 
 export default function AprendizHome() {
   const { width } = useWindowDimensions();
@@ -28,7 +32,7 @@ export default function AprendizHome() {
   const [competencias, setCompetencias] = useState<Array<{ nombre: string; nota: number; max: number }>>([]);
   const [loading, setLoading] = useState(true);
 
-  const [selectedClase, setSelectedClase] = useState<typeof proximasClases[0] | null>(null);
+  const [selectedClase, setSelectedClase] = useState<ProximaClase | null>(null);
   const [claseModalVisible, setClaseModalVisible] = useState(false);
 
   useEffect(() => {
@@ -54,13 +58,36 @@ export default function AprendizHome() {
         asistenciaService.getMisAsistencias(),
       ]);
 
-      // Métricas de calificaciones
-      if (grades.length > 0) {
-        const avg = (grades.reduce((s, g) => s + g.nota, 0) / grades.length).toFixed(1);
+      // Métricas de calificaciones unificadas con evidencias evaluadas
+      const allScores: { nombre: string; nota: number }[] = [];
+      grades.forEach((g) => {
+        allScores.push({
+          nombre: g.actividad || g.moduloNombre || 'Competencia Formativa',
+          nota: g.nota,
+        });
+      });
+
+      // Incluir también evidencias evaluadas que puedan no estar en calificaciones directas
+      evidencias.forEach((ev) => {
+        if (ev.entrega && ev.entrega.nota !== undefined && ev.entrega.nota !== null) {
+          const exists = allScores.some(
+            (s) => s.nombre.toLowerCase().trim() === ev.titulo.toLowerCase().trim()
+          );
+          if (!exists) {
+            allScores.push({
+              nombre: ev.titulo,
+              nota: Number(ev.entrega.nota),
+            });
+          }
+        }
+      });
+
+      if (allScores.length > 0) {
+        const avg = (allScores.reduce((s, g) => s + g.nota, 0) / allScores.length).toFixed(1);
         setPromedio(avg);
         setCompetencias(
-          grades.slice(0, 5).map((g) => ({
-            nombre: g.actividad || g.moduloNombre || 'Competencia',
+          allScores.slice(0, 5).map((g) => ({
+            nombre: g.nombre,
             nota: g.nota,
             max: 5,
           }))
@@ -93,10 +120,10 @@ export default function AprendizHome() {
     { label: 'PROMEDIO', value: promedio, highlight: true, icon: 'star-outline', route: '/aprendiz/calificaciones' },
     { label: 'ASISTENCIA', value: asistenciaPct, highlight: true, icon: 'checkmark-circle-outline', route: '/aprendiz/asistencia' },
     { label: 'TAREAS', value: String(tareasPendientes), highlight: true, icon: 'clipboard-outline', route: '/aprendiz/tareas' },
-    { label: 'MATERIAS', value: String(competencias.length || 1), highlight: false, icon: 'book-outline', route: '/aprendiz/horario' },
+    { label: 'MATERIAS', value: String(competencias.length), highlight: false, icon: 'book-outline', route: '/aprendiz/horario' },
   ];
 
-  const handleOpenClase = (clase: typeof proximasClases[0]) => {
+  const handleOpenClase = (clase: ProximaClase) => {
     setSelectedClase(clase);
     setClaseModalVisible(true);
   };
@@ -111,7 +138,14 @@ export default function AprendizHome() {
           <Text style={styles.greeting}>Bienvenido(a),</Text>
           <Text style={styles.name}>{userName}</Text>
         </View>
-        <View style={styles.headerActions}></View>
+        <View style={styles.headerActions}>
+          <Pressable
+            style={styles.bellBtn}
+            onPress={() => router.push('/aprendiz/notificaciones' as any)}
+          >
+            <Ionicons name="notifications-outline" size={22} color={NAVY} />
+          </Pressable>
+        </View>
       </View>
 
       {/* Stat Cards */}
@@ -175,23 +209,30 @@ export default function AprendizHome() {
             <Text style={styles.sectionLink}>Ver horario →</Text>
           </Pressable>
         </View>
-        {proximasClases.map((clase, i) => (
-          <Pressable
-            key={i}
-            style={({ hovered }: any) => [styles.claseRow, hovered && styles.claseRowHover]}
-            onPress={() => handleOpenClase(clase)}
-          >
-            <View style={styles.claseTimeBadge}>
-              <Ionicons name="time-outline" size={14} color={GOLD} />
-              <Text style={styles.claseTimeText}>{clase.hora}</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.claseMateriaText}>{clase.materia}</Text>
-              <Text style={styles.claseInfoText}>Aula {clase.aula} • {clase.instructor}</Text>
-            </View>
-            <Ionicons name="chevron-forward-outline" size={18} color="#94A3B8" />
-          </Pressable>
-        ))}
+        {proximasClases.length === 0 ? (
+          <View style={{ paddingVertical: 18, alignItems: 'center' }}>
+            <Ionicons name="calendar-outline" size={32} color="#94A3B8" style={{ marginBottom: 6 }} />
+            <Text style={{ color: '#64748B', fontSize: 13 }}>No tienes clases programadas para hoy.</Text>
+          </View>
+        ) : (
+          proximasClases.map((clase, i) => (
+            <Pressable
+              key={i}
+              style={({ hovered }: any) => [styles.claseRow, hovered && styles.claseRowHover]}
+              onPress={() => handleOpenClase(clase)}
+            >
+              <View style={styles.claseTimeBadge}>
+                <Ionicons name="time-outline" size={14} color={GOLD} />
+                <Text style={styles.claseTimeText}>{clase.hora}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.claseMateriaText}>{clase.materia}</Text>
+                <Text style={styles.claseInfoText}>Aula {clase.aula} • {clase.instructor}</Text>
+              </View>
+              <Ionicons name="chevron-forward-outline" size={18} color="#94A3B8" />
+            </Pressable>
+          ))
+        )}
       </View>
 
       {/* Clase Modal */}
@@ -278,10 +319,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
     marginBottom: 20,
-    flexWrap: 'nowrap',
+    flexWrap: 'wrap',
   },
   statCard: {
     flex: 1,
+    minWidth: 130,
     backgroundColor: '#FFFFFF',
     borderRadius: 14,
     paddingVertical: 14,
@@ -295,7 +337,8 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
   },
   statCardMobile: {
-    flex: 1,
+    minWidth: '46%',
+    flexGrow: 1,
   },
   statCardHover: {
     borderColor: GOLD,

@@ -17,22 +17,35 @@ export interface Ficha {
 }
 
 export const fichasService = {
-  async getFichas(params: { search?: string } = {}): Promise<Ficha[]> {
+  async getFichas(params: { search?: string; publicOnly?: boolean } = {}): Promise<Ficha[]> {
     try {
       const query = params.search ? `?search=${encodeURIComponent(params.search)}` : '';
-      const response = await authService.fetchWithAuth(`${API_BASE_URL}/fichas${query}`);
+      let response: Response | null = null;
+      if (!params.publicOnly) {
+        try {
+          const authRes = await authService.fetchWithAuth(`${API_BASE_URL}/fichas${query}`);
+          if (authRes.ok) {
+            response = authRes;
+          }
+        } catch {
+          // Fallback if not authenticated
+        }
+      }
+      if (!response || !response.ok) {
+        response = await fetch(`${API_BASE_URL}/fichas/public${query}`);
+      }
       const data = await response.json();
       if (!response.ok || !data.data || data.data.length === 0) {
         return [];
       }
       return data.data.map((item: any) => ({
         id: item.id || item.codigo,
-        codigo: item.codigo || item.numero || 'N/A',
-        numero: item.numero || item.codigo || '2845670',
+        codigo: item.badgeCode || item.codigo || item.numero || 'N/A',
+        numero: item.numero || item.codigo || '',
         programaNombre: item.programa?.nombre || item.programaTitle || 'Programa Formación',
         instructorNombre: item.instructor ? `${item.instructor.firstName} ${item.instructor.lastName}` : (item.instructorNombre || 'Sin asignar'),
         jornada: item.jornada || item.shift || 'Jornada Mañana',
-        aprendicesCount: item.aprendicesCount ?? (item._count?.matriculas || 0),
+        aprendicesCount: item.aprendicesCount ?? (item._count?.matriculas ?? 0),
         estado: item.estado || item.status || 'Activo',
       }));
     } catch {

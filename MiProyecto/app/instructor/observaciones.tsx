@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState, useCallback } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, RefreshControl } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, RefreshControl, Platform, Alert } from 'react-native';
 import { fichasService } from '../../services/fichasService';
 import { ObservacionItem, observacionesService } from '../../services/observacionesService';
 
@@ -24,6 +24,7 @@ export default function ObservacionesScreen() {
   const [saving, setSaving] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedAprendizId, setSelectedAprendizId] = useState('');
+  const [buscarAprendiz, setBuscarAprendiz] = useState('');
   const [tipo, setTipo] = useState<ObservacionItem['tipo']>('ACADEMICA');
   const [materia, setMateria] = useState('');
   const [descripcion, setDescripcion] = useState('');
@@ -110,11 +111,39 @@ export default function ObservacionesScreen() {
       setSelectedAprendizId('');
       setMateria('');
       setDescripcion('');
-      showToast('✅ Observación guardada correctamente');
+      showToast('Observación guardada correctamente');
     } catch (error: any) {
       showToast(error?.message || 'No se pudo guardar la observación');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDeleteObservation = (id: string) => {
+    const confirmDelete = () => {
+      observacionesService.eliminarObservacion(id)
+        .then(() => {
+          setObservations(prev => prev.filter(o => o.id !== id));
+          showToast('Observación eliminada correctamente');
+        })
+        .catch(err => {
+          showToast(err?.message || 'Error al eliminar la observación');
+        });
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm('¿Deseas eliminar esta observación pedagógica?')) {
+        confirmDelete();
+      }
+    } else {
+      Alert.alert(
+        'Eliminar Observación',
+        '¿Estás seguro de que deseas eliminar esta observación pedagógica?',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Eliminar', style: 'destructive', onPress: confirmDelete },
+        ]
+      );
     }
   };
 
@@ -174,7 +203,16 @@ export default function ObservacionesScreen() {
         <View key={item.id} style={styles.card}>
           <View style={styles.cardTop}>
             <Text style={styles.student}>{item.aprendizNombre || 'Aprendiz'}</Text>
-            <Text style={styles.date}>{item.fecha}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <Text style={styles.date}>{item.fecha}</Text>
+              <Pressable
+                style={styles.cardDeleteBtn}
+                onPress={() => handleDeleteObservation(item.id)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="trash-outline" size={16} color="#DC2626" />
+              </Pressable>
+            </View>
           </View>
           <Text style={styles.type}>{item.tipo}</Text>
           {item.materia && <Text style={styles.subject}>{item.materia}</Text>}
@@ -183,16 +221,131 @@ export default function ObservacionesScreen() {
       ))}
 
       <Modal visible={modalVisible} transparent animationType="fade" onRequestClose={() => setModalVisible(false)}>
-        <View style={styles.backdrop}><View style={styles.modal}>
-          <View style={styles.modalHeader}><Text style={styles.modalTitle}>Nueva observación</Text><Pressable onPress={() => setModalVisible(false)}><Ionicons name="close" size={22} color="#64748B" /></Pressable></View>
-          <Text style={styles.label}>Aprendiz</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.selector}>{apprentices.map(apprentice => <Pressable key={apprentice.id} style={[styles.chip, selectedAprendizId === apprentice.id && styles.chipActive]} onPress={() => setSelectedAprendizId(apprentice.id)}><Text style={selectedAprendizId === apprentice.id ? styles.chipActiveText : undefined}>{apprentice.firstName} {apprentice.lastName || ''}</Text></Pressable>)}</ScrollView>
-          <Text style={styles.label}>Tipo</Text>
-          <View style={styles.selector}>{TYPES.map(option => <Pressable key={option.value} style={[styles.chip, tipo === option.value && styles.chipActive]} onPress={() => setTipo(option.value)}><Text style={tipo === option.value ? styles.chipActiveText : undefined}>{option.label}</Text></Pressable>)}</View>
-          <TextInput style={styles.input} placeholder="Materia (opcional)" placeholderTextColor="#94A3B8" value={materia} onChangeText={setMateria} />
-          <TextInput style={[styles.input, styles.multiline]} placeholder="Descripción" placeholderTextColor="#94A3B8" value={descripcion} onChangeText={setDescripcion} multiline />
-          <View style={styles.actions}><Pressable style={styles.cancel} onPress={() => setModalVisible(false)} disabled={saving}><Text>Cancelar</Text></Pressable><Pressable style={styles.save} onPress={createObservation} disabled={saving}>{saving ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.saveText}>Guardar</Text>}</Pressable></View>
-        </View></View>
+        <View style={styles.backdrop}>
+          <View style={styles.modal}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Nueva observación</Text>
+              <Pressable onPress={() => setModalVisible(false)}>
+                <Ionicons name="close" size={22} color="#64748B" />
+              </Pressable>
+            </View>
+
+            <ScrollView style={{ maxHeight: 480 }} showsVerticalScrollIndicator={false}>
+              <Text style={styles.label}>Buscar y Seleccionar Aprendiz</Text>
+              
+              {/* Barra de búsqueda de aprendiz */}
+              <View style={styles.searchBox}>
+                <Ionicons name="search-outline" size={16} color="#64748B" style={{ marginRight: 6 }} />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Buscar por nombre o apellido..."
+                  placeholderTextColor="#94A3B8"
+                  value={buscarAprendiz}
+                  onChangeText={setBuscarAprendiz}
+                />
+                {buscarAprendiz ? (
+                  <Pressable onPress={() => setBuscarAprendiz('')}>
+                    <Ionicons name="close-circle" size={16} color="#94A3B8" />
+                  </Pressable>
+                ) : null}
+              </View>
+
+              {/* Indicador de aprendiz seleccionado */}
+              {(() => {
+                const sel = apprentices.find((a) => a.id === selectedAprendizId);
+                if (!sel) return null;
+                return (
+                  <View style={styles.selectedAprendizChip}>
+                    <Ionicons name="checkmark-circle" size={16} color="#047857" style={{ marginRight: 6 }} />
+                    <Text style={styles.selectedAprendizText}>
+                      Seleccionado: {sel.firstName} {sel.lastName || ''}
+                    </Text>
+                    <Pressable onPress={() => setSelectedAprendizId('')} style={{ marginLeft: 8 }}>
+                      <Ionicons name="close-circle-outline" size={16} color="#047857" />
+                    </Pressable>
+                  </View>
+                );
+              })()}
+
+              {/* Lista filtrada de aprendices */}
+              <View style={styles.apprenticesContainer}>
+                {apprentices
+                  .filter((a) =>
+                    `${a.firstName} ${a.lastName || ''}`
+                      .toLowerCase()
+                      .includes(buscarAprendiz.toLowerCase().trim())
+                  )
+                  .map((apprentice) => {
+                    const isSelected = selectedAprendizId === apprentice.id;
+                    return (
+                      <Pressable
+                        key={apprentice.id}
+                        style={[styles.apprenticeItem, isSelected && styles.apprenticeItemSelected]}
+                        onPress={() => setSelectedAprendizId(apprentice.id)}
+                      >
+                        <View style={[styles.apprenticeAvatar, isSelected && { backgroundColor: GOLD }]}>
+                          <Text style={[styles.apprenticeAvatarText, isSelected && { color: NAVY }]}>
+                            {apprentice.firstName.charAt(0).toUpperCase()}
+                          </Text>
+                        </View>
+                        <Text style={[styles.apprenticeName, isSelected && { fontWeight: '700', color: NAVY }]}>
+                          {apprentice.firstName} {apprentice.lastName || ''}
+                        </Text>
+                        {isSelected ? (
+                          <Ionicons name="checkmark" size={18} color="#047857" style={{ marginLeft: 'auto' }} />
+                        ) : null}
+                      </Pressable>
+                    );
+                  })}
+              </View>
+
+              <Text style={[styles.label, { marginTop: 14 }]}>Tipo de Observación</Text>
+              <View style={styles.selector}>
+                {TYPES.map((option) => (
+                  <Pressable
+                    key={option.value}
+                    style={[styles.chip, tipo === option.value && styles.chipActive]}
+                    onPress={() => setTipo(option.value)}
+                  >
+                    <Text style={tipo === option.value ? styles.chipActiveText : undefined}>
+                      {option.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              <TextInput
+                style={styles.input}
+                placeholder="Materia o competencia (opcional)"
+                placeholderTextColor="#94A3B8"
+                value={materia}
+                onChangeText={setMateria}
+              />
+
+              <TextInput
+                style={[styles.input, styles.multiline]}
+                placeholder="Descripción detallada de la observación pedagógica..."
+                placeholderTextColor="#94A3B8"
+                value={descripcion}
+                onChangeText={setDescripcion}
+                multiline
+              />
+            </ScrollView>
+
+            <View style={styles.actions}>
+              <Pressable style={styles.cancel} onPress={() => setModalVisible(false)} disabled={saving}>
+                <Text>Cancelar</Text>
+              </Pressable>
+              <Pressable style={styles.save} onPress={createObservation} disabled={saving}>
+                {saving ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.saveText}>Guardar</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
       </Modal>
     </ScrollView>
   );
@@ -228,10 +381,82 @@ const styles = StyleSheet.create({
   subject: { color: '#64748B', fontSize: 12 },
   description: { color: '#334155' },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 20 },
-  modal: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 20, maxHeight: '90%' },
+  modal: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 20, maxHeight: '90%', width: '100%', maxWidth: 540, alignSelf: 'center' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14 },
   modalTitle: { fontSize: 18, fontWeight: '700', color: '#0F172A' },
   label: { color: '#334155', fontWeight: '600', marginTop: 8, marginBottom: 6 },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: '#0F172A',
+    padding: 0,
+  },
+  selectedAprendizChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#86EFAC',
+    marginBottom: 8,
+  },
+  selectedAprendizText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#047857',
+    flex: 1,
+  },
+  apprenticesContainer: {
+    maxHeight: 130,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginBottom: 4,
+  },
+  apprenticeItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    backgroundColor: '#FFFFFF',
+  },
+  apprenticeItemSelected: {
+    backgroundColor: '#FEF3C7',
+  },
+  apprenticeAvatar: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#E2E8F0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  apprenticeAvatarText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  apprenticeName: {
+    fontSize: 13,
+    color: '#1E293B',
+  },
   selector: { flexDirection: 'row', flexWrap: 'wrap' },
   chip: { padding: 8, backgroundColor: '#F1F5F9', borderRadius: 8, marginRight: 6, marginBottom: 6 },
   chipActive: { backgroundColor: '#FEF3C7', borderWidth: 1, borderColor: GOLD },

@@ -24,6 +24,7 @@ import { router } from 'expo-router';
 import { authService } from '../services/authService';
 import { fichasService, type Ficha } from '../services/fichasService';
 import { validatePassword, validatePasswordMatch, isDisposableEmail } from '../utils/validation';
+import { saveRememberedAuth, getRememberedAuth, removeRememberedAuth } from '../utils/storage';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -39,6 +40,7 @@ export default function AuthScreen() {
   const [loginPassword, setLoginPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [isCapsLockOn, setIsCapsLockOn] = useState(false);
 
   // Register Form State
   const [regNombre, setRegNombre] = useState('');
@@ -71,18 +73,26 @@ export default function AuthScreen() {
   const isAprendiz = regDomain === 'soy.sena.edu.co' || regDomain === 'misena.edu.co' || regDomain === 'gmail.com' || regDomain === 'formacionsena.edu.co';
   const esAprendiz = !isInstructor;
 
-  const buscarFichas = useCallback(async (texto: string) => {
-    if (!texto.trim() || texto.trim().length < 3) {
-      setFichasDisponibles([]);
-      setFichaEncontrada(null);
-      return;
-    }
+  const buscarFichas = useCallback(async (texto: string = '') => {
     setBuscandoFicha(true);
     try {
       const fichas = await fichasService.getFichas({ search: texto.trim() });
       setFichasDisponibles(fichas);
-      const exacta = fichas.find((f) => f.numero.toLowerCase() === texto.trim().toLowerCase());
-      setFichaEncontrada(exacta || null);
+      if (texto.trim().length >= 3) {
+        const exacta = fichas.find((f) => 
+          f.numero.toLowerCase() === texto.trim().toLowerCase() ||
+          f.numero.includes(texto.trim())
+        );
+        if (exacta) {
+          setFichaEncontrada(exacta);
+          setRegPrograma(exacta.programaNombre || '');
+          setRegFicha(exacta.numero);
+        } else {
+          setFichaEncontrada(null);
+        }
+      } else if (!texto.trim()) {
+        setFichaEncontrada(null);
+      }
     } catch {
       setFichasDisponibles([]);
     } finally {
@@ -98,6 +108,23 @@ export default function AuthScreen() {
       setFichaEncontrada(null);
     }
   }, [esAprendiz]);
+
+  // Cargar credenciales guardadas si 'Recordar mis datos' estaba activo
+  useEffect(() => {
+    const loadRememberedAuth = async () => {
+      try {
+        const saved = await getRememberedAuth();
+        if (saved && saved.remember) {
+          if (saved.correo) setLoginCorreo(saved.correo.trim().toLowerCase());
+          if (saved.contrasenia) setLoginPassword(saved.contrasenia);
+          setRememberMe(true);
+        }
+      } catch (err) {
+        console.error('Error al cargar datos recordados:', err);
+      }
+    };
+    loadRememberedAuth();
+  }, []);
 
   // Validación de la contraseña en tiempo real para Registro
   const passValidation = validatePassword(regPassword);
@@ -195,7 +222,7 @@ useEffect(() => {
 
     setIsSubmitting(true);
     const res = await login({
-      correo: loginCorreo.trim(),
+      correo: loginCorreo.trim().toLowerCase(),
       contrasenia: loginPassword,
     });
     setIsSubmitting(false);
@@ -203,7 +230,40 @@ useEffect(() => {
     if (!res.success) {
       setFeedback({ text: res.message || 'Error al iniciar sesión', type: 'error' });
     } else {
+      // Guardar o eliminar credenciales según estado de Recordar mis datos
+      if (rememberMe) {
+        await saveRememberedAuth({
+          correo: loginCorreo.trim().toLowerCase(),
+          contrasenia: loginPassword,
+          remember: true,
+        });
+      } else {
+        await removeRememberedAuth();
+      }
       setFeedback({ text: res.message || '¡Sesión iniciada correctamente!', type: 'success' });
+    }
+  };
+
+  // Web security: ensure password plain-text is never exposed as a DOM content attribute in DevTools inspector
+  const secureInputRef = (node: any) => {
+    if (Platform.OS === 'web' && node) {
+      try {
+        const el = (typeof node.focus === 'function' && typeof node.removeAttribute === 'function')
+          ? node
+          : (node?.target || null);
+        if (el && typeof el.removeAttribute === 'function') {
+          el.removeAttribute('value');
+          if (!el._aims_observer && typeof MutationObserver !== 'undefined') {
+            const obs = new MutationObserver(() => {
+              if (el.hasAttribute('value')) {
+                el.removeAttribute('value');
+              }
+            });
+            obs.observe(el, { attributes: true, attributeFilter: ['value'] });
+            el._aims_observer = obs;
+          }
+        }
+      } catch {}
     }
   };
 
@@ -229,8 +289,8 @@ useEffect(() => {
 
     const role: 'INSTRUCTOR' | 'APRENDIZ' = isInstructorDomain ? 'INSTRUCTOR' : 'APRENDIZ';
 
-    if (role === 'APRENDIZ' && (!regTipoDocumento || !regDocumento.trim() || !regFicha.trim() || !regPrograma.trim())) {
-      setFeedback({ text: 'Por favor completa tus datos académicos (Documento, Ficha y Programa).', type: 'error' });
+    if (role === 'APRENDIZ' && (!regTipoDocumento || !regDocumento.trim())) {
+      setFeedback({ text: 'Por favor completa tus datos de documento (Tipo y Número de documento).', type: 'error' });
       return;
     }
 
@@ -245,6 +305,7 @@ useEffect(() => {
     }
 
     setIsSubmitting(true);
+    const resolvedFichaNumero = (regFichaNumero.trim() || regFicha.trim());
     const res = await register({
       nombre: regNombre.trim(),
       correo: regCorreo.trim(),
@@ -253,8 +314,14 @@ useEffect(() => {
       role: role,
       tipoDocumento: role === 'APRENDIZ' ? regTipoDocumento : undefined,
       documento: role === 'APRENDIZ' ? regDocumento.trim() : undefined,
-      ficha: role === 'APRENDIZ' ? regFicha.trim() : undefined,
-      programa: role === 'APRENDIZ' ? regPrograma.trim() : undefined,
+      ficha: role === 'APRENDIZ' ? (resolvedFichaNumero || undefined) : undefined,
+      programa: role === 'APRENDIZ' ? (regPrograma.trim() || fichaEncontrada?.programaNombre || undefined) : undefined,
+      academicData: role === 'APRENDIZ' ? {
+        fichaId: fichaEncontrada?.id || undefined,
+        fichaNumero: resolvedFichaNumero || undefined,
+        sede: regSede.trim() || undefined,
+        trimestre: regTrimestre ? Number(regTrimestre) : undefined,
+      } : undefined,
     });
 
     if (!res.success) {
@@ -426,29 +493,73 @@ useEffect(() => {
                           placeholderTextColor="#94A3B8"
                           keyboardType="email-address"
                           autoCapitalize="none"
+                          autoCorrect={false}
                           value={loginCorreo}
-                          onChangeText={setLoginCorreo}
+                          onChangeText={(val) => setLoginCorreo(val.trim().toLowerCase())}
+                          onBlur={() => setLoginCorreo((prev) => prev.trim().toLowerCase())}
                         />
                       </View>
                     </View>
 
                     {/* Contraseña */}
                     <View style={styles.fieldGroup}>
-                      <Text style={styles.labelLight}>Contraseña</Text>
-                      <View style={styles.borderedInputWrapper}>
-                        <Ionicons name="lock-closed" size={18} color="#475569" style={styles.fieldIcon} />
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <Text style={styles.labelLight}>Contraseña</Text>
+                        <Text style={{ fontSize: 11, color: '#64748B' }}>Distingue mayúsculas (A ≠ a)</Text>
+                      </View>
+                      <View style={[
+                        styles.borderedInputWrapper,
+                        feedback?.type === 'error' && (feedback.text.toLowerCase().includes('contraseña') || feedback.text.toLowerCase().includes('mayúscula')) ? { borderColor: '#EF4444', borderWidth: 1.5, backgroundColor: '#FEF2F2' } : null
+                      ]}>
+                        <Ionicons 
+                          name="lock-closed" 
+                          size={18} 
+                          color={feedback?.type === 'error' && (feedback.text.toLowerCase().includes('contraseña') || feedback.text.toLowerCase().includes('mayúscula')) ? '#EF4444' : '#475569'} 
+                          style={styles.fieldIcon} 
+                        />
                         <TextInput
+                          ref={secureInputRef}
                           style={styles.borderedInput}
                           placeholder="••••••••••••"
                           placeholderTextColor="#94A3B8"
                           secureTextEntry={!showLoginPassword}
                           value={loginPassword}
-                          onChangeText={setLoginPassword}
+                          autoComplete="current-password"
+                          textContentType="password"
+                          autoCorrect={false}
+                          spellCheck={false}
+                          onChangeText={(val) => {
+                            setLoginPassword(val);
+                            if (feedback?.type === 'error') setFeedback(null);
+                          }}
+                          // @ts-ignore
+                          onKeyPress={(e: any) => {
+                            if (Platform.OS === 'web' && e?.nativeEvent) {
+                              const caps = e.nativeEvent.getModifierState?.('CapsLock');
+                              if (typeof caps === 'boolean') setIsCapsLockOn(caps);
+                            }
+                          }}
                         />
                         <TouchableOpacity onPress={() => setShowLoginPassword(!showLoginPassword)}>
                           <Ionicons name={showLoginPassword ? "eye-off-outline" : "eye-outline"} size={18} color="#64748B" />
                         </TouchableOpacity>
                       </View>
+                      {isCapsLockOn && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, gap: 6, backgroundColor: '#FEF9C3', padding: 8, borderRadius: 8 }}>
+                          <Ionicons name="warning-outline" size={14} color="#CA8A04" />
+                          <Text style={{ fontSize: 12, color: '#A16207', fontWeight: '600' }}>
+                            Bloq Mayús (Caps Lock) está activado en tu teclado
+                          </Text>
+                        </View>
+                      )}
+                      {feedback?.type === 'error' && feedback.text.toLowerCase().includes('mayúscula') && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, gap: 6, backgroundColor: '#FEF2F2', padding: 8, borderRadius: 8, borderWidth: 1, borderColor: '#FECACA' }}>
+                          <Ionicons name="alert-circle" size={15} color="#DC2626" />
+                          <Text style={{ fontSize: 11, color: '#DC2626', fontWeight: '600', flex: 1 }}>
+                            {feedback.text}
+                          </Text>
+                        </View>
+                      )}
                     </View>
 
                     {/* Options Row: Checkbox & Forgot Password */}
@@ -587,7 +698,7 @@ useEffect(() => {
 
                       {regCorreo.length > 0 && isDisposableEmail(regCorreo) && (
                         <Text style={[styles.matchText, styles.matchError]}>
-                          ⚠️ No se permiten correos temporales/desechables (ej. yopmail, mailinator)
+                          No se permiten correos temporales ni desechables (ej. yopmail, mailinator)
                         </Text>
                       )}
                     </View>
@@ -625,33 +736,65 @@ useEffect(() => {
                           </View>
                         </View>
 
+                        {/* Ficha de Formación con Buscador Integrado */}
                         <View style={styles.fieldGroup}>
-                          <Text style={styles.labelDark}>Ficha</Text>
-                          <View style={styles.whiteInputWrapper}>
-                            <Ionicons name="bookmark-outline" size={18} color="#475569" style={styles.fieldIcon} />
-                            <TextInput
-                              style={styles.whiteInput}
-                              placeholder="Número de ficha asignada"
-                              placeholderTextColor="#94A3B8"
-                              keyboardType="numeric"
-                              value={regFicha}
-                              onChangeText={setRegFicha}
-                            />
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                            <Text style={styles.labelDark}>Ficha de formación</Text>
+                            <TouchableOpacity
+                              onPress={() => {
+                                setMostrarSelectorFicha(true);
+                                buscarFichas('');
+                              }}
+                            >
+                              <Text style={{ fontSize: 12, color: '#C59427', fontWeight: '700' }}>
+                                Seleccionar de la lista
+                              </Text>
+                            </TouchableOpacity>
                           </View>
-                        </View>
+                          <View style={styles.fichaInputRow}>
+                            <View style={[styles.whiteInputWrapper, { flex: 1 }]}>
+                              <Ionicons name="bookmark-outline" size={18} color="#475569" style={styles.fieldIcon} />
+                              <TextInput
+                                style={styles.whiteInput}
+                                placeholder="Número de ficha (ej: 2670142)"
+                                placeholderTextColor="#94A3B8"
+                                keyboardType="number-pad"
+                                value={regFichaNumero}
+                                onChangeText={(t) => {
+                                  setRegFichaNumero(t);
+                                  setRegFicha(t);
+                                  buscarFichas(t);
+                                }}
+                              />
+                              {buscandoFicha && <ActivityIndicator size="small" color="#C59427" />}
+                            </View>
+                            <TouchableOpacity
+                              style={styles.fichaSearchBtn}
+                              onPress={() => {
+                                setMostrarSelectorFicha(true);
+                                buscarFichas('');
+                              }}
+                            >
+                              <Ionicons name="search-outline" size={18} color="#FFF" />
+                            </TouchableOpacity>
+                          </View>
 
-                        <View style={styles.fieldGroup}>
-                          <Text style={styles.labelDark}>Programa de formación</Text>
-                          <View style={styles.whiteInputWrapper}>
-                            <Ionicons name="school-outline" size={18} color="#475569" style={styles.fieldIcon} />
-                            <TextInput
-                              style={styles.whiteInput}
-                              placeholder="Programa registrado en la ficha"
-                              placeholderTextColor="#94A3B8"
-                              value={regPrograma}
-                              onChangeText={setRegPrograma}
-                            />
-                          </View>
+                          {fichaEncontrada && (
+                            <View style={styles.fichaFoundBadge}>
+                              <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                              <View style={{ flex: 1, marginLeft: 6 }}>
+                                <Text style={styles.fichaFoundText}>
+                                  Ficha {fichaEncontrada.numero} — {fichaEncontrada.programaNombre}
+                                </Text>
+                              </View>
+                            </View>
+                          )}
+
+                          {regFichaNumero.length > 0 && !fichaEncontrada && !buscandoFicha && (
+                            <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 4 }}>
+                              ℹ Si tu ficha aún no está registrada, puedes continuar y el administrador te la asignará.
+                            </Text>
+                          )}
                         </View>
                       </>
                     )}
@@ -663,11 +806,16 @@ useEffect(() => {
                       <View style={styles.whiteInputWrapper}>
                         <Ionicons name="lock-closed" size={18} color="#475569" style={styles.fieldIcon} />
                         <TextInput
+                          ref={secureInputRef}
                           style={styles.whiteInput}
                           placeholder="••••••••••••"
                           placeholderTextColor="#94A3B8"
                           secureTextEntry={!showRegPassword}
                           value={regPassword}
+                          autoComplete="new-password"
+                          textContentType="password"
+                          autoCorrect={false}
+                          spellCheck={false}
                           onChangeText={setRegPassword}
                         />
                         <TouchableOpacity onPress={() => setShowRegPassword(!showRegPassword)}>
@@ -765,11 +913,16 @@ useEffect(() => {
                       <View style={styles.whiteInputWrapper}>
                         <Ionicons name="lock-closed" size={18} color="#475569" style={styles.fieldIcon} />
                         <TextInput
+                          ref={secureInputRef}
                           style={styles.whiteInput}
                           placeholder="••••••••••••"
                           placeholderTextColor="#94A3B8"
                           secureTextEntry={!showRegConfirmPassword}
                           value={regConfirmPassword}
+                          autoComplete="new-password"
+                          textContentType="password"
+                          autoCorrect={false}
+                          spellCheck={false}
                           onChangeText={setRegConfirmPassword}
                         />
                         <TouchableOpacity onPress={() => setShowRegConfirmPassword(!showRegConfirmPassword)}>
@@ -791,47 +944,6 @@ useEffect(() => {
                           <Text style={styles.academicSectionTitle}>Datos Académicos (Opcional)</Text>
                         </View>
 
-                        {/* Número de Ficha con búsqueda */}
-                        <View style={styles.fieldGroup}>
-                          <Text style={styles.labelDark}>Número de Ficha</Text>
-                          <View style={styles.fichaInputRow}>
-                            <View style={[styles.whiteInputWrapper, { flex: 1 }]}>
-                              <Ionicons name="id-card-outline" size={18} color="#475569" style={styles.fieldIcon} />
-                              <TextInput
-                                style={styles.whiteInput}
-                                placeholder="Ej: 2693551"
-                                placeholderTextColor="#94A3B8"
-                                keyboardType="number-pad"
-                                value={regFichaNumero}
-                                onChangeText={(t) => {
-                                  setRegFichaNumero(t);
-                                  buscarFichas(t);
-                                }}
-                              />
-                              {buscandoFicha && <ActivityIndicator size="small" color="#C59427" />}
-                            </View>
-                            <TouchableOpacity
-                              style={styles.fichaSearchBtn}
-                              onPress={() => setMostrarSelectorFicha(true)}
-                            >
-                              <Ionicons name="search-outline" size={18} color="#FFF" />
-                            </TouchableOpacity>
-                          </View>
-                          {fichaEncontrada && (
-                            <View style={styles.fichaFoundBadge}>
-                              <Ionicons name="checkmark-circle" size={14} color="#10B981" />
-                              <Text style={styles.fichaFoundText}>
-                                {fichaEncontrada.numero} — {fichaEncontrada.programaNombre}
-                              </Text>
-                            </View>
-                          )}
-                          {regFichaNumero.length >= 3 && !fichaEncontrada && !buscandoFicha && (
-                            <Text style={[styles.matchText, styles.matchError]}>
-                              ⚠ Ficha no encontrada, puedes continuar igual y el admin la asignará
-                            </Text>
-                          )}
-                        </View>
-
                         {/* Sede */}
                         <View style={styles.fieldGroup}>
                           <Text style={styles.labelDark}>Sede del Centro de Formación</Text>
@@ -851,7 +963,7 @@ useEffect(() => {
                         <View style={styles.fieldGroup}>
                           <Text style={styles.labelDark}>Trimestre Actual</Text>
                           <View style={styles.trimestreRow}>
-                            {['1','2','3','4','5','6'].map((t) => (
+                            {['1','2','3','4','5','6','7'].map((t) => (
                               <TouchableOpacity
                                 key={t}
                                 style={[
@@ -908,13 +1020,15 @@ useEffect(() => {
                                 data={fichasDisponibles}
                                 keyExtractor={(item) => item.id}
                                 ListEmptyComponent={!buscandoFicha ? (
-                                  <Text style={styles.modalEmpty}>Escribe al menos 3 dígitos para buscar</Text>
+                                  <Text style={styles.modalEmpty}>No se encontraron fichas activas con ese criterio</Text>
                                 ) : null}
                                 renderItem={({ item }) => (
                                   <TouchableOpacity
                                     style={styles.modalFichaItem}
                                     onPress={() => {
                                       setRegFichaNumero(item.numero);
+                                      setRegFicha(item.numero);
+                                      setRegPrograma(item.programaNombre || '');
                                       setFichaEncontrada(item);
                                       setMostrarSelectorFicha(false);
                                     }}
@@ -1133,8 +1247,18 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
   },
+  outerContainer: {
+    flex: 1,
+    backgroundColor: '#020308',
+    width: '100%',
+    maxWidth: '100%',
+    overflow: 'hidden',
+  },
   safeArea: {
     flex: 1,
+    width: '100%',
+    maxWidth: '100%',
+    overflow: 'hidden',
   },
   /* AMBIENT GLOW ORBS (DARK ACADEMIA SATIN GOLD & SAPPHIRE) */
   glowOrb: {

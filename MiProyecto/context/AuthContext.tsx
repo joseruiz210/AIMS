@@ -6,9 +6,10 @@ type AuthContextType = {
   user: User | null;
   isLoading: boolean;
   login: (credentials: { correo: string; contrasenia: string }) => Promise<{ success: boolean; message?: string }>;
-   setSession: (user: User) => void;
+  setSession: (user: User) => void;
   register: (data: RegisterData) => Promise<{ success: boolean; message?: string }>;
   logout: () => Promise<void>;
+  updateUser: (updatedFields: Partial<User>) => void;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -85,8 +86,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.replace(destination as any);
   };
 
+  const updateUser = (updatedFields: Partial<User>) => {
+    setUser((prev) => (prev ? { ...prev, ...updatedFields } : null));
+  };
+
   return (
-   <AuthContext.Provider value={{ user, isLoading, login, setSession, register, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, login, setSession, register, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

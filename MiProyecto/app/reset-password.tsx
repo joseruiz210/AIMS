@@ -261,13 +261,14 @@ const GOLD = '#C59427';
 const NAVY = '#0B1220';
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: NAVY },
-  container: { flex: 1, backgroundColor: NAVY },
+  flex: { flex: 1, backgroundColor: NAVY, width: '100%', maxWidth: '100%', overflow: 'hidden' },
+  container: { flex: 1, backgroundColor: NAVY, width: '100%', maxWidth: '100%', overflow: 'hidden' },
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    padding: 20,
+    width: '100%',
   },
   circleTop: {
     position: 'absolute',
