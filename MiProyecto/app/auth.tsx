@@ -3,6 +3,8 @@ import * as Google from 'expo-auth-session/providers/google';
 import * as AuthSession from 'expo-auth-session';
 
 import React, { useEffect, useState, useCallback } from 'react';
+import { Platform } from 'react-native';
+import { useRecaptcha } from '../hooks/useRecaptcha';
 import { Modal, FlatList, TouchableWithoutFeedback } from 'react-native';
 import { 
   View, 
@@ -31,6 +33,9 @@ WebBrowser.maybeCompleteAuthSession();
 
 export default function AuthScreen() {
   const { user, isLoading, login, register, logout, setSession } = useAuth();
+  // reCAPTCHA v3 (solo web, en nativo retorna null)
+  const { executeRecaptcha } = useRecaptcha();
+
   // Screen state: 'login' (default) | 'register'
   const [currentScreen, setCurrentScreen] = useState<'login' | 'register'>('login');
 
@@ -193,6 +198,16 @@ useEffect(() => {
       return;
     }
 
+    // reCAPTCHA v3 (solo web)
+    if (Platform.OS === 'web' && executeRecaptcha) {
+      try {
+        await executeRecaptcha('login');
+      } catch {
+        setFeedback({ text: 'Error al verificar reCAPTCHA. Intenta de nuevo.', type: 'error' });
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     const res = await login({
       correo: loginCorreo.trim(),
@@ -209,6 +224,16 @@ useEffect(() => {
 
   const handleRegister = async () => {
     setFeedback(null);
+
+    // reCAPTCHA v3 (solo web)
+    if (Platform.OS === 'web' && executeRecaptcha) {
+      try {
+        await executeRecaptcha('register');
+      } catch {
+        setFeedback({ text: 'Error al verificar reCAPTCHA. Intenta de nuevo.', type: 'error' });
+        return;
+      }
+    }
 
     if (!regNombre.trim() || !regCorreo.trim() || !regPassword || !regConfirmPassword) {
       setFeedback({ text: 'Por favor completa todos los campos del formulario.', type: 'error' });
