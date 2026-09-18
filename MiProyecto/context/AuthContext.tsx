@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { router } from 'expo-router';
 import { authService, User, RegisterData } from '../services/authService';
 
@@ -53,7 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const login = async (credentials: { correo: string; contrasenia: string }) => {
+  const login = useCallback(async (credentials: { correo: string; contrasenia: string }) => {
     const result = await authService.login(credentials);
 
     if (!result.success || !result.user) {
@@ -67,31 +67,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.replace(destination as any);
 
     return { success: true };
-  };
+  }, []);
 
-  const register = async (data: RegisterData) => {
+  const register = useCallback(async (data: RegisterData) => {
     return authService.register(data);
-  };
+  }, []);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     await authService.logout();
     setUser(null);
     router.replace('/');
-  };
+  }, []);
 
-  const setSession = (loggedUser: User) => {
+  const setSession = useCallback((loggedUser: User) => {
     const normalizedUser = normalizeUser(loggedUser);
     setUser(normalizedUser);
     const destination = ROLE_ROUTES[normalizedUser.role] ?? '/(tabs)';
     router.replace(destination as any);
-  };
+  }, []);
 
-  const updateUser = (updatedFields: Partial<User>) => {
+  const updateUser = useCallback((updatedFields: Partial<User>) => {
     setUser((prev) => (prev ? { ...prev, ...updatedFields } : null));
-  };
+  }, []);
+
+  const contextValue = useMemo(() => ({
+    user,
+    isLoading,
+    login,
+    setSession,
+    register,
+    logout,
+    updateUser,
+  }), [user, isLoading, login, setSession, register, logout, updateUser]);
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, setSession, register, logout, updateUser }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );
