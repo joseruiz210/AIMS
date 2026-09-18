@@ -12,7 +12,7 @@ COPY . .
 
 # Variables de entorno en producción (Azure)
 ENV EXPO_PUBLIC_API_URL=https://academicaimsapp-edh3c3g2eabtgqc2.westus-01.azurewebsites.net/api/v1
-ENV EXPO_PUBLIC_RECAPTCHA_SITE_KEY=6LclGsMtAAAAAKIrWUSkjX9qzOciKUrPxPk3sD_D
+ENV EXPO_PUBLIC_RECAPTCHA_SITE_KEY=6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI
 
 # Compilar la aplicación web estática → genera la carpeta dist/
 RUN npx expo export -p web
