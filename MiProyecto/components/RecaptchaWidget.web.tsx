@@ -10,7 +10,7 @@ interface RecaptchaWidgetProps {
 
 const SITE_KEY =
   process.env.EXPO_PUBLIC_RECAPTCHA_SITE_KEY ||
-  '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI';
+  '6LehF8MtAAAAANSI4xi-cPP5udJw9BGq7tDf9-Xc';
 
 export const RecaptchaWidget = forwardRef<ReCAPTCHA, RecaptchaWidgetProps>(
   ({ onChange, onExpired, theme = 'light' }, ref) => {
