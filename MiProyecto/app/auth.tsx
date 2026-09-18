@@ -2,10 +2,8 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
 import * as AuthSession from 'expo-auth-session';
 
-import React, { useEffect, useState, useCallback } from 'react';
-import { Platform } from 'react-native';
-import { useRecaptcha } from '../hooks/useRecaptcha';
-import { Modal, FlatList, TouchableWithoutFeedback } from 'react-native';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { RecaptchaWidget } from '../components/RecaptchaWidget';
 import { 
   View, 
   Text, 
@@ -16,7 +14,10 @@ import {
   Platform,
   Image,
   ScrollView,
-  ActivityIndicator
+  ActivityIndicator,
+  Modal, 
+  FlatList, 
+  TouchableWithoutFeedback 
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -33,8 +34,9 @@ WebBrowser.maybeCompleteAuthSession();
 
 export default function AuthScreen() {
   const { user, isLoading, login, register, logout, setSession } = useAuth();
-  // reCAPTCHA v3 (solo web, en nativo retorna null)
-  const { executeRecaptcha } = useRecaptcha();
+  // reCAPTCHA v2 State & Ref
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const recaptchaRef = useRef<any>(null);
 
   // Screen state: 'login' (default) | 'register'
   const [currentScreen, setCurrentScreen] = useState<'login' | 'register'>('login');
@@ -198,14 +200,10 @@ useEffect(() => {
       return;
     }
 
-    // reCAPTCHA v3 (solo web)
-    if (Platform.OS === 'web' && executeRecaptcha) {
-      try {
-        await executeRecaptcha('login');
-      } catch {
-        setFeedback({ text: 'Error al verificar reCAPTCHA. Intenta de nuevo.', type: 'error' });
-        return;
-      }
+    // reCAPTCHA v2 Checkbox Obligatorio en Web
+    if (Platform.OS === 'web' && !captchaToken) {
+      setFeedback({ text: 'Por favor marca la casilla "No soy un robot" para continuar.', type: 'error' });
+      return;
     }
 
     setIsSubmitting(true);
@@ -225,14 +223,10 @@ useEffect(() => {
   const handleRegister = async () => {
     setFeedback(null);
 
-    // reCAPTCHA v3 (solo web)
-    if (Platform.OS === 'web' && executeRecaptcha) {
-      try {
-        await executeRecaptcha('register');
-      } catch {
-        setFeedback({ text: 'Error al verificar reCAPTCHA. Intenta de nuevo.', type: 'error' });
-        return;
-      }
+    // reCAPTCHA v2 Checkbox Obligatorio en Web
+    if (Platform.OS === 'web' && !captchaToken) {
+      setFeedback({ text: 'Por favor marca la casilla "No soy un robot" para continuar.', type: 'error' });
+      return;
     }
 
     if (!regNombre.trim() || !regCorreo.trim() || !regPassword || !regConfirmPassword) {
@@ -496,6 +490,14 @@ useEffect(() => {
 </TouchableOpacity>
                     </View>
 
+                    {/* reCAPTCHA v2 Checkbox Widget */}
+                    <RecaptchaWidget
+                      ref={recaptchaRef}
+                      theme="light"
+                      onChange={(token) => setCaptchaToken(token)}
+                      onExpired={() => setCaptchaToken(null)}
+                    />
+
                     {/* Submit Login Button */}
                     <TouchableOpacity style={styles.goldButton} activeOpacity={0.85} onPress={handleLogin}>
                       <Text style={styles.goldButtonText}>INICIAR SESIÓN →</Text>
@@ -527,7 +529,7 @@ useEffect(() => {
                     {/* Switch to Register Button */}
                     <View style={styles.switchContainer}>
                       <Text style={styles.switchTextLight}>¿No tienes una cuenta? </Text>
-                      <TouchableOpacity onPress={() => { setFeedback(null); setCurrentScreen('register'); }}>
+                      <TouchableOpacity onPress={() => { setFeedback(null); setCaptchaToken(null); setCurrentScreen('register'); }}>
                         <Text style={styles.goldLink}>Regístrate</Text>
                       </TouchableOpacity>
                     </View>
@@ -967,6 +969,14 @@ useEffect(() => {
                       </TouchableWithoutFeedback>
                     </Modal>
 
+                    {/* reCAPTCHA v2 Checkbox Widget */}
+                    <RecaptchaWidget
+                      ref={recaptchaRef}
+                      theme="dark"
+                      onChange={(token) => setCaptchaToken(token)}
+                      onExpired={() => setCaptchaToken(null)}
+                    />
+
                     {/* Submit Register Button */}
                     <TouchableOpacity style={styles.goldButton} activeOpacity={0.85} onPress={handleRegister}>
                       <Text style={styles.goldButtonText}>CREAR CUENTA →</Text>
@@ -975,7 +985,7 @@ useEffect(() => {
                     {/* Switch back to Login */}
                     <View style={styles.switchContainer}>
                       <Text style={styles.switchTextDark}>¿Ya tienes una cuenta? </Text>
-                      <TouchableOpacity onPress={() => { setFeedback(null); setCurrentScreen('login'); }}>
+                      <TouchableOpacity onPress={() => { setFeedback(null); setCaptchaToken(null); setCurrentScreen('login'); }}>
                         <Text style={styles.goldLink}>Inicia Sesión</Text>
                       </TouchableOpacity>
                     </View>
