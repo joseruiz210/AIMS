@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   Pressable,
   useWindowDimensions,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,6 +33,7 @@ export default function InstructorInicioScreen() {
   const isMobile = width < 768;
 
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [userName, setUserName] = useState('Instructor');
   const [userEmail, setUserEmail] = useState('');
   const [fichas, setFichas] = useState<Ficha[]>([]);
@@ -49,114 +51,109 @@ export default function InstructorInicioScreen() {
   const [mayorAsistencia, setMayorAsistencia] = useState({ dia: 'Miércoles', pct: 96 });
   const [menorAsistencia, setMenorAsistencia] = useState({ dia: 'Jueves', pct: 78 });
 
-  useEffect(() => {
-    let isMounted = true;
+  const fetchDashboardData = useCallback(async () => {
+    try {
+      const { user } = await authService.checkSession();
+      if (user) {
+        const nombreCompleto =
+          (user as any).firstName
+            ? `${(user as any).firstName} ${(user as any).lastName || ''}`.trim()
+            : user.nombre || 'Instructor';
+        setUserName(nombreCompleto);
+        setUserEmail((user as any).email || user.correo || '');
+      }
 
-    const loadDashboardData = async () => {
-      setLoading(true);
-      try {
-        const { user } = await authService.checkSession();
-        if (!isMounted) return;
-        if (user) {
-          const nombreCompleto =
-            (user as any).firstName
-              ? `${(user as any).firstName} ${(user as any).lastName || ''}`.trim()
-              : user.nombre || 'Instructor';
-          setUserName(nombreCompleto);
-          setUserEmail((user as any).email || user.correo || '');
-        }
+      const [fichasData, evidenciasData] = await Promise.all([
+        fichasService.getFichas(),
+        evidenciasService.getEvidenciasInstructor(),
+      ]);
 
-        const [fichasData, evidenciasData] = await Promise.all([
-          fichasService.getFichas(),
-          evidenciasService.getEvidenciasInstructor(),
-        ]);
+      setFichas(fichasData);
+      setEvidencias(evidenciasData);
 
-        if (!isMounted) return;
-        setFichas(fichasData);
-        setEvidencias(evidenciasData);
+      const aprendicesCount = fichasData.reduce(
+        (acc, f) => acc + (f.aprendicesCount || 0),
+        0
+      );
+      if (aprendicesCount > 0) {
+        setTotalAprendices(aprendicesCount);
+      }
 
-        // Calcular total de aprendices sumando matriculas
-        const aprendicesCount = fichasData.reduce(
-          (acc, f) => acc + (f.aprendicesCount || 0),
-          0
-        );
-        if (aprendicesCount > 0) {
-          setTotalAprendices(aprendicesCount);
-        }
+      if (fichasData.length > 0) {
+        const targetFicha = fichasData[0];
 
-        if (fichasData.length > 0) {
-          const targetFicha = fichasData[0];
-
-          // 1. Cargar calificaciones reales desde PostgreSQL
-          try {
-            const califs = await calificacionesService.getCalificacionesByFicha(targetFicha.id);
-            if (isMounted && califs && califs.length > 0) {
-              const notas = califs.map(c => c.overallNota).filter(n => n > 0);
-              if (notas.length > 0) {
-                const prom = Number((notas.reduce((a, b) => a + b, 0) / notas.length).toFixed(1));
-                setCalificacionPromedio(prom);
-              }
+        try {
+          const califs = await calificacionesService.getCalificacionesByFicha(targetFicha.id);
+          if (califs && califs.length > 0) {
+            const notas = califs.map(c => c.overallNota).filter(n => n > 0);
+            if (notas.length > 0) {
+              const prom = Number((notas.reduce((a, b) => a + b, 0) / notas.length).toFixed(1));
+              setCalificacionPromedio(prom);
             }
-          } catch (e) {
-            console.error(e);
           }
+        } catch (e) {
+          console.error(e);
+        }
 
-          // 2. Cargar asistencias reales desde PostgreSQL
-          try {
-            const asistenciasData = await asistenciaService.getAsistenciasByFicha(targetFicha.id);
-            if (isMounted && asistenciasData && asistenciasData.length > 0) {
-              const presentes = asistenciasData.filter(a => a.estado === 'PRESENTE' || (a.estado as any) === 'EXCUSADO' || (a.estado as any) === 'EXCUSA').length;
-              const pct = Math.round((presentes / asistenciasData.length) * 100);
-              setAsistenciaPromedio(pct);
+        try {
+          const asistenciasData = await asistenciaService.getAsistenciasByFicha(targetFicha.id);
+          if (asistenciasData && asistenciasData.length > 0) {
+            const presentes = asistenciasData.filter(a => a.estado === 'PRESENTE' || (a.estado as any) === 'EXCUSADO' || (a.estado as any) === 'EXCUSA').length;
+            const pct = Math.round((presentes / asistenciasData.length) * 100);
+            setAsistenciaPromedio(pct);
 
-              const byDateMap = new Map<string, { presentes: number; total: number }>();
-              asistenciasData.forEach(r => {
-                const d = r.fecha ? r.fecha.split('T')[0] : 'Hoy';
-                const cur = byDateMap.get(d) || { presentes: 0, total: 0 };
-                cur.total += 1;
-                if (r.estado === 'PRESENTE' || (r.estado as any) === 'EXCUSADO' || (r.estado as any) === 'EXCUSA') cur.presentes += 1;
-                byDateMap.set(d, cur);
+            const byDateMap = new Map<string, { presentes: number; total: number }>();
+            asistenciasData.forEach(r => {
+              const d = r.fecha ? r.fecha.split('T')[0] : 'Hoy';
+              const cur = byDateMap.get(d) || { presentes: 0, total: 0 };
+              cur.total += 1;
+              if (r.estado === 'PRESENTE' || (r.estado as any) === 'EXCUSADO' || (r.estado as any) === 'EXCUSA') cur.presentes += 1;
+              byDateMap.set(d, cur);
+            });
+
+            if (byDateMap.size >= 2) {
+              const sortedDates = Array.from(byDateMap.keys()).sort().slice(-5);
+              const dynamicBars = sortedDates.map(dateStr => {
+                const dt = new Date(dateStr);
+                const dayName = dt.toLocaleDateString('es-CO', { weekday: 'short' });
+                const info = byDateMap.get(dateStr)!;
+                const p = Math.round((info.presentes / info.total) * 100);
+                return {
+                  day: dayName.charAt(0).toUpperCase() + dayName.slice(1, 3),
+                  percentage: p,
+                  label: `${p}%`,
+                };
               });
+              setWeeklyAttendance(dynamicBars);
 
-              if (byDateMap.size >= 2) {
-                const sortedDates = Array.from(byDateMap.keys()).sort().slice(-5);
-                const dynamicBars = sortedDates.map(dateStr => {
-                  const dt = new Date(dateStr);
-                  const dayName = dt.toLocaleDateString('es-CO', { weekday: 'short' });
-                  const info = byDateMap.get(dateStr)!;
-                  const p = Math.round((info.presentes / info.total) * 100);
-                  return {
-                    day: dayName.charAt(0).toUpperCase() + dayName.slice(1, 3),
-                    percentage: p,
-                    label: `${p}%`,
-                  };
-                });
-                setWeeklyAttendance(dynamicBars);
-
-                const sortedByPct = [...dynamicBars].sort((a, b) => b.percentage - a.percentage);
-                setMayorAsistencia({ dia: sortedByPct[0].day, pct: sortedByPct[0].percentage });
-                setMenorAsistencia({ dia: sortedByPct[sortedByPct.length - 1].day, pct: sortedByPct[sortedByPct.length - 1].percentage });
-              }
+              const sortedByPct = [...dynamicBars].sort((a, b) => b.percentage - a.percentage);
+              setMayorAsistencia({ dia: sortedByPct[0].day, pct: sortedByPct[0].percentage });
+              setMenorAsistencia({ dia: sortedByPct[sortedByPct.length - 1].day, pct: sortedByPct[sortedByPct.length - 1].percentage });
             }
-          } catch (e) {
-            console.error(e);
           }
-        }
-      } catch (error) {
-        console.warn('Error cargando dashboard instructor:', error);
-      } finally {
-        if (isMounted) {
-          setLoading(false);
+        } catch (e) {
+          console.error(e);
         }
       }
-    };
-
-    loadDashboardData();
-
-    return () => {
-      isMounted = false;
-    };
+    } catch (error) {
+      console.warn('Error cargando dashboard instructor:', error);
+    }
   }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    setLoading(true);
+    fetchDashboardData().finally(() => {
+      if (isMounted) setLoading(false);
+    });
+    return () => { isMounted = false; };
+  }, [fetchDashboardData]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchDashboardData();
+    setRefreshing(false);
+  }, [fetchDashboardData]);
 
   const primaryFicha = fichas.length > 0 ? fichas[0] : null;
 
@@ -165,6 +162,14 @@ export default function InstructorInicioScreen() {
       style={styles.container}
       contentContainerStyle={[styles.contentContainer, isMobile && styles.contentContainerMobile]}
       showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={GOLD}
+          colors={[GOLD, NAVY]}
+        />
+      }
     >
       {/* ─── BANNER DE BIENVENIDA INSTITUCIONAL SENA ─── */}
       <View style={[styles.welcomeCard, isMobile && styles.welcomeCardMobile]}>

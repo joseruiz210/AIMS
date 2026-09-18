@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -9,6 +9,7 @@ import {
   Text,
   TextInput,
   View,
+  RefreshControl,
 } from 'react-native';
 import { fichasService } from '../../services/fichasService';
 import { calificacionesService, CompetenciaGroup, StudentGrade } from '../../services/calificacionesService';
@@ -20,6 +21,7 @@ const RED = '#E74C3C';
 
 export default function CalificacionesScreenPremium() {
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [groups, setGroups] = useState<CompetenciaGroup[]>([]);
   const [fichaNumero, setFichaNumero] = useState('');
   const [programaNombre, setProgramaNombre] = useState('');
@@ -101,12 +103,29 @@ export default function CalificacionesScreenPremium() {
     }
   };
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  }, []);
+
   if (loading) {
     return <View style={styles.loading}><ActivityIndicator size="large" color={GOLD} /><Text>Cargando calificaciones...</Text></View>;
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={GOLD}
+          colors={[GOLD, NAVY]}
+        />
+      }
+    >
       <View style={styles.header}>
         <View><Text style={styles.title}>Libro de Calificaciones</Text><Text style={styles.subtitle}>Ficha {fichaNumero || 'sin ficha'} • {programaNombre || 'ADSO'}</Text></View>
         <Pressable style={styles.refresh} onPress={loadData}><Ionicons name="reload-outline" size={16} color="#475569" /><Text>Actualizar</Text></Pressable>

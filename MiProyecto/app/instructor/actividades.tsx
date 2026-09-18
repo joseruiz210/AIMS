@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   TextInput,
   ActivityIndicator,
   Alert,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { evidenciasService, EvidenciaItem } from '../../services/evidenciasService';
@@ -27,6 +28,7 @@ export default function ActividadesInstructorScreen() {
   const [fichas, setFichas] = useState<Ficha[]>([]);
   const [selectedFichaId, setSelectedFichaId] = useState<string>('all');
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Modal para Crear Nueva Actividad
   const [modalCreateVisible, setModalCreateVisible] = useState(false);
@@ -49,23 +51,32 @@ export default function ActividadesInstructorScreen() {
   // Modal para ver feedback de una entrega específica
   const [selectedEntregaFeedback, setSelectedEntregaFeedback] = useState<any | null>(null);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    setLoading(true);
-    const [evidenciasData, fichasData] = await Promise.all([
-      evidenciasService.getEvidenciasInstructor(),
-      fichasService.getFichas(),
-    ]);
-    setEvidencias(evidenciasData);
-    setFichas(fichasData);
-    if (fichasData.length > 0 && !fichaId) {
-      setFichaId(fichasData[0].id);
+  const loadData = useCallback(async () => {
+    try {
+      const [evidenciasData, fichasData] = await Promise.all([
+        evidenciasService.getEvidenciasInstructor(),
+        fichasService.getFichas(),
+      ]);
+      setEvidencias(evidenciasData);
+      setFichas(fichasData);
+      if (fichasData.length > 0 && !fichaId) {
+        setFichaId(fichasData[0].id);
+      }
+    } catch (e) {
+      console.error('Error cargando actividades:', e);
     }
-    setLoading(false);
-  };
+  }, [fichaId]);
+
+  useEffect(() => {
+    setLoading(true);
+    loadData().finally(() => setLoading(false));
+  }, [loadData]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  }, [loadData]);
 
   const handleOpenCreateModal = () => {
     setTitulo('');
@@ -159,7 +170,19 @@ export default function ActividadesInstructorScreen() {
   const pad = isDesktop ? 24 : 14;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { padding: pad, paddingTop: isDesktop ? 32 : 20 }]}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[styles.content, { padding: pad, paddingTop: isDesktop ? 32 : 20 }]}
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={GOLD}
+          colors={[GOLD, NAVY]}
+        />
+      }
+    >
       {/* Header Principal */}
       <View style={styles.headerRow}>
         <View style={{ flex: 1 }}>
