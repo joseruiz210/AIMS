@@ -1,13 +1,15 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { router } from 'expo-router';
 import { authService, User, RegisterData } from '../services/authService';
-
-import { notificationsUtil } from '../utils/notifications';
 
 type AuthContextType = {
   user: User | null;
   isLoading: boolean;
+<<<<<<< HEAD
   login: (credentials: { correo: string; contrasenia: string; role: 'INSTRUCTOR' | 'APRENDIZ'; documento?: string }) => Promise<{ success: boolean; message?: string }>;
+=======
+  login: (credentials: { correo: string; contrasenia: string }) => Promise<{ success: boolean; message?: string }>;
+>>>>>>> a2470226edae0863cccfdcd982557dbbef0a094e
   setSession: (user: User) => void;
   register: (data: RegisterData) => Promise<{ success: boolean; message?: string }>;
   logout: () => Promise<void>;
@@ -33,19 +35,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Al abrir la app, revisa si ya había sesión guardada
   useEffect(() => {
+    let isMounted = true;
     (async () => {
-      const { user: storedUser } = await authService.checkSession();
-      if (storedUser) {
-        const normalizedUser = normalizeUser(storedUser);
-        setUser(normalizedUser);
-        const destination = ROLE_ROUTES[normalizedUser.role] ?? '/(tabs)';
-        router.replace(destination as any);
+      try {
+        const { user: storedUser } = await authService.checkSession();
+        if (isMounted && storedUser) {
+          const normalizedUser = normalizeUser(storedUser);
+          setUser(normalizedUser);
+        }
+      } catch {
+        // error al verificar sesión previa
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
-      setIsLoading(false);
     })();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  const login = async (credentials: { correo: string; contrasenia: string; role: 'INSTRUCTOR' | 'APRENDIZ'; documento?: string }) => {
+  const login = useCallback(async (credentials: { correo: string; contrasenia: string }) => {
     const result = await authService.login(credentials);
 
     if (!result.success || !result.user) {
@@ -59,27 +70,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.replace(destination as any);
 
     return { success: true };
-  };
+  }, []);
 
+<<<<<<< HEAD
   const register = async (data: RegisterData) => {
     return authService.register(data);
   };
+=======
+  const register = useCallback(async (data: RegisterData) => {
+    return authService.register(data);
+  }, []);
+>>>>>>> a2470226edae0863cccfdcd982557dbbef0a094e
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     await authService.logout();
     setUser(null);
     router.replace('/');
-  };
+  }, []);
 
-  const setSession = (loggedUser: User) => {
+  const setSession = useCallback((loggedUser: User) => {
     const normalizedUser = normalizeUser(loggedUser);
     setUser(normalizedUser);
     const destination = ROLE_ROUTES[normalizedUser.role] ?? '/(tabs)';
     router.replace(destination as any);
-  };
+  }, []);
+
+  const contextValue = useMemo(() => ({
+    user,
+    isLoading,
+    login,
+    setSession,
+    register,
+    logout,
+  }), [user, isLoading, login, setSession, register, logout]);
 
   return (
-   <AuthContext.Provider value={{ user, isLoading, login, setSession, register, logout }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

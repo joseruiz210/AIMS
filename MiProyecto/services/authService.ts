@@ -17,8 +17,6 @@ export interface AuthResponse {
 export interface LoginCredentials {
   correo: string;
   contrasenia: string;
-  role: 'INSTRUCTOR' | 'APRENDIZ';
-  documento?: string;
 }
 
 export interface RegisterData {
@@ -31,6 +29,12 @@ export interface RegisterData {
   documento?: string;
   ficha?: string;
   programa?: string;
+  academicData?: {
+    fichaId?: string;
+    fichaNumero?: string;
+    sede?: string;
+    trimestre?: number;
+  };
 }
 
 // Configuración de URL base para la API Backend
@@ -43,7 +47,7 @@ export const authService = {
   /**
    * Iniciar sesión de usuario y obtener JWT
    */
-  async login({ correo, contrasenia, role, documento }: LoginCredentials): Promise<AuthResponse> {
+  async login({ correo, contrasenia }: LoginCredentials): Promise<AuthResponse> {
     const emailCheck = await verifyEmailDomainExistence(correo);
     if (!emailCheck.isValidFormat || !emailCheck.isNotDisposable || !emailCheck.domainExists) {
       return { success: false, message: emailCheck.message };
@@ -56,7 +60,7 @@ export const authService = {
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: correo, password: contrasenia, role, documento }),
+        body: JSON.stringify({ email: correo, password: contrasenia }),
       });
       const data = await response.json();
 
@@ -314,7 +318,11 @@ async googleLogin(idToken: string): Promise<AuthResponse> {
   } catch (error: any) {
     return { success: false, message: error.message || 'Error de conexión con el servidor.' };
   }
+<<<<<<< HEAD
 },
+=======
+  },
+>>>>>>> a2470226edae0863cccfdcd982557dbbef0a094e
 
   /**
    * Actualizar Expo Push Token para notificaciones móviles

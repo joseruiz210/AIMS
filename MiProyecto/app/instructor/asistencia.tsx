@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Animated,
   Easing,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { fichasService, Ficha } from '../../services/fichasService';
@@ -55,6 +56,7 @@ export default function AsistenciaAnimatedScreen() {
   const [fichaNumero, setFichaNumero] = useState<string>('2670142');
   const [programaNombre, setProgramaNombre] = useState<string>('ADSO');
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [loadingDate, setLoadingDate] = useState(false);
   const dateRequestId = useRef(0);
 
@@ -411,8 +413,28 @@ export default function AsistenciaAnimatedScreen() {
       ? 'Escribe el tema para guardar'
       : 'Sin cambios';
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await loadApprenticesFromDb();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fichaId]);
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.contentContainer}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={GOLD}
+          colors={[GOLD, NAVY]}
+        />
+      }
+    >
       {/* Toast Banner Notification */}
       {toastMessage && (
         <View style={styles.toastBanner}>

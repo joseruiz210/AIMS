@@ -1,8 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useState, useCallback } from 'react';
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, RefreshControl } from 'react-native';
 import { fichasService } from '../../services/fichasService';
 import { ObservacionItem, observacionesService } from '../../services/observacionesService';
+
+const GOLD = '#D4AF37';
+const NAVY = '#0F1026';
 
 const TYPES: Array<{ label: string; value: ObservacionItem['tipo'] }> = [
   { label: 'Académica', value: 'ACADEMICA' },
@@ -17,6 +20,7 @@ export default function ObservacionesScreen() {
   const [observations, setObservations] = useState<ObservacionItem[]>([]);
   const [apprentices, setApprentices] = useState<Apprentice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedAprendizId, setSelectedAprendizId] = useState('');
@@ -24,11 +28,22 @@ export default function ObservacionesScreen() {
   const [materia, setMateria] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [toast, setToast] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  useEffect(() => { void loadData(); }, []);
+  useEffect(() => {
+    let isMounted = true;
+    loadData().finally(() => { if (!isMounted) return; });
+    return () => { isMounted = false; };
+  }, []);
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2500);
+  };
 
   const loadData = async () => {
     setLoading(true);
+    setErrorMsg(null);
     try {
       const [items, fichas] = await Promise.all([
         observacionesService.getMisObservaciones(),
@@ -44,17 +59,42 @@ export default function ObservacionesScreen() {
         }));
         setApprentices(list);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error cargando observaciones:', error);
-      setToast('No se pudieron cargar las observaciones');
+      setErrorMsg(error?.message || 'No se pudieron cargar las observaciones. Verifica tu conexión.');
     } finally {
       setLoading(false);
     }
   };
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    setErrorMsg(null);
+    try {
+      const [items, fichas] = await Promise.all([
+        observacionesService.getMisObservaciones(),
+        fichasService.getFichas(),
+      ]);
+      setObservations(items);
+      if (fichas[0]) {
+        const detail = await fichasService.getFichaById(fichas[0].id);
+        const list = (detail?.matriculas || []).map((item: any) => ({
+          id: item.aprendiz.id,
+          firstName: item.aprendiz.firstName,
+          lastName: item.aprendiz.lastName,
+        }));
+        setApprentices(list);
+      }
+    } catch (error: any) {
+      setErrorMsg(error?.message || 'No se pudieron cargar las observaciones.');
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
+
   const createObservation = async () => {
     if (!selectedAprendizId || !descripcion.trim()) {
-      setToast('Selecciona un aprendiz y escribe una descripción');
+      showToast('Selecciona un aprendiz y escribe una descripción');
       return;
     }
     setSaving(true);
@@ -70,37 +110,87 @@ export default function ObservacionesScreen() {
       setSelectedAprendizId('');
       setMateria('');
       setDescripcion('');
-      setToast('Observación guardada');
+      showToast('✅ Observación guardada correctamente');
     } catch (error: any) {
-      setToast(error?.message || 'No se pudo guardar la observación');
+      showToast(error?.message || 'No se pudo guardar la observación');
     } finally {
       setSaving(false);
     }
   };
 
   if (loading) {
-    return <View style={styles.loading}><ActivityIndicator size="large" color="#D4AF37" /><Text>Cargando observaciones...</Text></View>;
+    return <View style={styles.loading}><ActivityIndicator size="large" color={GOLD} /><Text style={styles.loadingText}>Cargando observaciones...</Text></View>;
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={GOLD}
+          colors={[GOLD, NAVY]}
+        />
+      }
+    >
       <View style={styles.header}>
-        <View><Text style={styles.title}>Observaciones</Text><Text style={styles.subtitle}>Seguimiento académico y formativo</Text></View>
-        <Pressable style={styles.addButton} onPress={() => setModalVisible(true)}><Ionicons name="add" size={18} color="#FFFFFF" /><Text style={styles.addText}>Nueva</Text></Pressable>
+        <View>
+          <Text style={styles.title}>Observaciones</Text>
+          <Text style={styles.subtitle}>Seguimiento académico y formativo</Text>
+        </View>
+        <Pressable style={styles.addButton} onPress={() => setModalVisible(true)}>
+          <Ionicons name="add" size={18} color="#FFFFFF" />
+          <Text style={styles.addText}>Nueva</Text>
+        </Pressable>
       </View>
-      {toast && <Text style={styles.toast}>{toast}</Text>}
-      {observations.length === 0 ? <View style={styles.empty}><Ionicons name="document-text-outline" size={44} color="#94A3B8" /><Text style={styles.emptyTitle}>Sin observaciones</Text></View> : observations.map(item => (
-        <View key={item.id} style={styles.card}><View style={styles.cardTop}><Text style={styles.student}>{item.aprendizNombre || 'Aprendiz'}</Text><Text style={styles.date}>{item.fecha}</Text></View><Text style={styles.type}>{item.tipo}</Text>{item.materia && <Text style={styles.subject}>{item.materia}</Text>}<Text style={styles.description}>{item.descripcion}</Text></View>
+
+      {toast && <View style={styles.toastWrap}><Ionicons name="checkmark-circle" size={16} color="#92400E" /><Text style={styles.toastText}>{toast}</Text></View>}
+
+      {errorMsg && (
+        <View style={styles.errorWrap}>
+          <Ionicons name="cloud-offline-outline" size={20} color="#DC2626" />
+          <Text style={styles.errorText}>{errorMsg}</Text>
+          <Pressable style={styles.retryBtn} onPress={loadData}>
+            <Text style={styles.retryText}>Reintentar</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {observations.length === 0 && !errorMsg ? (
+        <View style={styles.empty}>
+          <View style={styles.emptyIconWrap}>
+            <Ionicons name="document-text-outline" size={48} color={GOLD} />
+          </View>
+          <Text style={styles.emptyTitle}>Sin observaciones registradas</Text>
+          <Text style={styles.emptySubtitle}>Registra la primera observación académica o formativa de tus aprendices.</Text>
+          <Pressable style={styles.emptyAction} onPress={() => setModalVisible(true)}>
+            <Ionicons name="add-circle-outline" size={18} color="#FFFFFF" />
+            <Text style={styles.emptyActionText}>Crear primera observación</Text>
+          </Pressable>
+        </View>
+      ) : observations.map(item => (
+        <View key={item.id} style={styles.card}>
+          <View style={styles.cardTop}>
+            <Text style={styles.student}>{item.aprendizNombre || 'Aprendiz'}</Text>
+            <Text style={styles.date}>{item.fecha}</Text>
+          </View>
+          <Text style={styles.type}>{item.tipo}</Text>
+          {item.materia && <Text style={styles.subject}>{item.materia}</Text>}
+          <Text style={styles.description}>{item.descripcion}</Text>
+        </View>
       ))}
+
       <Modal visible={modalVisible} transparent animationType="fade" onRequestClose={() => setModalVisible(false)}>
         <View style={styles.backdrop}><View style={styles.modal}>
           <View style={styles.modalHeader}><Text style={styles.modalTitle}>Nueva observación</Text><Pressable onPress={() => setModalVisible(false)}><Ionicons name="close" size={22} color="#64748B" /></Pressable></View>
           <Text style={styles.label}>Aprendiz</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.selector}>{apprentices.map(apprentice => <Pressable key={apprentice.id} style={[styles.chip, selectedAprendizId === apprentice.id && styles.chipActive]} onPress={() => setSelectedAprendizId(apprentice.id)}><Text>{apprentice.firstName} {apprentice.lastName || ''}</Text></Pressable>)}</ScrollView>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.selector}>{apprentices.map(apprentice => <Pressable key={apprentice.id} style={[styles.chip, selectedAprendizId === apprentice.id && styles.chipActive]} onPress={() => setSelectedAprendizId(apprentice.id)}><Text style={selectedAprendizId === apprentice.id ? styles.chipActiveText : undefined}>{apprentice.firstName} {apprentice.lastName || ''}</Text></Pressable>)}</ScrollView>
           <Text style={styles.label}>Tipo</Text>
-          <View style={styles.selector}>{TYPES.map(option => <Pressable key={option.value} style={[styles.chip, tipo === option.value && styles.chipActive]} onPress={() => setTipo(option.value)}><Text>{option.label}</Text></Pressable>)}</View>
-          <TextInput style={styles.input} placeholder="Materia (opcional)" value={materia} onChangeText={setMateria} />
-          <TextInput style={[styles.input, styles.multiline]} placeholder="Descripción" value={descripcion} onChangeText={setDescripcion} multiline />
+          <View style={styles.selector}>{TYPES.map(option => <Pressable key={option.value} style={[styles.chip, tipo === option.value && styles.chipActive]} onPress={() => setTipo(option.value)}><Text style={tipo === option.value ? styles.chipActiveText : undefined}>{option.label}</Text></Pressable>)}</View>
+          <TextInput style={styles.input} placeholder="Materia (opcional)" placeholderTextColor="#94A3B8" value={materia} onChangeText={setMateria} />
+          <TextInput style={[styles.input, styles.multiline]} placeholder="Descripción" placeholderTextColor="#94A3B8" value={descripcion} onChangeText={setDescripcion} multiline />
           <View style={styles.actions}><Pressable style={styles.cancel} onPress={() => setModalVisible(false)} disabled={saving}><Text>Cancelar</Text></Pressable><Pressable style={styles.save} onPress={createObservation} disabled={saving}>{saving ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.saveText}>Guardar</Text>}</Pressable></View>
         </View></View>
       </Modal>
@@ -111,15 +201,25 @@ export default function ObservacionesScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8FAFC' },
   content: { padding: 28, gap: 16, paddingBottom: 40 },
-  loading: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
+  loading: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12, backgroundColor: '#F8FAFC' },
+  loadingText: { color: '#64748B', marginTop: 8 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   title: { fontSize: 24, fontWeight: '700', color: '#0F172A' },
   subtitle: { color: '#64748B', marginTop: 4 },
-  addButton: { flexDirection: 'row', gap: 5, alignItems: 'center', backgroundColor: '#0F2027', padding: 10, borderRadius: 8 },
+  addButton: { flexDirection: 'row', gap: 5, alignItems: 'center', backgroundColor: NAVY, padding: 10, paddingHorizontal: 14, borderRadius: 10 },
   addText: { color: '#FFFFFF', fontWeight: '700' },
-  toast: { color: '#92400E', backgroundColor: '#FEF3C7', padding: 10, borderRadius: 8 },
-  empty: { alignItems: 'center', padding: 32, backgroundColor: '#FFFFFF', borderRadius: 16, gap: 8 },
-  emptyTitle: { color: '#0F172A', fontWeight: '700' },
+  toastWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FEF3C7', padding: 12, borderRadius: 10 },
+  toastText: { color: '#92400E', fontWeight: '600', flex: 1 },
+  errorWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#FEF2F2', padding: 14, borderRadius: 12, borderWidth: 1, borderColor: '#FECACA' },
+  errorText: { color: '#DC2626', flex: 1, fontSize: 13 },
+  retryBtn: { backgroundColor: '#DC2626', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
+  retryText: { color: '#FFFFFF', fontWeight: '700', fontSize: 12 },
+  empty: { alignItems: 'center', padding: 40, backgroundColor: '#FFFFFF', borderRadius: 20, gap: 10, borderWidth: 1, borderColor: '#E2E8F0' },
+  emptyIconWrap: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  emptyTitle: { color: '#0F172A', fontWeight: '700', fontSize: 17 },
+  emptySubtitle: { color: '#64748B', textAlign: 'center', lineHeight: 20, paddingHorizontal: 10 },
+  emptyAction: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: NAVY, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 10, marginTop: 6 },
+  emptyActionText: { color: '#FFFFFF', fontWeight: '700' },
   card: { backgroundColor: '#FFFFFF', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#E2E8F0', gap: 6 },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between' },
   student: { color: '#0F172A', fontWeight: '700' },
@@ -134,11 +234,12 @@ const styles = StyleSheet.create({
   label: { color: '#334155', fontWeight: '600', marginTop: 8, marginBottom: 6 },
   selector: { flexDirection: 'row', flexWrap: 'wrap' },
   chip: { padding: 8, backgroundColor: '#F1F5F9', borderRadius: 8, marginRight: 6, marginBottom: 6 },
-  chipActive: { backgroundColor: '#FEF3C7' },
+  chipActive: { backgroundColor: '#FEF3C7', borderWidth: 1, borderColor: GOLD },
+  chipActiveText: { color: '#92400E', fontWeight: '600' },
   input: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, padding: 10, marginTop: 10, color: '#0F172A' },
   multiline: { minHeight: 90, textAlignVertical: 'top' },
   actions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 18 },
   cancel: { padding: 10, backgroundColor: '#F1F5F9', borderRadius: 8 },
-  save: { minWidth: 110, alignItems: 'center', padding: 10, backgroundColor: '#0F1026', borderRadius: 8 },
+  save: { minWidth: 110, alignItems: 'center', padding: 10, backgroundColor: NAVY, borderRadius: 8 },
   saveText: { color: '#FFFFFF', fontWeight: '700' },
 });

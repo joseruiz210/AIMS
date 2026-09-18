@@ -1,9 +1,10 @@
 import { Platform } from 'react-native';
+import { getToken, saveToken, removeToken, getUserData, saveUserData, removeUserData } from '../utils/storage';
 
-// URL base de la API backend (puerto 3000)
-const API_BASE_URL = Platform.OS === 'web'
+// URL base de la API backend
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || (Platform.OS === 'web'
   ? (typeof window !== 'undefined' ? `http://${window.location.hostname}:3000/api/v1` : 'http://localhost:3000/api/v1')
-  : 'http://10.0.2.2:3000/api/v1';
+  : 'http://10.0.2.2:3000/api/v1');
 
 export const getApiBaseUrl = () => API_BASE_URL;
 
@@ -53,42 +54,24 @@ export function invalidateCache(prefix: string): void {
 }
 
 // ─── Almacenamiento de sesion ─────────────────────────────────────────────────
-const TOKEN_KEY = 'aims_jwt_token';
-const USER_KEY = 'aims_user_data';
-
 export const storage = {
   getToken: async (): Promise<string | null> => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      return localStorage.getItem(TOKEN_KEY);
-    }
-    return null;
+    return getToken();
   },
   setToken: async (token: string): Promise<void> => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      localStorage.setItem(TOKEN_KEY, token);
-    }
+    return saveToken(token);
   },
   removeToken: async (): Promise<void> => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      localStorage.removeItem(TOKEN_KEY);
-    }
+    return removeToken();
   },
   getUser: async (): Promise<any | null> => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      const data = localStorage.getItem(USER_KEY);
-      return data ? JSON.parse(data) : null;
-    }
-    return null;
+    return getUserData();
   },
   setUser: async (user: any): Promise<void> => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      localStorage.setItem(USER_KEY, JSON.stringify(user));
-    }
+    return saveUserData(user);
   },
   removeUser: async (): Promise<void> => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      localStorage.removeItem(USER_KEY);
-    }
+    return removeUserData();
   }
 };
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   ActivityIndicator,
   Modal,
   Platform,
+  useWindowDimensions,
+  RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,8 +21,11 @@ const BG_PAGE = '#F8FAFC';
 
 export default function FichasScreenInstructor() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
   const [fichas, setFichas] = useState<Ficha[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   // State para modal de carga CSV
   const [uploadFicha, setUploadFicha] = useState<Ficha | null>(null);
@@ -31,19 +36,23 @@ export default function FichasScreenInstructor() {
   const [feedback, setFeedback] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
   async function loadFichas() {
-    setLoading(true);
     try {
       const data = await fichasService.getFichas();
       setFichas(data);
     } catch (error) {
       console.error('Error al cargar fichas:', error);
-    } finally {
-      setLoading(false);
     }
   }
 
   useEffect(() => {
-    loadFichas();
+    setLoading(true);
+    loadFichas().finally(() => setLoading(false));
+  }, []);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadFichas();
+    setRefreshing(false);
   }, []);
 
   const totalAprendices = fichas.reduce((acc, f) => acc + (f.aprendicesCount || 0), 0);
@@ -118,7 +127,19 @@ export default function FichasScreenInstructor() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[styles.contentContainer, isMobile && { paddingHorizontal: 14, paddingVertical: 14 }]}
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={GOLD}
+          colors={[GOLD, NAVY]}
+        />
+      }
+    >
       {/* Title */}
       <View style={styles.topHeader}>
         <View>
@@ -489,7 +510,7 @@ const styles = StyleSheet.create({
   },
   actionsRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
     paddingTop: 14,
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
@@ -498,25 +519,29 @@ const styles = StyleSheet.create({
   btnGold: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: GOLD,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderRadius: 10,
+    flexGrow: 1,
   },
   btnGoldText: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    fontWeight: '700',
+    color: '#0F1026',
   },
   btnWhite: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
+    borderColor: '#CBD5E1',
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderRadius: 10,
+    flexGrow: 1,
   },
   btnWhiteText: {
     fontSize: 13,
@@ -526,10 +551,12 @@ const styles = StyleSheet.create({
   btnNavy: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: NAVY,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderRadius: 10,
+    flexGrow: 1,
   },
   btnNavyText: {
     fontSize: 13,
