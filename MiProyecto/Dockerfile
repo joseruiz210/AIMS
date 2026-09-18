@@ -1,32 +1,20 @@
-# Etapa 1: Compilación de la aplicación Expo Web
-FROM node:20-alpine AS builder
-
-WORKDIR /app
-
-# Copiar dependencias e instalarlas
-COPY package*.json ./
-RUN npm install
-
-# Copiar el código fuente y variables de entorno
-COPY . .
-ENV EXPO_PUBLIC_API_URL=https://academicaimsapp-edh3c3g2eabtgqc2.westus-01.azurewebsites.net/api/v1
-
-# Exportar la aplicación web estática a la carpeta dist
-RUN npx expo export -p web
-
-# Etapa 2: Servidor web de producción ligero
+# Imagen base oficial de Node.js 20 sobre Alpine Linux
 FROM node:20-alpine
 
+# Directorio de trabajo del contenedor
 WORKDIR /app
 
-# Instalar el servidor estático 'serve'
-RUN npm install -g serve
+# Copiar manifiestos de dependencias
+COPY package*.json ./
 
-# Copiar únicamente los archivos compilados listos para producción
-COPY --from=builder /app/dist ./dist
+# Instalar dependencias del frontend
+RUN npm install
 
-# Exponer el puerto 8081
+# Copiar el resto del código del frontend
+COPY . .
+
+# Exponer el puerto 8081 de la app web de Expo
 EXPOSE 8081
 
-# Iniciar el servidor estático
-CMD ["serve", "-s", "dist", "-l", "8081"]
+# Comando por defecto para arrancar la app de Expo en modo web
+CMD ["npx", "expo", "start", "--web", "--port", "8081"]
