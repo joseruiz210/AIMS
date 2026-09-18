@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import ActionModal from '../../components/ActionModal';
 
 import { calificacionesService } from '../../services/calificacionesService';
+import { evidenciasService } from '../../services/evidenciasService';
 
 const NAVY = '#12103C';
 const GOLD = '#cfa235';
@@ -32,20 +33,39 @@ export default function CalificacionesAprendiz() {
   const loadCalificaciones = async () => {
     setLoading(true);
     try {
-      const records = await calificacionesService.getMisCalificaciones();
-      if (records.length > 0) {
-        setItems(
-          records.map((r) => ({
-            subject: r.actividad || r.moduloNombre || 'Evaluación',
-            grade: r.nota,
-            periodo: 'Trimestre Actual',
-            instructor: r.aprendizNombre || 'Instructor SENA',
-            estado: r.esAprobado ? 'Aprobado' : 'Por mejorar',
-          }))
-        );
-      } else {
-        setItems([]);
-      }
+      const [records, evidencias] = await Promise.all([
+        calificacionesService.getMisCalificaciones(),
+        evidenciasService.getMisEvidencias(),
+      ]);
+
+      const list: GradeItem[] = records.map((r) => ({
+        subject: r.actividad || r.moduloNombre || 'Evaluación Formativa',
+        grade: r.nota,
+        periodo: 'Trimestre Actual',
+        instructor: r.aprendizNombre || 'Instructor SENA',
+        estado: r.nota >= 3.5 ? 'Aprobado' : 'Por mejorar',
+      }));
+
+      // Unificar con evidencias evaluadas para asegurar reflejo inmediato
+      evidencias.forEach((ev) => {
+        if (ev.entrega && ev.entrega.nota !== undefined && ev.entrega.nota !== null) {
+          const exists = list.some(
+            (item) => item.subject.toLowerCase().trim() === ev.titulo.toLowerCase().trim()
+          );
+          if (!exists) {
+            const gradeNum = Number(ev.entrega.nota);
+            list.push({
+              subject: ev.titulo,
+              grade: gradeNum,
+              periodo: 'Trimestre Actual',
+              instructor: ev.instructor || 'Instructor SENA',
+              estado: gradeNum >= 3.5 ? 'Aprobado' : 'Por mejorar',
+            });
+          }
+        }
+      });
+
+      setItems(list);
     } catch {
       setItems([]);
     } finally {

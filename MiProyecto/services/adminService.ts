@@ -1,4 +1,4 @@
-import { authService } from './authService';
+ï»¿import { authService } from './authService';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
 
@@ -22,12 +22,24 @@ export interface DashboardStatsResult {
   programasCount: number;
   fichasActivasCount: number;
   aprendicesPorEstado?: Array<{ estado: string; count: number }>;
+  asistenciasRecientes?: Array<{ estado: string; _count: { id: number } }>;
+}
+
+export interface RecentActivityItem {
+  id: string;
+  accion: string;
+  detalles?: string;
+  createdAt: string;
+  user?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    role: string;
+  };
 }
 
 export const adminService = {
-  /**
-   * Obtener métricas consolidadas del panel de administración en una sola consulta
-   */
   async getDashboardStats(): Promise<DashboardStatsResult | null> {
     try {
       const response = await authService.fetchWithAuth(`${API_BASE_URL}/admin/stats`);
@@ -41,9 +53,19 @@ export const adminService = {
     }
   },
 
-  /**
-   * Listar usuarios con filtros (rol, búsqueda) - solo ADMIN
-   */
+  async getRecentActivity(limit = 10): Promise<RecentActivityItem[]> {
+    try {
+      const response = await authService.fetchWithAuth(`${API_BASE_URL}/admin/recent-activity?limit=${limit}`);
+      const data = await response.json();
+      if (!response.ok || !data.data) {
+        return [];
+      }
+      return data.data;
+    } catch {
+      return [];
+    }
+  },
+
   async getUsers(params: { role?: string; search?: string; limit?: number } = {}): Promise<UsersListResult> {
     const query = new URLSearchParams();
     if (params.role) query.append('role', params.role);
@@ -60,9 +82,6 @@ export const adminService = {
     return { users: data.data || [], total: data.pagination?.total || 0 };
   },
 
-  /**
-   * Obtener solo el conteo de usuarios por rol (para stat cards)
-   */
   async countByRole(role: 'ADMIN' | 'INSTRUCTOR' | 'APRENDIZ'): Promise<number> {
     try {
       const query = new URLSearchParams({ role, limit: '1' });
@@ -79,9 +98,6 @@ export const adminService = {
     }
   },
 
-  /**
-   * Crear un nuevo usuario directamente en PostgreSQL (vía API Admin)
-   */
   async createUser(userData: { firstName: string; lastName: string; email: string; role: 'ADMIN' | 'INSTRUCTOR' | 'APRENDIZ'; password?: string }) {
     const response = await authService.fetchWithAuth(`${API_BASE_URL}/users`, {
       method: 'POST',
@@ -92,6 +108,16 @@ export const adminService = {
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.message || 'Error al crear usuario');
+    return data.data;
+  },
+
+  async sendGlobalNotification(payload: { title: string; body: string; tipo?: string; targetRole?: string | null }) {
+    const response = await authService.fetchWithAuth(`${API_BASE_URL}/notificaciones/global`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Error al enviar notificaciÃ³n global');
     return data.data;
   },
 };

@@ -41,6 +41,7 @@ export default function ActividadesInstructorScreen() {
   const [creating, setCreating] = useState(false);
   const [aiGenerating, setAiGenerating] = useState(false);
   const [temaIa, setTemaIa] = useState('');
+  const [recursoUrl, setRecursoUrl] = useState('');
 
   // Modal para Ver Entregas de una Actividad
   const [modalEntregasVisible, setModalEntregasVisible] = useState(false);
@@ -82,6 +83,7 @@ export default function ActividadesInstructorScreen() {
     setTitulo('');
     setDescripcion('');
     setTemaIa('');
+    setRecursoUrl('');
     if (fichas.length > 0 && !fichaId) {
       setFichaId(fichas[0].id);
     }
@@ -134,6 +136,7 @@ export default function ActividadesInstructorScreen() {
         fichaId: fichaSeleccionada,
         ponderacion,
         formatoEntrega,
+        recursoUrl: recursoUrl.trim() || undefined,
       });
 
       // Recargar lista real de actividades desde la base de datos
@@ -432,6 +435,17 @@ export default function ActividadesInstructorScreen() {
                     />
                   </View>
                 </View>
+
+                {/* Enlace o recurso de apoyo (OPCIONAL) */}
+                <Text style={styles.fieldLabel}>ENLACE O MATERIAL DE APOYO (OPCIONAL)</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  value={recursoUrl}
+                  onChangeText={setRecursoUrl}
+                  placeholder="https://drive.google.com/... o enlace de material complementario"
+                  placeholderTextColor="#94A3B8"
+                  autoCapitalize="none"
+                />
               </View>
             </ScrollView>
 

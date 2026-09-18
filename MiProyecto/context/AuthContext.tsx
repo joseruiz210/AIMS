@@ -13,6 +13,7 @@ type AuthContextType = {
   setSession: (user: User) => void;
   register: (data: RegisterData) => Promise<{ success: boolean; message?: string }>;
   logout: () => Promise<void>;
+  updateUser: (updatedFields: Partial<User>) => void;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -95,6 +96,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.replace(destination as any);
   }, []);
 
+  const updateUser = useCallback((updatedFields: Partial<User>) => {
+    setUser((prev) => (prev ? { ...prev, ...updatedFields } : null));
+  }, []);
+
   const contextValue = useMemo(() => ({
     user,
     isLoading,
@@ -102,7 +107,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSession,
     register,
     logout,
-  }), [user, isLoading, login, setSession, register, logout]);
+    updateUser,
+  }), [user, isLoading, login, setSession, register, logout, updateUser]);
 
   return (
     <AuthContext.Provider value={contextValue}>

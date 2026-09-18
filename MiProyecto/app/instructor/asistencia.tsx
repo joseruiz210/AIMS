@@ -53,8 +53,8 @@ export default function AsistenciaAnimatedScreen() {
   const [fichas, setFichas] = useState<Ficha[]>([]);
   const [apprentices, setApprentices] = useState<ApprenticeAttendance[]>([]);
   const [fichaId, setFichaId] = useState<string>('');
-  const [fichaNumero, setFichaNumero] = useState<string>('2670142');
-  const [programaNombre, setProgramaNombre] = useState<string>('ADSO');
+  const [fichaNumero, setFichaNumero] = useState<string>('');
+  const [programaNombre, setProgramaNombre] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingDate, setLoadingDate] = useState(false);
@@ -81,9 +81,10 @@ export default function AsistenciaAnimatedScreen() {
   const [filterStatus, setFilterStatus] = useState<'todos' | AttendanceState>('todos');
   const [viewMode, setViewMode] = useState<'uno-por-uno' | 'tarjetas' | 'matriz'>('uno-por-uno');
 
-  // Tema de la sesión: obligatorio para poder autoguardar
+  // Tema de la sesión
   const [tema, setTema] = useState('');
   const [autoSaveStatus, setAutoSaveStatus] = useState<AutoSaveStatus>('idle');
+  const [manualSaving, setManualSaving] = useState(false);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const skipNextAutoSave = useRef(false);
 
@@ -144,26 +145,27 @@ export default function AsistenciaAnimatedScreen() {
     prevRecords.forEach(r => prevMap.set(r.aprendizId, r.estado));
 
     // Si ya existe una sesión guardada para esta fecha, recuperamos su tema.
-    // Si no existe, se limpia para que el instructor defina uno nuevo antes
-    // de que se dispare el autoguardado.
     const temaExistente = prevRecords.find(r => r.tema)?.tema || '';
     skipNextAutoSave.current = true;
     setTema(temaExistente);
     setAutoSaveStatus('idle');
 
-    setApprentices(prev => {
-      const base = currentList || prev;
-      return base.map(a => {
-        const prevStatus = prevMap.get(a.id);
-        let st: AttendanceState = 'presente';
-        if (prevStatus === 'AUSENTE') st = 'ausente';
-        else if (prevStatus === 'EXCUSA' || prevStatus === 'EXCUSADO') st = 'excusa';
-        return { ...a, status: st };
+    const source = currentList || apprentices;
+    if (source.length > 0) {
+      const merged = source.map(a => {
+        const estadoDb = prevMap.get(a.id);
+        const mappedStatus: AttendanceState =
+          estadoDb === 'PRESENTE' ? 'presente' :
+          estadoDb === 'AUSENTE' ? 'ausente' :
+          estadoDb === 'EXCUSA' ? 'excusa' : 'ausente';
+        return { ...a, status: mappedStatus };
       });
-    });
+      setApprentices(merged);
+    }
   };
 
   const handleSelectDate = async (isoDate: string) => {
+    if (isoDate === selectedDate || loadingDate) return;
     const requestId = ++dateRequestId.current;
     setSelectedDate(isoDate);
     setCurrentIndex(0);
@@ -179,7 +181,7 @@ export default function AsistenciaAnimatedScreen() {
         }
       } catch (err: any) {
         console.error('Error al obtener asistencias por fecha:', err);
-        showToast(`⚠️ ${err.message || 'No se pudo cargar la fecha seleccionada'}`);
+        showToast(err.message || 'No se pudo cargar la fecha seleccionada');
       } finally {
         if (requestId === dateRequestId.current) {
           setLoadingDate(false);
@@ -197,7 +199,7 @@ export default function AsistenciaAnimatedScreen() {
         const targetFicha = fichasData[0];
         setFichaId(targetFicha.id);
         setFichaNumero(targetFicha.numero);
-        setProgramaNombre(targetFicha.programaNombre || 'ADSO');
+        setProgramaNombre(targetFicha.programaNombre || '');
 
         const detail = await fichasService.getFichaById(targetFicha.id);
         if (detail && detail.matriculas && detail.matriculas.length > 0) {
@@ -230,23 +232,12 @@ export default function AsistenciaAnimatedScreen() {
     }
   };
 
-  // ---- Autoguardado ----
-  // Cualquier cambio en la lista de aprendices o en el tema dispara un
-  // guardado con debounce, en vez del botón manual "Guardar en BD".
-  // No se guarda nada mientras no haya un tema definido: eso evita crear
-  // sesiones vacías en la BD apenas se abre la pantalla.
+  // ---- Autoguardado & Guardado Manual ----
   useEffect(() => {
     if (loading || !fichaId || apprentices.length === 0) return;
 
     if (skipNextAutoSave.current) {
-      // Este cambio vino de cargar datos desde la BD (cambio de fecha /
-      // carga inicial), no de una acción del instructor: no reprogramar guardado.
       skipNextAutoSave.current = false;
-      return;
-    }
-
-    if (!tema.trim()) {
-      setAutoSaveStatus('idle');
       return;
     }
 
@@ -262,13 +253,13 @@ export default function AsistenciaAnimatedScreen() {
   }, [apprentices, tema]);
 
   const runAutoSave = async () => {
-    if (!fichaId || apprentices.length === 0 || !tema.trim()) return;
+    if (!fichaId || apprentices.length === 0) return;
     setAutoSaveStatus('saving');
     try {
       const payload = {
         fichaId,
         fecha: selectedDate,
-        tema: tema.trim(),
+        tema: (tema && tema.trim()) || 'Sesión Formativa',
         asistencias: apprentices.map(a => ({
           aprendizId: a.id,
           estado: a.status === 'presente' ? 'PRESENTE' : a.status === 'ausente' ? 'AUSENTE' : 'EXCUSA',
@@ -281,7 +272,38 @@ export default function AsistenciaAnimatedScreen() {
     } catch (err: any) {
       console.error('Error en autoguardado de asistencia:', err);
       setAutoSaveStatus('error');
-      showToast('⚠️ ' + (err.message || 'No se pudo autoguardar la asistencia'));
+      showToast(err.message || 'No se pudo autoguardar la asistencia');
+    }
+  };
+
+  const handleManualSave = async () => {
+    if (!fichaId || apprentices.length === 0) {
+      showToast('Seleccione una ficha con aprendices primero');
+      return;
+    }
+    setManualSaving(true);
+    setAutoSaveStatus('saving');
+    try {
+      const payload = {
+        fichaId,
+        fecha: selectedDate,
+        tema: (tema && tema.trim()) || 'Sesión Formativa',
+        asistencias: apprentices.map(a => ({
+          aprendizId: a.id,
+          estado: a.status === 'presente' ? 'PRESENTE' : a.status === 'ausente' ? 'AUSENTE' : 'EXCUSA',
+          observacion: a.note || undefined,
+        })),
+      };
+
+      await asistenciaService.registrarAsistencia(payload);
+      setAutoSaveStatus('saved');
+      showToast('Asistencia guardada con éxito en la base de datos');
+    } catch (err: any) {
+      console.error('Error al guardar asistencia:', err);
+      setAutoSaveStatus('error');
+      showToast(err.message || 'Error al guardar la asistencia');
+    } finally {
+      setManualSaving(false);
     }
   };
 
@@ -337,7 +359,7 @@ export default function AsistenciaAnimatedScreen() {
   // 1-Click Mass Actions
   const handleMarkAllPresent = () => {
     setApprentices(prev => prev.map(a => ({ ...a, status: 'presente' })));
-    showToast('⚡ Todos los aprendices marcados como PRESENTES');
+    showToast('Todos los aprendices marcados como PRESENTES');
   };
 
   const handleResetAll = () => {
@@ -345,7 +367,7 @@ export default function AsistenciaAnimatedScreen() {
       setApprentices(prev => prev.map(a => ({ ...a, status: 'ausente' })));
       setCurrentIndex(0);
     });
-    showToast('↺ Toma de lista reiniciada');
+    showToast('Toma de lista reiniciada');
   };
 
   const setSingleStatus = (id: string, newStatus: AttendanceState) => {
@@ -359,7 +381,7 @@ export default function AsistenciaAnimatedScreen() {
     const currentApprentice = apprentices[currentIndex];
     if (currentApprentice) {
       setSingleStatus(currentApprentice.id, status);
-      const statusName = status === 'presente' ? 'PRESENTE 🟢' : status === 'ausente' ? 'NO VINO 🔴' : 'EXCUSA 🟡';
+      const statusName = status === 'presente' ? 'PRESENTE' : status === 'ausente' ? 'NO VINO' : 'EXCUSA';
       showToast(`${currentApprentice.name}: ${statusName}`);
 
       triggerCardTransition(() => {
@@ -495,6 +517,7 @@ export default function AsistenciaAnimatedScreen() {
         </View>
       </View>
 
+<<<<<<< HEAD
       {/* Selector de Ficha Activa para el Instructor */}
       {fichas.length > 0 && (
         <View style={styles.fichaSelectorBar}>
@@ -520,15 +543,32 @@ export default function AsistenciaAnimatedScreen() {
       )}
 
       {/* Tema de la sesión + estado de autoguardado (reemplaza el botón "Guardar en BD") */}
+=======
+      {/* Tema de la sesión + estado de autoguardado + botón Guardar en BD */}
+>>>>>>> 6597411ad521ddf784bf85f9c493596fb579613e
       <View style={styles.temaBar}>
         <Ionicons name="book-outline" size={18} color={NAVY} style={{ marginRight: 8 }} />
         <TextInput
           style={styles.temaInput}
-          placeholder="Tema de la sesión de hoy (obligatorio para guardar)"
+          placeholder="Tema de la sesión (ej. Sesión Formativa)"
           placeholderTextColor="#999999"
           value={tema}
           onChangeText={setTema}
         />
+        <Pressable
+          style={[styles.btnManualSave, (manualSaving || apprentices.length === 0) && { opacity: 0.6 }]}
+          onPress={handleManualSave}
+          disabled={manualSaving || apprentices.length === 0}
+        >
+          {manualSaving ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <>
+              <Ionicons name="cloud-upload-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+              <Text style={styles.btnManualSaveText}>Guardar en BD</Text>
+            </>
+          )}
+        </Pressable>
         <View style={styles.autoSaveBadge}>
           {autoSaveStatus === 'saving' && <ActivityIndicator size="small" color={NAVY} style={{ marginRight: 6 }} />}
           {autoSaveStatus === 'saved' && <Ionicons name="checkmark-circle" size={16} color={GREEN} style={{ marginRight: 4 }} />}
@@ -607,7 +647,15 @@ export default function AsistenciaAnimatedScreen() {
           </View>
 
           {/* FLUID ANIMATED STUDENT CARD */}
-          {!isFinished && currentFocusStudent ? (
+          {total === 0 ? (
+            <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 36, alignItems: 'center', borderWidth: 1, borderColor: '#D0D8E4' }}>
+              <Ionicons name="people-outline" size={48} color="#94A3B8" style={{ marginBottom: 12 }} />
+              <Text style={{ fontSize: 16, fontWeight: '700', color: NAVY }}>Sin aprendices en esta ficha</Text>
+              <Text style={{ fontSize: 13, color: '#64748B', marginTop: 4, textAlign: 'center', maxWidth: 400 }}>
+                No hay aprendices matriculados en la ficha seleccionada.
+              </Text>
+            </View>
+          ) : !isFinished && currentFocusStudent ? (
             <Animated.View
               style={[
                 styles.focusCard,
@@ -642,10 +690,10 @@ export default function AsistenciaAnimatedScreen() {
                 >
                   <Text style={styles.statusIndicatorText}>
                     {currentFocusStudent.status === 'presente'
-                      ? '🟢 Presente'
+                      ? 'Presente'
                       : currentFocusStudent.status === 'ausente'
-                      ? '🔴 No vino'
-                      : '🟡 Excusa'}
+                      ? 'No vino'
+                      : 'Excusa'}
                   </Text>
                 </View>
               </View>
@@ -730,15 +778,15 @@ export default function AsistenciaAnimatedScreen() {
               <View style={styles.summaryBox}>
                 <View style={styles.summaryItem}>
                   <Text style={[styles.summaryNumber, { color: GREEN }]}>{presentesCount}</Text>
-                  <Text style={styles.summaryLabel}>Presentes 🟢</Text>
+                  <Text style={styles.summaryLabel}>Presentes</Text>
                 </View>
                 <View style={styles.summaryItem}>
                   <Text style={[styles.summaryNumber, { color: RED }]}>{ausentesCount}</Text>
-                  <Text style={styles.summaryLabel}>No vinieron 🔴</Text>
+                  <Text style={styles.summaryLabel}>No vinieron</Text>
                 </View>
                 <View style={styles.summaryItem}>
                   <Text style={[styles.summaryNumber, { color: YELLOW }]}>{excusasCount}</Text>
-                  <Text style={styles.summaryLabel}>Excusas 🟡</Text>
+                  <Text style={styles.summaryLabel}>Excusas</Text>
                 </View>
               </View>
 
@@ -769,21 +817,21 @@ export default function AsistenciaAnimatedScreen() {
         <View style={styles.statsCard}>
           <View style={styles.statMetricItem}>
             <Text style={[styles.statMetricNumber, { color: GREEN }]}>{presentesCount}</Text>
-            <Text style={styles.statMetricLabel}>Presentes 🟢</Text>
+            <Text style={styles.statMetricLabel}>Presentes</Text>
           </View>
 
           <View style={styles.statDivider} />
 
           <View style={styles.statMetricItem}>
             <Text style={[styles.statMetricNumber, { color: RED }]}>{ausentesCount}</Text>
-            <Text style={styles.statMetricLabel}>No vinieron 🔴</Text>
+            <Text style={styles.statMetricLabel}>No vinieron</Text>
           </View>
 
           <View style={styles.statDivider} />
 
           <View style={styles.statMetricItem}>
             <Text style={[styles.statMetricNumber, { color: YELLOW }]}>{excusasCount}</Text>
-            <Text style={styles.statMetricLabel}>Excusas 🟡</Text>
+            <Text style={styles.statMetricLabel}>Excusas</Text>
           </View>
 
           <View style={styles.statDivider} />
@@ -833,7 +881,7 @@ export default function AsistenciaAnimatedScreen() {
                     onPress={() => setSingleStatus(item.id, 'presente')}
                   >
                     <Text style={[styles.stateBtnText, item.status === 'presente' && styles.stateBtnTextActive]}>
-                      🟢 Presente
+                      Presente
                     </Text>
                   </Pressable>
 
@@ -845,7 +893,7 @@ export default function AsistenciaAnimatedScreen() {
                     onPress={() => setSingleStatus(item.id, 'ausente')}
                   >
                     <Text style={[styles.stateBtnText, item.status === 'ausente' && styles.stateBtnTextActive]}>
-                      🔴 No vino
+                      No vino
                     </Text>
                   </Pressable>
 
@@ -857,7 +905,7 @@ export default function AsistenciaAnimatedScreen() {
                     onPress={() => setSingleStatus(item.id, 'excusa')}
                   >
                     <Text style={[styles.stateBtnText, item.status === 'excusa' && styles.stateBtnTextActive]}>
-                      🟡 Excusa
+                      Excusa
                     </Text>
                   </Pressable>
                 </View>
@@ -1015,6 +1063,19 @@ const styles = StyleSheet.create({
     minWidth: 180,
     fontSize: 14,
     color: '#000000',
+  },
+  btnManualSave: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: NAVY,
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+  },
+  btnManualSaveText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '600',
   },
   autoSaveBadge: {
     flexDirection: 'row',

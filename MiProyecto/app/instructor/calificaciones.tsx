@@ -49,7 +49,7 @@ export default function CalificacionesScreenPremium() {
         return;
       }
       setFichaNumero(ficha.numero);
-      setProgramaNombre(ficha.programaNombre || 'ADSO');
+      setProgramaNombre(ficha.programaNombre || '');
       setGroups(await calificacionesService.getCalificacionesByFicha(ficha.id));
     } catch (error) {
       console.error('Error cargando calificaciones:', error);
@@ -127,7 +127,7 @@ export default function CalificacionesScreenPremium() {
       }
     >
       <View style={styles.header}>
-        <View><Text style={styles.title}>Libro de Calificaciones</Text><Text style={styles.subtitle}>Ficha {fichaNumero || 'sin ficha'} • {programaNombre || 'ADSO'}</Text></View>
+        <View><Text style={styles.title}>Libro de Calificaciones</Text><Text style={styles.subtitle}>{fichaNumero ? `Ficha ${fichaNumero}${programaNombre ? ` • ${programaNombre}` : ''}` : 'Sin ficha asignada'}</Text></View>
         <Pressable style={styles.refresh} onPress={loadData}><Ionicons name="reload-outline" size={16} color="#475569" /><Text>Actualizar</Text></Pressable>
       </View>
       {toast && <View style={styles.toast}><Text style={styles.toastText}>{toast}</Text></View>}

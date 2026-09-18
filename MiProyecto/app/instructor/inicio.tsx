@@ -38,18 +38,12 @@ export default function InstructorInicioScreen() {
   const [userEmail, setUserEmail] = useState('');
   const [fichas, setFichas] = useState<Ficha[]>([]);
   const [evidencias, setEvidencias] = useState<EvidenciaItem[]>([]);
-  const [totalAprendices, setTotalAprendices] = useState(13);
-  const [asistenciaPromedio, setAsistenciaPromedio] = useState<number>(90);
-  const [calificacionPromedio, setCalificacionPromedio] = useState<number>(4.3);
-  const [weeklyAttendance, setWeeklyAttendance] = useState([
-    { day: 'Lun', percentage: 92, label: '92%' },
-    { day: 'Mar', percentage: 85, label: '85%' },
-    { day: 'Mié', percentage: 96, label: '96%' },
-    { day: 'Jue', percentage: 78, label: '78%' },
-    { day: 'Vie', percentage: 90, label: '90%' },
-  ]);
-  const [mayorAsistencia, setMayorAsistencia] = useState({ dia: 'Miércoles', pct: 96 });
-  const [menorAsistencia, setMenorAsistencia] = useState({ dia: 'Jueves', pct: 78 });
+  const [totalAprendices, setTotalAprendices] = useState(0);
+  const [asistenciaPromedio, setAsistenciaPromedio] = useState<number>(0);
+  const [calificacionPromedio, setCalificacionPromedio] = useState<number>(0.0);
+  const [weeklyAttendance, setWeeklyAttendance] = useState<Array<{ day: string; percentage: number; label: string }>>([]);
+  const [mayorAsistencia, setMayorAsistencia] = useState<{ dia: string; pct: number } | null>(null);
+  const [menorAsistencia, setMenorAsistencia] = useState<{ dia: string; pct: number } | null>(null);
 
   const fetchDashboardData = useCallback(async () => {
     try {
@@ -75,9 +69,7 @@ export default function InstructorInicioScreen() {
         (acc, f) => acc + (f.aprendicesCount || 0),
         0
       );
-      if (aprendicesCount > 0) {
-        setTotalAprendices(aprendicesCount);
-      }
+      setTotalAprendices(aprendicesCount);
 
       if (fichasData.length > 0) {
         const targetFicha = fichasData[0];
@@ -243,7 +235,7 @@ export default function InstructorInicioScreen() {
           </View>
           <Text style={[styles.metricValue, { color: NAVY }]}>{totalAprendices}</Text>
           <Text style={styles.metricLabel}>Aprendices Matriculados</Text>
-          <Text style={styles.metricSub}>Ficha {primaryFicha?.numero || '2670142'}</Text>
+          <Text style={styles.metricSub}>{primaryFicha ? `Ficha ${primaryFicha.numero}` : 'Sin ficha asignada'}</Text>
         </View>
 
         {/* Métrica 2: Actividades */}
@@ -280,8 +272,8 @@ export default function InstructorInicioScreen() {
             </View>
             <Text style={[styles.metricTrend, { color: '#F59E0B' }]}>Aprobado ≥ 3.5</Text>
           </View>
-          <Text style={[styles.metricValue, { color: '#D97706' }]}>{calificacionPromedio.toFixed(1)}</Text>
-          <Text style={styles.metricLabel}>Promedio de la Ficha ADSO</Text>
+          <Text style={[styles.metricValue, { color: '#D97706' }]}>{calificacionPromedio > 0 ? calificacionPromedio.toFixed(1) : '0.0'}</Text>
+          <Text style={styles.metricLabel}>{primaryFicha?.programaNombre ? `Promedio ${primaryFicha.programaNombre}` : 'Promedio General'}</Text>
           <Text style={styles.metricSub}>Escala oficial SENA 0.0 - 5.0</Text>
         </View>
       </View>
@@ -449,55 +441,67 @@ export default function InstructorInicioScreen() {
             </View>
           </View>
 
-          <View style={styles.chartBody}>
-            {/* Eje Y */}
-            <View style={styles.yAxis}>
-              <Text style={styles.yAxisText}>100%</Text>
-              <Text style={styles.yAxisText}>75%</Text>
-              <Text style={styles.yAxisText}>50%</Text>
-              <Text style={styles.yAxisText}>25%</Text>
-              <Text style={styles.yAxisText}>0%</Text>
+          {weeklyAttendance.length === 0 ? (
+            <View style={{ padding: 40, alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="bar-chart-outline" size={40} color="#94A3B8" style={{ marginBottom: 8 }} />
+              <Text style={{ fontSize: 14, fontWeight: '600', color: NAVY }}>Sin registros de asistencia</Text>
+              <Text style={{ fontSize: 12, color: '#64748B', marginTop: 4, textAlign: 'center' }}>
+                Toma asistencia a tus aprendices para ver las estadísticas semanales.
+              </Text>
             </View>
+          ) : (
+            <>
+              <View style={styles.chartBody}>
+                {/* Eje Y */}
+                <View style={styles.yAxis}>
+                  <Text style={styles.yAxisText}>100%</Text>
+                  <Text style={styles.yAxisText}>75%</Text>
+                  <Text style={styles.yAxisText}>50%</Text>
+                  <Text style={styles.yAxisText}>25%</Text>
+                  <Text style={styles.yAxisText}>0%</Text>
+                </View>
 
-            {/* Columnas de Barras */}
-            <View style={styles.barsArea}>
-              <View style={styles.gridLinesWrap}>
-                <View style={styles.gridLine} />
-                <View style={styles.gridLine} />
-                <View style={styles.gridLine} />
-                <View style={styles.gridLine} />
-                <View style={styles.gridLine} />
-              </View>
-
-              <View style={styles.barsFlexRow}>
-                {weeklyAttendance.map((item, idx) => (
-                  <View key={idx} style={styles.barColWrap}>
-                    <Text style={styles.barLabelTooltip}>{item.label}</Text>
-                    <View style={styles.barTrack}>
-                      <View style={[styles.barFill, { height: `${item.percentage}%` }]} />
-                    </View>
-                    <Text style={styles.barDayText}>{item.day}</Text>
+                {/* Columnas de Barras */}
+                <View style={styles.barsArea}>
+                  <View style={styles.gridLinesWrap}>
+                    <View style={styles.gridLine} />
+                    <View style={styles.gridLine} />
+                    <View style={styles.gridLine} />
+                    <View style={styles.gridLine} />
+                    <View style={styles.gridLine} />
                   </View>
-                ))}
-              </View>
-            </View>
-          </View>
 
-          {/* Resumen al pie del gráfico */}
-          <View style={styles.chartSummaryFooter}>
-            <View style={styles.summaryItem}>
-              <Ionicons name="checkmark-done-outline" size={16} color={GREEN} />
-              <Text style={styles.summaryItemText}>
-                Mayor Asistencia: <Text style={{ fontWeight: '700', color: NAVY }}>{mayorAsistencia.dia} ({mayorAsistencia.pct}%)</Text>
-              </Text>
-            </View>
-            <View style={styles.summaryItem}>
-              <Ionicons name="alert-circle-outline" size={16} color="#F59E0B" />
-              <Text style={styles.summaryItemText}>
-                Menor Asistencia: <Text style={{ fontWeight: '700', color: NAVY }}>{menorAsistencia.dia} ({menorAsistencia.pct}%)</Text>
-              </Text>
-            </View>
-          </View>
+                  <View style={styles.barsFlexRow}>
+                    {weeklyAttendance.map((item, idx) => (
+                      <View key={idx} style={styles.barColWrap}>
+                        <Text style={styles.barLabelTooltip}>{item.label}</Text>
+                        <View style={styles.barTrack}>
+                          <View style={[styles.barFill, { height: `${item.percentage}%` }]} />
+                        </View>
+                        <Text style={styles.barDayText}>{item.day}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              </View>
+
+              {/* Resumen al pie del gráfico */}
+              <View style={styles.chartSummaryFooter}>
+                <View style={styles.summaryItem}>
+                  <Ionicons name="checkmark-done-outline" size={16} color={GREEN} />
+                  <Text style={styles.summaryItemText}>
+                    Mayor Asistencia: <Text style={{ fontWeight: '700', color: NAVY }}>{mayorAsistencia?.dia || 'N/A'} ({mayorAsistencia?.pct || 0}%)</Text>
+                  </Text>
+                </View>
+                <View style={styles.summaryItem}>
+                  <Ionicons name="alert-circle-outline" size={16} color="#F59E0B" />
+                  <Text style={styles.summaryItemText}>
+                    Menor Asistencia: <Text style={{ fontWeight: '700', color: NAVY }}>{menorAsistencia?.dia || 'N/A'} ({menorAsistencia?.pct || 0}%)</Text>
+                  </Text>
+                </View>
+              </View>
+            </>
+          )}
         </View>
       </View>
 

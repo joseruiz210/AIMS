@@ -17,15 +17,6 @@ import { exportToCsv } from '../../utils/exportUtil';
 const NAVY = '#12103C';
 const GOLD = '#cfa235';
 
-const MONTHLY_ENROLLMENTS = [
-  { month: 'Feb', count: 48 },
-  { month: 'Mar', count: 38 },
-  { month: 'Abr', count: 52 },
-  { month: 'May', count: 28 },
-  { month: 'Jun', count: 55 },
-  { month: 'Jul', count: 27 },
-];
-
 export default function ReportesAdminScreen() {
   const { width } = useWindowDimensions();
   const [fichas, setFichas] = useState<Ficha[]>([]);
@@ -158,6 +149,8 @@ export default function ReportesAdminScreen() {
     }
   };
 
+  const monthlyEnrollments: Array<{ month: string; count: number }> = [];
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       {/* Top Header */}
@@ -219,19 +212,19 @@ export default function ReportesAdminScreen() {
       <View style={styles.metricsGrid}>
         <View style={styles.metricCard}>
           <Text style={styles.metricLabel}>PROMEDIO GLOBAL</Text>
-          <Text style={styles.metricValueGold}>4.0</Text>
+          <Text style={styles.metricValueGold}>0.0</Text>
         </View>
         <View style={styles.metricCard}>
           <Text style={styles.metricLabel}>MEJOR PROGRAMA</Text>
-          <Text style={styles.metricValueDark}>ADSO</Text>
+          <Text style={styles.metricValueDark}>Sin datos</Text>
         </View>
         <View style={styles.metricCard}>
           <Text style={styles.metricLabel}>APROBADOS</Text>
-          <Text style={styles.metricValueGold}>92%</Text>
+          <Text style={styles.metricValueGold}>0%</Text>
         </View>
         <View style={styles.metricCard}>
           <Text style={styles.metricLabel}>EN RIESGO</Text>
-          <Text style={styles.metricValueDark}>8%</Text>
+          <Text style={styles.metricValueDark}>0%</Text>
         </View>
       </View>
 
@@ -239,33 +232,40 @@ export default function ReportesAdminScreen() {
       <View style={styles.chartBox}>
         <Text style={styles.chartTitle}>MATRICULAS MENSUALES</Text>
 
-        <View style={styles.vChartArea}>
-          {/* Y Axis Numbers */}
-          <View style={styles.yAxisColumn}>
-            <Text style={styles.yAxisText}>60</Text>
-            <Text style={styles.yAxisText}>45</Text>
-            <Text style={styles.yAxisText}>30</Text>
-            <Text style={styles.yAxisText}>15</Text>
-            <Text style={styles.yAxisText}>0</Text>
+        {monthlyEnrollments.length === 0 ? (
+          <View style={{ padding: 28, alignItems: 'center' }}>
+            <Ionicons name="bar-chart-outline" size={36} color="#94A3B8" style={{ marginBottom: 6 }} />
+            <Text style={{ color: '#64748B', fontSize: 13 }}>No hay datos de matrículas mensuales registradas.</Text>
           </View>
+        ) : (
+          <View style={styles.vChartArea}>
+            {/* Y Axis Numbers */}
+            <View style={styles.yAxisColumn}>
+              <Text style={styles.yAxisText}>60</Text>
+              <Text style={styles.yAxisText}>45</Text>
+              <Text style={styles.yAxisText}>30</Text>
+              <Text style={styles.yAxisText}>15</Text>
+              <Text style={styles.yAxisText}>0</Text>
+            </View>
 
-          {/* Vertical Bars */}
-          <View style={styles.barsFlexContainer}>
-            {MONTHLY_ENROLLMENTS.map((item) => {
-              const heightPct = (item.count / 60) * 100;
+            {/* Vertical Bars */}
+            <View style={styles.barsFlexContainer}>
+              {monthlyEnrollments.map((item) => {
+                const heightPct = (item.count / 60) * 100;
 
-              return (
-                <View key={item.month} style={styles.vBarColumn}>
-                  <Text style={styles.barValText}>{item.count}</Text>
-                  <View style={styles.vBarTrack}>
-                    <View style={[styles.vBarFill, { height: `${heightPct}%` }]} />
+                return (
+                  <View key={item.month} style={styles.vBarColumn}>
+                    <Text style={styles.barValText}>{item.count}</Text>
+                    <View style={styles.vBarTrack}>
+                      <View style={[styles.vBarFill, { height: `${heightPct}%` }]} />
+                    </View>
+                    <Text style={styles.vBarLabel}>{item.month}</Text>
                   </View>
-                  <Text style={styles.vBarLabel}>{item.month}</Text>
-                </View>
-              );
-            })}
+                );
+              })}
+            </View>
           </View>
-        </View>
+        )}
       </View>
     </ScrollView>
   );

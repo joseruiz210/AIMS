@@ -345,4 +345,54 @@ async googleLogin(idToken: string): Promise<AuthResponse> {
       return false;
     }
   },
+
+  /**
+   * Obtener perfil del usuario autenticado directamente desde PostgreSQL
+   */
+  async getProfile(): Promise<{ success: boolean; user?: any; message?: string }> {
+    try {
+      const response = await this.fetchWithAuth(`${API_BASE_URL}/users/profile`);
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, message: data.message || 'Error al obtener perfil' };
+      }
+      return { success: true, user: data.data };
+    } catch (error: any) {
+      return { success: false, message: error.message || 'Error de conexión con el servidor.' };
+    }
+  },
+
+  /**
+   * Actualizar datos básicos de perfil (nombre, apellido, teléfono, documento)
+   */
+  async updateProfile(profileData: {
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    documentType?: string;
+    documentNumber?: string;
+  }): Promise<{ success: boolean; user?: any; message?: string }> {
+    try {
+      const response = await this.fetchWithAuth(`${API_BASE_URL}/users/profile`, {
+        method: 'PUT',
+        body: JSON.stringify(profileData),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, message: data.message || 'Error al actualizar perfil' };
+      }
+      if (data.data) {
+        const current = await getUserData();
+        const updatedUser = {
+          ...current,
+          ...data.data,
+          nombre: `${data.data.firstName || ''} ${data.data.lastName || ''}`.trim() || current?.nombre,
+        };
+        await saveUserData(updatedUser);
+      }
+      return { success: true, user: data.data, message: data.message || 'Perfil actualizado exitosamente' };
+    } catch (error: any) {
+      return { success: false, message: error.message || 'Error de conexión con el servidor.' };
+    }
+  },
 };
