@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   Pressable,
   useWindowDimensions,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,29 +33,19 @@ export default function InstructorInicioScreen() {
   const isMobile = width < 768;
 
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [userName, setUserName] = useState('Instructor');
   const [userEmail, setUserEmail] = useState('');
   const [fichas, setFichas] = useState<Ficha[]>([]);
   const [evidencias, setEvidencias] = useState<EvidenciaItem[]>([]);
-  const [totalAprendices, setTotalAprendices] = useState(13);
-  const [asistenciaPromedio, setAsistenciaPromedio] = useState<number>(90);
-  const [calificacionPromedio, setCalificacionPromedio] = useState<number>(4.3);
-  const [weeklyAttendance, setWeeklyAttendance] = useState([
-    { day: 'Lun', percentage: 92, label: '92%' },
-    { day: 'Mar', percentage: 85, label: '85%' },
-    { day: 'Mié', percentage: 96, label: '96%' },
-    { day: 'Jue', percentage: 78, label: '78%' },
-    { day: 'Vie', percentage: 90, label: '90%' },
-  ]);
-  const [mayorAsistencia, setMayorAsistencia] = useState({ dia: 'Miércoles', pct: 96 });
-  const [menorAsistencia, setMenorAsistencia] = useState({ dia: 'Jueves', pct: 78 });
+  const [totalAprendices, setTotalAprendices] = useState(0);
+  const [asistenciaPromedio, setAsistenciaPromedio] = useState<number>(0);
+  const [calificacionPromedio, setCalificacionPromedio] = useState<number>(0.0);
+  const [weeklyAttendance, setWeeklyAttendance] = useState<Array<{ day: string; percentage: number; label: string }>>([]);
+  const [mayorAsistencia, setMayorAsistencia] = useState<{ dia: string; pct: number } | null>(null);
+  const [menorAsistencia, setMenorAsistencia] = useState<{ dia: string; pct: number } | null>(null);
 
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
-
-  const loadDashboardData = async () => {
-    setLoading(true);
+  const fetchDashboardData = useCallback(async () => {
     try {
       const { user } = await authService.checkSession();
       if (user) {
@@ -74,19 +65,15 @@ export default function InstructorInicioScreen() {
       setFichas(fichasData);
       setEvidencias(evidenciasData);
 
-      // Calcular total de aprendices sumando matriculas
       const aprendicesCount = fichasData.reduce(
         (acc, f) => acc + (f.aprendicesCount || 0),
         0
       );
-      if (aprendicesCount > 0) {
-        setTotalAprendices(aprendicesCount);
-      }
+      setTotalAprendices(aprendicesCount);
 
       if (fichasData.length > 0) {
         const targetFicha = fichasData[0];
 
-        // 1. Cargar calificaciones reales desde PostgreSQL
         try {
           const califs = await calificacionesService.getCalificacionesByFicha(targetFicha.id);
           if (califs && califs.length > 0) {
@@ -100,7 +87,6 @@ export default function InstructorInicioScreen() {
           console.error(e);
         }
 
-        // 2. Cargar asistencias reales desde PostgreSQL
         try {
           const asistenciasData = await asistenciaService.getAsistenciasByFicha(targetFicha.id);
           if (asistenciasData && asistenciasData.length > 0) {
@@ -143,17 +129,42 @@ export default function InstructorInicioScreen() {
       }
     } catch (error) {
       console.warn('Error cargando dashboard instructor:', error);
-    } finally {
-      setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    setLoading(true);
+    fetchDashboardData().finally(() => {
+      if (isMounted) setLoading(false);
+    });
+    return () => { isMounted = false; };
+  }, [fetchDashboardData]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchDashboardData();
+    setRefreshing(false);
+  }, [fetchDashboardData]);
 
   const primaryFicha = fichas.length > 0 ? fichas[0] : null;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[styles.contentContainer, isMobile && styles.contentContainerMobile]}
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={GOLD}
+          colors={[GOLD, NAVY]}
+        />
+      }
+    >
       {/* ─── BANNER DE BIENVENIDA INSTITUCIONAL SENA ─── */}
-      <View style={styles.welcomeCard}>
+      <View style={[styles.welcomeCard, isMobile && styles.welcomeCardMobile]}>
         <View style={styles.welcomePatternLeft} />
         <View style={styles.welcomePatternRight} />
 
@@ -224,7 +235,7 @@ export default function InstructorInicioScreen() {
           </View>
           <Text style={[styles.metricValue, { color: NAVY }]}>{totalAprendices}</Text>
           <Text style={styles.metricLabel}>Aprendices Matriculados</Text>
-          <Text style={styles.metricSub}>Ficha {primaryFicha?.numero || '2670142'}</Text>
+          <Text style={styles.metricSub}>{primaryFicha ? `Ficha ${primaryFicha.numero}` : 'Sin ficha asignada'}</Text>
         </View>
 
         {/* Métrica 2: Actividades */}
@@ -261,8 +272,8 @@ export default function InstructorInicioScreen() {
             </View>
             <Text style={[styles.metricTrend, { color: '#F59E0B' }]}>Aprobado ≥ 3.5</Text>
           </View>
-          <Text style={[styles.metricValue, { color: '#D97706' }]}>{calificacionPromedio.toFixed(1)}</Text>
-          <Text style={styles.metricLabel}>Promedio de la Ficha ADSO</Text>
+          <Text style={[styles.metricValue, { color: '#D97706' }]}>{calificacionPromedio > 0 ? calificacionPromedio.toFixed(1) : '0.0'}</Text>
+          <Text style={styles.metricLabel}>{primaryFicha?.programaNombre ? `Promedio ${primaryFicha.programaNombre}` : 'Promedio General'}</Text>
           <Text style={styles.metricSub}>Escala oficial SENA 0.0 - 5.0</Text>
         </View>
       </View>
@@ -430,77 +441,99 @@ export default function InstructorInicioScreen() {
             </View>
           </View>
 
-          <View style={styles.chartBody}>
-            {/* Eje Y */}
-            <View style={styles.yAxis}>
-              <Text style={styles.yAxisText}>100%</Text>
-              <Text style={styles.yAxisText}>75%</Text>
-              <Text style={styles.yAxisText}>50%</Text>
-              <Text style={styles.yAxisText}>25%</Text>
-              <Text style={styles.yAxisText}>0%</Text>
+          {weeklyAttendance.length === 0 ? (
+            <View style={{ padding: 40, alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="bar-chart-outline" size={40} color="#94A3B8" style={{ marginBottom: 8 }} />
+              <Text style={{ fontSize: 14, fontWeight: '600', color: NAVY }}>Sin registros de asistencia</Text>
+              <Text style={{ fontSize: 12, color: '#64748B', marginTop: 4, textAlign: 'center' }}>
+                Toma asistencia a tus aprendices para ver las estadísticas semanales.
+              </Text>
             </View>
+          ) : (
+            <>
+              <View style={styles.chartBody}>
+                {/* Eje Y */}
+                <View style={styles.yAxis}>
+                  <Text style={styles.yAxisText}>100%</Text>
+                  <Text style={styles.yAxisText}>75%</Text>
+                  <Text style={styles.yAxisText}>50%</Text>
+                  <Text style={styles.yAxisText}>25%</Text>
+                  <Text style={styles.yAxisText}>0%</Text>
+                </View>
 
-            {/* Columnas de Barras */}
-            <View style={styles.barsArea}>
-              <View style={styles.gridLinesWrap}>
-                <View style={styles.gridLine} />
-                <View style={styles.gridLine} />
-                <View style={styles.gridLine} />
-                <View style={styles.gridLine} />
-                <View style={styles.gridLine} />
-              </View>
-
-              <View style={styles.barsFlexRow}>
-                {weeklyAttendance.map((item, idx) => (
-                  <View key={idx} style={styles.barColWrap}>
-                    <Text style={styles.barLabelTooltip}>{item.label}</Text>
-                    <View style={styles.barTrack}>
-                      <View style={[styles.barFill, { height: `${item.percentage}%` }]} />
-                    </View>
-                    <Text style={styles.barDayText}>{item.day}</Text>
+                {/* Columnas de Barras */}
+                <View style={styles.barsArea}>
+                  <View style={styles.gridLinesWrap}>
+                    <View style={styles.gridLine} />
+                    <View style={styles.gridLine} />
+                    <View style={styles.gridLine} />
+                    <View style={styles.gridLine} />
+                    <View style={styles.gridLine} />
                   </View>
-                ))}
-              </View>
-            </View>
-          </View>
 
-          {/* Resumen al pie del gráfico */}
-          <View style={styles.chartSummaryFooter}>
-            <View style={styles.summaryItem}>
-              <Ionicons name="checkmark-done-outline" size={16} color={GREEN} />
-              <Text style={styles.summaryItemText}>
-                Mayor Asistencia: <Text style={{ fontWeight: '700', color: NAVY }}>{mayorAsistencia.dia} ({mayorAsistencia.pct}%)</Text>
-              </Text>
-            </View>
-            <View style={styles.summaryItem}>
-              <Ionicons name="alert-circle-outline" size={16} color="#F59E0B" />
-              <Text style={styles.summaryItemText}>
-                Menor Asistencia: <Text style={{ fontWeight: '700', color: NAVY }}>{menorAsistencia.dia} ({menorAsistencia.pct}%)</Text>
-              </Text>
-            </View>
-          </View>
+                  <View style={styles.barsFlexRow}>
+                    {weeklyAttendance.map((item, idx) => (
+                      <View key={idx} style={styles.barColWrap}>
+                        <Text style={styles.barLabelTooltip}>{item.label}</Text>
+                        <View style={styles.barTrack}>
+                          <View style={[styles.barFill, { height: `${item.percentage}%` }]} />
+                        </View>
+                        <Text style={styles.barDayText}>{item.day}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              </View>
+
+              {/* Resumen al pie del gráfico */}
+              <View style={styles.chartSummaryFooter}>
+                <View style={styles.summaryItem}>
+                  <Ionicons name="checkmark-done-outline" size={16} color={GREEN} />
+                  <Text style={styles.summaryItemText}>
+                    Mayor Asistencia: <Text style={{ fontWeight: '700', color: NAVY }}>{mayorAsistencia?.dia || 'N/A'} ({mayorAsistencia?.pct || 0}%)</Text>
+                  </Text>
+                </View>
+                <View style={styles.summaryItem}>
+                  <Ionicons name="alert-circle-outline" size={16} color="#F59E0B" />
+                  <Text style={styles.summaryItemText}>
+                    Menor Asistencia: <Text style={{ fontWeight: '700', color: NAVY }}>{menorAsistencia?.dia || 'N/A'} ({menorAsistencia?.pct || 0}%)</Text>
+                  </Text>
+                </View>
+              </View>
+            </>
+          )}
         </View>
       </View>
 
       {/* ─── AVISO INSTITUCIONAL Y SOPORTE PEDAGÓGICO ─── */}
       <View style={styles.pedagogicalNoticeCard}>
-        <View style={styles.pedagogicalIconWrap}>
-          <Ionicons name="ribbon-outline" size={24} color={GOLD} />
+        <View style={styles.pedagogicalHeaderRow}>
+          <View style={styles.pedagogicalIconWrap}>
+            <Ionicons name="ribbon-outline" size={24} color={GOLD} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.pedagogicalTitle}>
+              Sistema de Evaluación y Rúbricas Formativas SENA
+            </Text>
+            <View style={styles.pedagogicalBadge}>
+              <Text style={styles.pedagogicalBadgeText}>Evaluación Integral ADSO</Text>
+            </View>
+          </View>
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.pedagogicalTitle}>
-            Sistema de Evaluación y Rúbricas Formativas SENA
-          </Text>
-          <Text style={styles.pedagogicalText}>
-            Cada evidencia entregada por los aprendices es valorada bajo la escala oficial de 0.0 a 5.0 (aprobatoria ≥ 3.5), generando retroalimentación detallada sobre fortalezas y recomendaciones. Puedes revisar las entregas en la sección de Actividades.
-          </Text>
-        </View>
+
+        <Text style={styles.pedagogicalText}>
+          Cada evidencia entregada por los aprendices es valorada bajo la escala oficial de 0.0 a 5.0 (aprobatoria ≥ 3.5), generando retroalimentación detallada sobre fortalezas y recomendaciones pedagógicas. Puedes revisar las entregas en la sección de Actividades.
+        </Text>
+
         <Pressable
-          style={styles.pedagogicalBtn}
+          style={({ hovered }: any) => [
+            styles.pedagogicalBtn,
+            hovered && styles.pedagogicalBtnHover,
+          ]}
           onPress={() => router.push('/instructor/actividades' as any)}
         >
           <Text style={styles.pedagogicalBtnText}>Ir a Actividades</Text>
-          <Ionicons name="arrow-forward" size={14} color="#0F1026" />
+          <Ionicons name="arrow-forward" size={16} color="#0F1026" />
         </Pressable>
       </View>
     </ScrollView>
@@ -517,13 +550,18 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     paddingBottom: 48,
   },
+  contentContainerMobile: {
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 40,
+  },
 
   // ─── BANNER DE BIENVENIDA ───
   welcomeCard: {
     backgroundColor: NAVY,
     borderRadius: 20,
-    padding: 28,
-    marginBottom: 24,
+    padding: 26,
+    marginBottom: 20,
     position: 'relative',
     overflow: 'hidden',
     shadowColor: '#0F1026',
@@ -531,6 +569,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 16,
     elevation: 5,
+  },
+  welcomeCardMobile: {
+    padding: 18,
+    borderRadius: 16,
+    marginBottom: 16,
   },
   welcomePatternLeft: {
     position: 'absolute',
@@ -640,8 +683,9 @@ const styles = StyleSheet.create({
   },
   welcomeActionsMobile: {
     width: '100%',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: 'column',
+    gap: 10,
+    marginTop: 16,
   },
   actionBtnPrimary: {
     flexDirection: 'row',
@@ -1093,52 +1137,85 @@ const styles = StyleSheet.create({
 
   // ─── AVISO PEDAGÓGICO ───
   pedagogicalNoticeCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
+    flexDirection: 'column',
+    alignItems: 'stretch',
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 20,
     borderWidth: 1,
-    borderColor: 'rgba(212, 175, 55, 0.25)',
+    borderColor: 'rgba(212, 175, 55, 0.35)',
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    elevation: 2,
-    flexWrap: 'wrap',
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
+    elevation: 3,
+    marginBottom: 20,
+    gap: 14,
+  },
+  pedagogicalHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   pedagogicalIconWrap: {
-    width: 46,
-    height: 46,
-    borderRadius: 14,
-    backgroundColor: 'rgba(212, 175, 55, 0.12)',
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: 'rgba(212, 175, 55, 0.14)',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(212, 175, 55, 0.25)',
   },
   pedagogicalTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '800',
     color: NAVY,
-    marginBottom: 4,
+    lineHeight: 22,
+  },
+  pedagogicalBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(212, 175, 55, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginTop: 4,
+  },
+  pedagogicalBadgeText: {
+    fontSize: 11,
+    color: '#B45309',
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   pedagogicalText: {
-    fontSize: 12,
-    color: '#64748B',
-    lineHeight: 18,
+    fontSize: 13.5,
+    color: '#475569',
+    lineHeight: 22,
+    letterSpacing: 0.1,
   },
   pedagogicalBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    justifyContent: 'center',
+    gap: 8,
     backgroundColor: GOLD,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 13,
+    borderRadius: 12,
+    shadowColor: GOLD,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 2,
+    marginTop: 4,
+  },
+  pedagogicalBtnHover: {
+    backgroundColor: '#C59E2E',
   },
   pedagogicalBtnText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
     color: '#0F1026',
+    letterSpacing: 0.3,
   },
 });

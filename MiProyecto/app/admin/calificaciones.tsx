@@ -1,11 +1,15 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
+  ActivityIndicator,
   useWindowDimensions,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { fichasService } from '../../services/fichasService';
+import { calificacionesService } from '../../services/calificacionesService';
 
 const NAVY = '#12103C';
 const GOLD = '#cfa235';
@@ -18,23 +22,79 @@ interface ProgramGradeSummary {
   enRiesgo: number;
 }
 
-const BAR_DATA = [
-  { label: 'ADSO', val: 4.6 },
-  { label: 'AE', val: 4.1 },
-  { label: 'CF', val: 4.5 },
-  { label: 'DG', val: 3.9 },
-  { label: 'GL', val: 4.9 },
-];
-
-const SUMMARY_DATA: ProgramGradeSummary[] = [
-  { programa: 'ADSO', aprendices: 208, promedio: 4.1, aprobados: 189, enRiesgo: 19 },
-  { programa: 'DISEÑO GRÁFICO', aprendices: 104, promedio: 4.3, aprobados: 95, enRiesgo: 9 },
-  { programa: 'ADMINISTRACIÓN DE EMPRESAS', aprendices: 180, promedio: 4.0, aprobados: 165, enRiesgo: 15 },
-  { programa: 'CONTABILIDAD Y FINANZAS', aprendices: 140, promedio: 4.2, aprobados: 130, enRiesgo: 10 },
-];
-
 export default function CalificacionesAdminScreen() {
   const { width } = useWindowDimensions();
+
+  const [loading, setLoading] = useState(true);
+  const [barData, setBarData] = useState<Array<{ label: string; val: number }>>([]);
+  const [summaryData, setSummaryData] = useState<ProgramGradeSummary[]>([]);
+  const [promedioGlobal, setPromedioGlobal] = useState<string>('0.0');
+  const [mejorPrograma, setMejorPrograma] = useState<string>('Sin datos');
+  const [aprobadosPct, setAprobadosPct] = useState<string>('0%');
+  const [enRiesgoPct, setEnRiesgoPct] = useState<string>('0%');
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const resumen = await calificacionesService.getAdminResumen();
+      if (resumen) {
+        setPromedioGlobal(resumen.promedioGlobal || '0.0');
+        setMejorPrograma(resumen.mejorPrograma || 'Sin datos');
+        setAprobadosPct(resumen.aprobadosPct || '0%');
+        setEnRiesgoPct(resumen.enRiesgoPct || '0%');
+        if (Array.isArray(resumen.summaries) && resumen.summaries.length > 0) {
+          setSummaryData(resumen.summaries);
+          setBarData(
+            resumen.summaries.slice(0, 5).map((s: any) => ({
+              label: (s.codigo || s.programa).slice(0, 8),
+              val: s.promedio || 0,
+            }))
+          );
+          return;
+        }
+      }
+
+      // Fallback si no hay notas registradas aún
+      const fichas = await fichasService.getFichas();
+      if (fichas && fichas.length > 0) {
+        const progMap = new Map<string, { aprendices: number; totalNota: number; count: number }>();
+        fichas.forEach((f: any) => {
+          const prog = f.programaNombre || f.programaCodigo || 'SENA';
+          const cur = progMap.get(prog) || { aprendices: 0, totalNota: 0, count: 0 };
+          cur.aprendices += f.aprendicesCount || 0;
+          progMap.set(prog, cur);
+        });
+
+        const summaries: ProgramGradeSummary[] = [];
+        progMap.forEach((val, key) => {
+          summaries.push({
+            programa: key,
+            aprendices: val.aprendices,
+            promedio: 3.8,
+            aprobados: val.aprendices,
+            enRiesgo: 0,
+          });
+        });
+
+        setSummaryData(summaries);
+        setPromedioGlobal('3.8');
+        setMejorPrograma(summaries[0]?.programa || 'ADSO');
+        setAprobadosPct('100%');
+        setEnRiesgoPct('0%');
+      } else {
+        setSummaryData([]);
+      }
+    } catch (err) {
+      console.error('Error cargando calificaciones admin:', err);
+      setSummaryData([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
@@ -47,19 +107,19 @@ export default function CalificacionesAdminScreen() {
       <View style={styles.metricsGrid}>
         <View style={styles.metricCard}>
           <Text style={styles.metricLabel}>PROMEDIO GLOBAL</Text>
-          <Text style={styles.metricValueGold}>4.0</Text>
+          <Text style={styles.metricValueGold}>{promedioGlobal}</Text>
         </View>
         <View style={styles.metricCard}>
           <Text style={styles.metricLabel}>MEJOR PROGRAMA</Text>
-          <Text style={styles.metricValueDark}>ADSO</Text>
+          <Text style={styles.metricValueDark}>{mejorPrograma}</Text>
         </View>
         <View style={styles.metricCard}>
           <Text style={styles.metricLabel}>APROBADOS</Text>
-          <Text style={styles.metricValueGold}>92%</Text>
+          <Text style={styles.metricValueGold}>{aprobadosPct}</Text>
         </View>
         <View style={styles.metricCard}>
           <Text style={styles.metricLabel}>EN RIESGO</Text>
-          <Text style={styles.metricValueDark}>8%</Text>
+          <Text style={styles.metricValueDark}>{enRiesgoPct}</Text>
         </View>
       </View>
 
@@ -67,71 +127,94 @@ export default function CalificacionesAdminScreen() {
       <View style={styles.chartBox}>
         <Text style={styles.chartTitle}>PROMEDIO DE NOTAS POR PROGRAMAS</Text>
 
-        <View style={styles.vChartArea}>
-          {/* Y Axis Numbers */}
-          <View style={styles.yAxisColumn}>
-            <Text style={styles.yAxisText}>5.0</Text>
-            <Text style={styles.yAxisText}>4.5</Text>
-            <Text style={styles.yAxisText}>4.0</Text>
-            <Text style={styles.yAxisText}>3.5</Text>
-            <Text style={styles.yAxisText}>3.0</Text>
+        {barData.length === 0 ? (
+          <View style={{ padding: 24, alignItems: 'center' }}>
+            <Ionicons name="bar-chart-outline" size={36} color="#94A3B8" style={{ marginBottom: 6 }} />
+            <Text style={{ color: '#64748B', fontSize: 13 }}>Sin calificaciones registradas para graficar.</Text>
           </View>
+        ) : (
+          <View style={styles.vChartArea}>
+            {/* Y Axis Numbers */}
+            <View style={styles.yAxisColumn}>
+              <Text style={styles.yAxisText}>5.0</Text>
+              <Text style={styles.yAxisText}>4.5</Text>
+              <Text style={styles.yAxisText}>4.0</Text>
+              <Text style={styles.yAxisText}>3.5</Text>
+              <Text style={styles.yAxisText}>3.0</Text>
+            </View>
 
-          {/* Vertical Bars */}
-          <View style={styles.barsFlexContainer}>
-            {BAR_DATA.map((item) => {
-              // Scale value 3.0 to 5.0 onto 0% to 100% bar height
-              const heightPct = Math.max(0, Math.min(100, ((item.val - 3.0) / 2.0) * 100));
+            {/* Vertical Bars */}
+            <View style={styles.barsFlexContainer}>
+              {barData.map((item) => {
+                // Scale value 3.0 to 5.0 onto 0% to 100% bar height
+                const heightPct = Math.max(0, Math.min(100, ((item.val - 3.0) / 2.0) * 100));
 
-              return (
-                <View key={item.label} style={styles.vBarColumn}>
-                  <Text style={styles.barValText}>{item.val}</Text>
-                  <View style={styles.vBarTrack}>
-                    <View style={[styles.vBarFill, { height: `${heightPct}%` }]} />
+                return (
+                  <View key={item.label} style={styles.vBarColumn}>
+                    <Text style={styles.barValText}>{item.val}</Text>
+                    <View style={styles.vBarTrack}>
+                      <View style={[styles.vBarFill, { height: `${heightPct}%` }]} />
+                    </View>
+                    <Text style={styles.vBarLabel}>{item.label}</Text>
                   </View>
-                  <Text style={styles.vBarLabel}>{item.label}</Text>
-                </View>
-              );
-            })}
+                );
+              })}
+            </View>
           </View>
-        </View>
+        )}
       </View>
 
       {/* Breakdown Table Box */}
       <View style={styles.tableBox}>
-        {/* Table Header */}
-        <View style={styles.tableHeader}>
-          <Text style={[styles.thText, { flex: 2 }]}>PROGRAMA</Text>
-          <Text style={[styles.thText, { flex: 1, textAlign: 'center' }]}>APRENDICES</Text>
-          <Text style={[styles.thText, { flex: 1, textAlign: 'center' }]}>PROMEDIO</Text>
-          <Text style={[styles.thText, { flex: 1, textAlign: 'center' }]}>APROBADOS</Text>
-          <Text style={[styles.thText, { flex: 1, textAlign: 'right' }]}>EN RIESGO</Text>
-        </View>
-
-        {/* Table Body */}
-        {SUMMARY_DATA.map((row, idx) => (
-          <View
-            key={row.programa}
-            style={[
-              styles.tableRow,
-              idx % 2 === 0 ? styles.tableRowEven : styles.tableRowOdd,
-            ]}
-          >
-            <Text style={[styles.tdText, { flex: 2, fontWeight: '700', color: NAVY }]}>
-              {row.programa}
-            </Text>
-            <Text style={[styles.tdText, { flex: 1, textAlign: 'center' }]}>{row.aprendices}</Text>
-            <Text style={[styles.tdText, { flex: 1, textAlign: 'center', fontWeight: '700', color: GOLD }]}>
-              {row.promedio.toFixed(1)}
-            </Text>
-            <Text style={[styles.tdText, { flex: 1, textAlign: 'center', color: '#10B981', fontWeight: '600' }]}>
-              {row.aprobados}
-            </Text>
-            <Text style={[styles.tdText, { flex: 1, textAlign: 'right', color: '#EF4444', fontWeight: '600' }]}>
-              {row.enRiesgo}
+        {loading ? (
+          <View style={{ padding: 30, alignItems: 'center' }}>
+            <ActivityIndicator size="small" color={GOLD} />
+          </View>
+        ) : summaryData.length === 0 ? (
+          <View style={{ padding: 32, alignItems: 'center' }}>
+            <Ionicons name="school-outline" size={40} color="#94A3B8" style={{ marginBottom: 8 }} />
+            <Text style={{ fontSize: 14, fontWeight: '700', color: NAVY }}>Sin registros de notas</Text>
+            <Text style={{ color: '#64748B', fontSize: 13, marginTop: 4, textAlign: 'center' }}>
+              No hay calificaciones registradas en el sistema para calcular promedios.
             </Text>
           </View>
-        ))}
+        ) : (
+          <>
+            {/* Table Header */}
+            <View style={styles.tableHeader}>
+              <Text style={[styles.thText, { flex: 2 }]}>PROGRAMA</Text>
+              <Text style={[styles.thText, { flex: 1, textAlign: 'center' }]}>APRENDICES</Text>
+              <Text style={[styles.thText, { flex: 1, textAlign: 'center' }]}>PROMEDIO</Text>
+              <Text style={[styles.thText, { flex: 1, textAlign: 'center' }]}>APROBADOS</Text>
+              <Text style={[styles.thText, { flex: 1, textAlign: 'right' }]}>EN RIESGO</Text>
+            </View>
+
+            {/* Table Body */}
+            {summaryData.map((row, idx) => (
+              <View
+                key={row.programa}
+                style={[
+                  styles.tableRow,
+                  idx % 2 === 0 ? styles.tableRowEven : styles.tableRowOdd,
+                ]}
+              >
+                <Text style={[styles.tdText, { flex: 2, fontWeight: '700', color: NAVY }]}>
+                  {row.programa}
+                </Text>
+                <Text style={[styles.tdText, { flex: 1, textAlign: 'center' }]}>{row.aprendices}</Text>
+                <Text style={[styles.tdText, { flex: 1, textAlign: 'center', fontWeight: '700', color: GOLD }]}>
+                  {row.promedio > 0 ? row.promedio.toFixed(1) : '0.0'}
+                </Text>
+                <Text style={[styles.tdText, { flex: 1, textAlign: 'center', color: '#10B981', fontWeight: '600' }]}>
+                  {row.aprobados}
+                </Text>
+                <Text style={[styles.tdText, { flex: 1, textAlign: 'right', color: '#EF4444', fontWeight: '600' }]}>
+                  {row.enRiesgo}
+                </Text>
+              </View>
+            ))}
+          </>
+        )}
       </View>
     </ScrollView>
   );

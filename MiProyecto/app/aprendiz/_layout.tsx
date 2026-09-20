@@ -26,9 +26,12 @@ const menuItems = [
   { name: 'Mi horario', path: '/aprendiz/horario', icon: 'calendar-outline' as const },
   { name: 'Asistencia', path: '/aprendiz/asistencia', icon: 'checkbox-outline' as const },
   { name: 'Calificaciones', path: '/aprendiz/calificaciones', icon: 'bar-chart-outline' as const },
+<<<<<<< HEAD
+  { name: 'Documentos', path: '/aprendiz/documentos', icon: 'folder-open-outline' as const },
   { name: 'Observaciones', path: '/aprendiz/observaciones', icon: 'chatbubbles-outline' as const },
+=======
+>>>>>>> 6597411ad521ddf784bf85f9c493596fb579613e
   { name: 'Notificaciones', path: '/aprendiz/notificaciones', icon: 'notifications-outline' as const },
-  { name: 'Documentos', path: '/aprendiz/documentos', icon: 'document-text-outline' as const },
   { name: 'Configuración', path: '/aprendiz/configuracion', icon: 'settings-outline' as const },
 ];
 
@@ -156,13 +159,6 @@ export default function AprendizLayout() {
           </Pressable>
           <Text style={styles.mobileHeaderTitle}>AIMS</Text>
           <View style={styles.mobileHeaderRight}>
-            <Pressable
-              style={styles.headerIconBtn}
-              onPress={() => router.push('/aprendiz/notificaciones' as any)}
-            >
-              <Ionicons name="notifications-outline" size={22} color={NAVY} />
-              <View style={styles.headerBadge} />
-            </Pressable>
             <Pressable
               style={styles.headerIconBtn}
               onPress={() => router.push('/aprendiz/configuracion' as any)}

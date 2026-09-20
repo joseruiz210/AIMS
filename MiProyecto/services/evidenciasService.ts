@@ -129,6 +129,7 @@ export const evidenciasService = {
     fichaId: string;
     ponderacion?: string;
     formatoEntrega?: string;
+    recursoUrl?: string;
   }) {
     const response = await authService.fetchWithAuth(`${API_BASE_URL}/evidencias`, {
       method: 'POST',
@@ -138,6 +139,9 @@ export const evidenciasService = {
         descripcion: payload.descripcion,
         fechaLimite: payload.fechaLimite,
         fichaId: payload.fichaId,
+        recursoUrl: payload.recursoUrl || undefined,
+        formatoEntrega: payload.formatoEntrega || undefined,
+        ponderacion: payload.ponderacion || undefined,
       }),
     });
     const data = await response.json();

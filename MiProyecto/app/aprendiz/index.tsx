@@ -1,55 +1,131 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, useWindowDimensions } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, Pressable, useWindowDimensions, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import ActionModal from '../../components/ActionModal';
+import { authService } from '../../services/authService';
+import { calificacionesService } from '../../services/calificacionesService';
+import { evidenciasService } from '../../services/evidenciasService';
+import { asistenciaService } from '../../services/asistenciaService';
 
 const NAVY = '#12103C';
 const GOLD = '#cfa235';
 
-const competencias = [
-  { nombre: 'Analisis de Datos', nota: 4.5, max: 5 },
-  { nombre: 'POO', nota: 4.0, max: 5 },
-  { nombre: 'Requisitos', nota: 3.8, max: 5 },
-  { nombre: 'Programación BD', nota: 4.2, max: 5 },
-];
+interface ProximaClase {
+  hora: string;
+  materia: string;
+  instructor: string;
+  aula: string;
+}
 
-const statCards = [
-  { label: 'PROMEDIO', value: '4.0', highlight: true, icon: 'star-outline', route: '/aprendiz/calificaciones' },
-  { label: 'ASISTENCIA', value: '96%', highlight: true, icon: 'checkmark-circle-outline', route: '/aprendiz/asistencia' },
-  { label: 'TAREAS', value: '2', highlight: true, icon: 'clipboard-outline', route: '/aprendiz/tareas' },
-  { label: 'MATERIAS', value: '6', highlight: false, icon: 'book-outline', route: '/aprendiz/horario' },
-];
-
-const proximasClases = [
-  { hora: '07:00 - 09:00', materia: 'Analisis de Datos', instructor: 'Roberto Vargas', aula: '201' },
-  { hora: '09:00 - 11:00', materia: 'POO', instructor: 'Carmen López', aula: '102' },
-];
-
-const notificacionesRecientes = [
-  { id: '1', titulo: 'Nueva calificación en ADSO', hora: 'Hace 10 min', leida: false },
-  { id: '2', titulo: 'Recordatorio de Asistencia mañana', hora: 'Hace 2 horas', leida: true },
-];
+const proximasClases: ProximaClase[] = [];
 
 export default function AprendizHome() {
   const { width } = useWindowDimensions();
   const isDesktop = width >= 1024;
   const router = useRouter();
 
-  const [selectedClase, setSelectedClase] = useState<typeof proximasClases[0] | null>(null);
+  const [userName, setUserName] = useState('Aprendiz');
+  const [promedio, setPromedio] = useState('0.0');
+  const [asistenciaPct, setAsistenciaPct] = useState('100%');
+  const [tareasPendientes, setTareasPendientes] = useState(0);
+  const [competencias, setCompetencias] = useState<Array<{ nombre: string; nota: number; max: number }>>([]);
+  const [loading, setLoading] = useState(true);
+
+  const [selectedClase, setSelectedClase] = useState<ProximaClase | null>(null);
   const [claseModalVisible, setClaseModalVisible] = useState(false);
 
-  const [selectedNotif, setSelectedNotif] = useState<typeof notificacionesRecientes[0] | null>(null);
-  const [notifModalVisible, setNotifModalVisible] = useState(false);
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
 
-  const handleOpenClase = (clase: typeof proximasClases[0]) => {
-    setSelectedClase(clase);
-    setClaseModalVisible(true);
+  const loadDashboardData = async () => {
+    setLoading(true);
+    try {
+      // 1. Obtener usuario de la sesión
+      const { user } = await authService.checkSession();
+      if (user) {
+        const full = (user as any).firstName
+          ? `${(user as any).firstName} ${(user as any).lastName || ''}`.trim()
+          : user.nombre || 'Aprendiz';
+        setUserName(full);
+      }
+
+      // 2. Cargar calificaciones, evidencias y asistencias en paralelo
+      const [grades, evidencias, asistencias] = await Promise.all([
+        calificacionesService.getMisCalificaciones(),
+        evidenciasService.getMisEvidencias(),
+        asistenciaService.getMisAsistencias(),
+      ]);
+
+      // Métricas de calificaciones unificadas con evidencias evaluadas
+      const allScores: { nombre: string; nota: number }[] = [];
+      grades.forEach((g) => {
+        allScores.push({
+          nombre: g.actividad || g.moduloNombre || 'Competencia Formativa',
+          nota: g.nota,
+        });
+      });
+
+      // Incluir también evidencias evaluadas que puedan no estar en calificaciones directas
+      evidencias.forEach((ev) => {
+        if (ev.entrega && ev.entrega.nota !== undefined && ev.entrega.nota !== null) {
+          const exists = allScores.some(
+            (s) => s.nombre.toLowerCase().trim() === ev.titulo.toLowerCase().trim()
+          );
+          if (!exists) {
+            allScores.push({
+              nombre: ev.titulo,
+              nota: Number(ev.entrega.nota),
+            });
+          }
+        }
+      });
+
+      if (allScores.length > 0) {
+        const avg = (allScores.reduce((s, g) => s + g.nota, 0) / allScores.length).toFixed(1);
+        setPromedio(avg);
+        setCompetencias(
+          allScores.slice(0, 5).map((g) => ({
+            nombre: g.nombre,
+            nota: g.nota,
+            max: 5,
+          }))
+        );
+      } else {
+        setPromedio('0.0');
+        setCompetencias([]);
+      }
+
+      // Métricas de tareas pendientes
+      const pending = evidencias.filter((e) => e.estado === 'Pendiente').length;
+      setTareasPendientes(pending);
+
+      // Métricas de asistencia
+      if (asistencias.length > 0) {
+        const attended = asistencias.filter((a) => a.estado === 'PRESENTE' || (a.estado as any) === 'EXCUSADO').length;
+        const pct = Math.round((attended / asistencias.length) * 100);
+        setAsistenciaPct(`${pct}%`);
+      } else {
+        setAsistenciaPct('100%');
+      }
+    } catch (e) {
+      console.error('Error cargando dashboard de aprendiz:', e);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleOpenNotif = (notif: typeof notificacionesRecientes[0]) => {
-    setSelectedNotif(notif);
-    setNotifModalVisible(true);
+  const statCards = [
+    { label: 'PROMEDIO', value: promedio, highlight: true, icon: 'star-outline', route: '/aprendiz/calificaciones' },
+    { label: 'ASISTENCIA', value: asistenciaPct, highlight: true, icon: 'checkmark-circle-outline', route: '/aprendiz/asistencia' },
+    { label: 'TAREAS', value: String(tareasPendientes), highlight: true, icon: 'clipboard-outline', route: '/aprendiz/tareas' },
+    { label: 'MATERIAS', value: String(competencias.length), highlight: false, icon: 'book-outline', route: '/aprendiz/horario' },
+  ];
+
+  const handleOpenClase = (clase: ProximaClase) => {
+    setSelectedClase(clase);
+    setClaseModalVisible(true);
   };
 
   const pad = isDesktop ? 28 : 16;
@@ -59,16 +135,15 @@ export default function AprendizHome() {
       {/* Header greeting + bell */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.greeting}>Bienvenida,</Text>
-          <Text style={styles.name}>Maria Torres</Text>
+          <Text style={styles.greeting}>Bienvenido(a),</Text>
+          <Text style={styles.name}>{userName}</Text>
         </View>
         <View style={styles.headerActions}>
           <Pressable
-            style={({ hovered }: any) => [styles.bellWrap, hovered && styles.bellWrapHover]}
+            style={styles.bellBtn}
             onPress={() => router.push('/aprendiz/notificaciones' as any)}
           >
             <Ionicons name="notifications-outline" size={22} color={NAVY} />
-            <View style={styles.bellBadge} />
           </Pressable>
         </View>
       </View>
@@ -97,25 +172,33 @@ export default function AprendizHome() {
       {/* Mis Competencias */}
       <View style={styles.section}>
         <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionLabel}>MIS COMPETENCIAS</Text>
+          <Text style={styles.sectionLabel}>MIS COMPETENCIAS ({competencias.length})</Text>
           <Pressable onPress={() => router.push('/aprendiz/calificaciones' as any)}>
             <Text style={styles.sectionLink}>Ver todo →</Text>
           </Pressable>
         </View>
 
-        {competencias.map((comp, i) => (
-          <Pressable
-            key={i}
-            style={({ hovered }: any) => [styles.compRow, hovered && styles.compRowHover]}
-            onPress={() => router.push('/aprendiz/calificaciones' as any)}
-          >
-            <Text style={styles.compNombre}>{comp.nombre}</Text>
-            <View style={styles.barBg}>
-              <View style={[styles.barFill, { width: `${(comp.nota / comp.max) * 100}%` as any }]} />
-            </View>
-            <Text style={styles.compNota}>{comp.nota.toFixed(1)}</Text>
-          </Pressable>
-        ))}
+        {loading ? (
+          <ActivityIndicator size="small" color={GOLD} style={{ padding: 10 }} />
+        ) : competencias.length === 0 ? (
+          <Text style={{ color: '#64748B', fontSize: 13, paddingVertical: 8 }}>
+            No hay competencias ni calificaciones registradas aún.
+          </Text>
+        ) : (
+          competencias.map((comp, i) => (
+            <Pressable
+              key={i}
+              style={({ hovered }: any) => [styles.compRow, hovered && styles.compRowHover]}
+              onPress={() => router.push('/aprendiz/calificaciones' as any)}
+            >
+              <Text style={styles.compNombre} numberOfLines={1}>{comp.nombre}</Text>
+              <View style={styles.barBg}>
+                <View style={[styles.barFill, { width: `${(comp.nota / comp.max) * 100}%` as any }]} />
+              </View>
+              <Text style={styles.compNota}>{comp.nota.toFixed(1)}</Text>
+            </Pressable>
+          ))
+        )}
       </View>
 
       {/* Próximas clases */}
@@ -126,51 +209,30 @@ export default function AprendizHome() {
             <Text style={styles.sectionLink}>Ver horario →</Text>
           </Pressable>
         </View>
-        {proximasClases.map((clase, i) => (
-          <Pressable
-            key={i}
-            style={({ hovered }: any) => [styles.claseRow, hovered && styles.claseRowHover]}
-            onPress={() => handleOpenClase(clase)}
-          >
-            <View style={styles.claseTimeBadge}>
-              <Ionicons name="time-outline" size={14} color={GOLD} />
-              <Text style={styles.claseTimeText}>{clase.hora}</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.claseMateriaText}>{clase.materia}</Text>
-              <Text style={styles.claseInfoText}>Aula {clase.aula} • {clase.instructor}</Text>
-            </View>
-            <Ionicons name="chevron-forward-outline" size={18} color="#94A3B8" />
-          </Pressable>
-        ))}
-      </View>
-
-      {/* Notificaciones recientes */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionLabel}>NOTIFICACIONES RECIENTES</Text>
-          <Pressable onPress={() => router.push('/aprendiz/notificaciones' as any)}>
-            <Text style={styles.sectionLink}>Ver todas →</Text>
-          </Pressable>
-        </View>
-        {notificacionesRecientes.map((notif, i) => (
-          <Pressable
-            key={i}
-            style={({ hovered }: any) => [
-              styles.notifRow,
-              !notif.leida && styles.notifRowUnread,
-              hovered && styles.notifRowHover,
-            ]}
-            onPress={() => handleOpenNotif(notif)}
-          >
-            <View style={[styles.notifDot, !notif.leida && styles.notifDotActive]} />
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.notifTitle, !notif.leida && styles.notifTitleBold]}>{notif.titulo}</Text>
-              <Text style={styles.notifTime}>{notif.hora}</Text>
-            </View>
-            <Ionicons name="chevron-forward-outline" size={18} color="#94A3B8" />
-          </Pressable>
-        ))}
+        {proximasClases.length === 0 ? (
+          <View style={{ paddingVertical: 18, alignItems: 'center' }}>
+            <Ionicons name="calendar-outline" size={32} color="#94A3B8" style={{ marginBottom: 6 }} />
+            <Text style={{ color: '#64748B', fontSize: 13 }}>No tienes clases programadas para hoy.</Text>
+          </View>
+        ) : (
+          proximasClases.map((clase, i) => (
+            <Pressable
+              key={i}
+              style={({ hovered }: any) => [styles.claseRow, hovered && styles.claseRowHover]}
+              onPress={() => handleOpenClase(clase)}
+            >
+              <View style={styles.claseTimeBadge}>
+                <Ionicons name="time-outline" size={14} color={GOLD} />
+                <Text style={styles.claseTimeText}>{clase.hora}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.claseMateriaText}>{clase.materia}</Text>
+                <Text style={styles.claseInfoText}>Aula {clase.aula} • {clase.instructor}</Text>
+              </View>
+              <Ionicons name="chevron-forward-outline" size={18} color="#94A3B8" />
+            </Pressable>
+          ))
+        )}
       </View>
 
       {/* Clase Modal */}
@@ -181,28 +243,12 @@ export default function AprendizHome() {
           title="Detalle de Clase"
           subtitle={selectedClase.materia}
           iconName="calendar-outline"
-          confirmText="Ir al horario completo"
+          confirmText="Cerrar detalle"
           fields={[
             { label: 'Competencia', placeholder: selectedClase.materia },
             { label: 'Instructor', placeholder: selectedClase.instructor },
             { label: 'Horario', placeholder: selectedClase.hora },
             { label: 'Aula', placeholder: selectedClase.aula },
-          ]}
-        />
-      )}
-
-      {/* Notif Modal */}
-      {selectedNotif && (
-        <ActionModal
-          visible={notifModalVisible}
-          onClose={() => setNotifModalVisible(false)}
-          title={selectedNotif.titulo}
-          subtitle={selectedNotif.hora}
-          iconName="notifications-outline"
-          confirmText="Entendido"
-          fields={[
-            { label: 'Notificación', placeholder: selectedNotif.titulo },
-            { label: 'Recibida', placeholder: selectedNotif.hora },
           ]}
         />
       )}
@@ -273,10 +319,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
     marginBottom: 20,
-    flexWrap: 'nowrap',
+    flexWrap: 'wrap',
   },
   statCard: {
     flex: 1,
+    minWidth: 130,
     backgroundColor: '#FFFFFF',
     borderRadius: 14,
     paddingVertical: 14,
@@ -290,7 +337,8 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
   },
   statCardMobile: {
-    flex: 1,
+    minWidth: '46%',
+    flexGrow: 1,
   },
   statCardHover: {
     borderColor: GOLD,

@@ -1,15 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   Pressable,
-
   useWindowDimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ActionModal from '../../components/ActionModal';
+import { comunicadosService } from '../../services/comunicadosService';
+import { authService } from '../../services/authService';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
 
 const NAVY = '#12103C';
 const GOLD = '#cfa235';
@@ -20,52 +24,91 @@ interface NotificacionItem {
   mensaje: string;
   hora: string;
   leida: boolean;
-  categoria: 'Académica' | 'Anuncio' | 'Asistencia';
+  categoria: 'Académica' | 'Anuncio' | 'Asistencia' | 'Horario';
 }
-
-const NOTIFICACIONES: NotificacionItem[] = [
-  {
-    id: '1',
-    titulo: 'Nueva calificación cargada en ADSO',
-    mensaje: 'El instructor Roberto Vargas ha publicado la nota del Proyecto Final Sprint 3.',
-    hora: 'Hace 10 min',
-    leida: false,
-    categoria: 'Académica',
-  },
-  {
-    id: '2',
-    titulo: 'Recordatorio de Asistencia',
-    mensaje: 'Recuerda registrar tu asistencia en la jornada de mañana a las 7:00 AM.',
-    hora: 'Hace 2 horas',
-    leida: false,
-    categoria: 'Asistencia',
-  },
-  {
-    id: '3',
-    titulo: 'Jornada Institucional de Innovación',
-    mensaje: 'Coordinación invita a la feria tecnológica SENA en el auditorio principal.',
-    hora: 'Ayer',
-    leida: true,
-    categoria: 'Anuncio',
-  },
-];
 
 export default function NotificacionesAprendizScreen() {
   const { width } = useWindowDimensions();
   const isDesktop = width >= 1024;
 
-  const [items, setItems] = useState<NotificacionItem[]>(NOTIFICACIONES);
+  const [items, setItems] = useState<NotificacionItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedNotif, setSelectedNotif] = useState<NotificacionItem | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
+  useEffect(() => {
+    loadNotificaciones();
+  }, []);
+
+  const loadNotificaciones = async () => {
+    setLoading(true);
+    try {
+      let notifs: NotificacionItem[] = [];
+      try {
+        const res = await authService.fetchWithAuth(`${API_BASE_URL}/notificaciones`);
+        const json = await res.json();
+        if (json.data && Array.isArray(json.data.notificaciones)) {
+          notifs = json.data.notificaciones.map((n: any) => ({
+            id: n.id,
+            titulo: n.titulo || 'Notificación',
+            mensaje: n.mensaje || '',
+            hora: n.createdAt
+              ? new Date(n.createdAt).toLocaleDateString('es-CO', {
+                  month: 'short',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })
+              : 'Reciente',
+            leida: !!n.leida,
+            categoria:
+              n.tipo === 'HORARIO'
+                ? 'Horario'
+                : n.tipo === 'CALIFICACION'
+                ? 'Académica'
+                : n.tipo === 'ASISTENCIA'
+                ? 'Asistencia'
+                : 'Anuncio',
+          }));
+        }
+      } catch {}
+
+      try {
+        const data = await comunicadosService.getComunicados();
+        const mapped: NotificacionItem[] = data.map((item: any) => ({
+          id: item.id,
+          titulo: item.titulo || 'Comunicado Institucional',
+          mensaje: item.mensaje || '',
+          hora: item.fecha ? new Date(item.fecha).toLocaleDateString('es-CO') : 'Reciente',
+          leida: item.leidos ? item.leidos > 0 : false,
+          categoria: item.destinatario?.includes('ASISTENCIA')
+            ? 'Asistencia'
+            : item.destinatario?.includes('ACADEMICO')
+            ? 'Académica'
+            : 'Anuncio',
+        }));
+        notifs = [...notifs, ...mapped];
+      } catch {}
+
+      setItems(notifs);
+    } catch {
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleMarkAllRead = () => {
     setItems(items.map((i) => ({ ...i, leida: true })));
+    authService.fetchWithAuth(`${API_BASE_URL}/notificaciones/read-all`, { method: 'PATCH' }).catch(() => {});
   };
 
   const handleOpenNotif = (notif: NotificacionItem) => {
     setSelectedNotif(notif);
     setModalVisible(true);
     setItems(items.map((i) => (i.id === notif.id ? { ...i, leida: true } : i)));
+    authService.fetchWithAuth(`${API_BASE_URL}/notificaciones/${notif.id}/read`, { method: 'PATCH' }).catch(() => {});
+    comunicadosService.marcarLeido(notif.id).catch(() => {});
   };
 
   const pad = isDesktop ? 24 : 14;
@@ -89,41 +132,54 @@ export default function NotificacionesAprendizScreen() {
       </View>
 
       {/* Notifications List */}
-      <View style={styles.listContainer}>
-        {items.map((item) => (
-          <Pressable
-            key={item.id}
-            style={({ hovered }: any) => [
-              styles.notifCard,
-              !item.leida && styles.notifCardUnread,
-              hovered && styles.notifCardHover,
-            ]}
-            onPress={() => handleOpenNotif(item)}
-          >
-            <View style={styles.iconCircle}>
-              <Ionicons
-                name={
-                  item.categoria === 'Académica'
-                    ? 'school-outline'
-                    : item.categoria === 'Asistencia'
-                    ? 'checkmark-circle-outline'
-                    : 'megaphone-outline'
-                }
-                size={22}
-                color={GOLD}
-              />
-            </View>
-
-            <View style={styles.textContainer}>
-              <View style={styles.titleRow}>
-                <Text style={styles.notifTitle}>{item.titulo}</Text>
-                <Text style={styles.notifTime}>{item.hora}</Text>
+      {loading ? (
+        <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={GOLD} />
+          <Text style={{ marginTop: 12, color: '#64748B', fontSize: 14 }}>Cargando notificaciones...</Text>
+        </View>
+      ) : items.length === 0 ? (
+        <View style={styles.emptyCard}>
+          <Ionicons name="notifications-off-outline" size={48} color="#94A3B8" />
+          <Text style={styles.emptyTitle}>Sin notificaciones nuevas</Text>
+          <Text style={styles.emptySubtext}>Estás al día con todos tus comunicados y avisos institucionales.</Text>
+        </View>
+      ) : (
+        <View style={styles.listContainer}>
+          {items.map((item) => (
+            <Pressable
+              key={item.id}
+              style={({ hovered }: any) => [
+                styles.notifCard,
+                !item.leida && styles.notifCardUnread,
+                hovered && styles.notifCardHover,
+              ]}
+              onPress={() => handleOpenNotif(item)}
+            >
+              <View style={styles.iconCircle}>
+                <Ionicons
+                  name={
+                    item.categoria === 'Académica'
+                      ? 'school-outline'
+                      : item.categoria === 'Asistencia'
+                      ? 'checkmark-circle-outline'
+                      : 'megaphone-outline'
+                  }
+                  size={22}
+                  color={GOLD}
+                />
               </View>
-              <Text style={styles.notifBody}>{item.mensaje}</Text>
-            </View>
-          </Pressable>
-        ))}
-      </View>
+
+              <View style={styles.textContainer}>
+                <View style={styles.titleRow}>
+                  <Text style={styles.notifTitle}>{item.titulo}</Text>
+                  <Text style={styles.notifTime}>{item.hora}</Text>
+                </View>
+                <Text style={styles.notifBody}>{item.mensaje}</Text>
+              </View>
+            </Pressable>
+          ))}
+        </View>
+      )}
 
       {/* Action Modal */}
       {selectedNotif && (
@@ -238,6 +294,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#475569',
     lineHeight: 20,
+  },
+  emptyCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 36,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#D0D8E4',
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: NAVY,
+    marginTop: 12,
+  },
+  emptySubtext: {
+    fontSize: 13,
+    color: '#64748B',
+    marginTop: 4,
+    textAlign: 'center',
   },
 });
 

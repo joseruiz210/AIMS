@@ -1,17 +1,40 @@
 import { saveToken, getToken, removeToken, saveUserData, getUserData, removeUserData } from '../utils/storage';
-import { validatePassword, validateEmail, verifyEmailDomainExistence } from '../utils/validation';
+import { validatePassword, verifyEmailDomainExistence } from '../utils/validation';
 
 export interface User {
   id: string;
   nombre: string;
   correo: string;
-  role: 'ADMIN' | 'INSTRUCTOR' | 'APRENDIZ';
+  role: 'SUPERADMIN' | 'ADMIN' | 'INSTRUCTOR' | 'APRENDIZ';
 }
 export interface AuthResponse {
   success: boolean;
   token?: string;
   user?: User;
   message?: string;
+}
+
+export interface LoginCredentials {
+  correo: string;
+  contrasenia: string;
+}
+
+export interface RegisterData {
+  nombre: string;
+  correo: string;
+  contrasenia: string;
+  confirmContrasenia: string;
+  role: 'INSTRUCTOR' | 'APRENDIZ';
+  tipoDocumento?: string;
+  documento?: string;
+  ficha?: string;
+  programa?: string;
+  academicData?: {
+    fichaId?: string;
+    fichaNumero?: string;
+    sede?: string;
+    trimestre?: number;
+  };
 }
 
 // Configuración de URL base para la API Backend
@@ -24,7 +47,7 @@ export const authService = {
   /**
    * Iniciar sesión de usuario y obtener JWT
    */
-  async login(correo: string, contrasenia: string): Promise<AuthResponse> {
+  async login({ correo, contrasenia }: LoginCredentials): Promise<AuthResponse> {
     const emailCheck = await verifyEmailDomainExistence(correo);
     if (!emailCheck.isValidFormat || !emailCheck.isNotDisposable || !emailCheck.domainExists) {
       return { success: false, message: emailCheck.message };
@@ -56,18 +79,18 @@ export const authService = {
   /**
    * Registrar nuevo usuario con validación de contraseña y datos académicos opcionales (Ficha, Sede, Trimestre)
    */
-  async register(
-    nombre: string,
-    correo: string,
-    contrasenia: string,
-    confirmContrasenia: string,
-    academicData?: {
-      fichaId?: string;
-      fichaNumero?: string;
-      sede?: string;
-      trimestre?: number;
-    }
-  ): Promise<AuthResponse> {
+  async register({
+    nombre,
+    correo,
+    contrasenia,
+    confirmContrasenia,
+    role,
+    tipoDocumento,
+    documento,
+    ficha,
+    programa,
+    academicData,
+  }: RegisterData): Promise<AuthResponse> {
     if (!nombre.trim()) {
       return { success: false, message: 'El nombre completo es requerido.' };
     }
@@ -99,6 +122,18 @@ export const authService = {
         email: correo,
         password: contrasenia,
       };
+
+      if (role) payload.role = role;
+      if (tipoDocumento) payload.documentType = tipoDocumento;
+      if (documento) payload.documentNumber = documento;
+      if (ficha) {
+        payload.fichaId = ficha;
+        payload.ficha = ficha;
+      }
+      if (programa) {
+        payload.programaId = programa;
+        payload.programa = programa;
+      }
 
       if (academicData) {
         if (academicData.fichaId) payload.fichaId = academicData.fichaId;
@@ -153,17 +188,10 @@ export const authService = {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
 
-    const response = await fetch(url, {
+    return fetch(url, {
       ...options,
       headers,
     });
-
-    if (response.status === 401) {
-      await removeToken();
-      await removeUserData();
-    }
-
-    return response;
   },
 
   /**
@@ -290,7 +318,11 @@ async googleLogin(idToken: string): Promise<AuthResponse> {
   } catch (error: any) {
     return { success: false, message: error.message || 'Error de conexión con el servidor.' };
   }
+<<<<<<< HEAD
 },
+=======
+  },
+>>>>>>> a2470226edae0863cccfdcd982557dbbef0a094e
 
   /**
    * Actualizar Expo Push Token para notificaciones móviles
@@ -311,6 +343,56 @@ async googleLogin(idToken: string): Promise<AuthResponse> {
       return response.ok;
     } catch {
       return false;
+    }
+  },
+
+  /**
+   * Obtener perfil del usuario autenticado directamente desde PostgreSQL
+   */
+  async getProfile(): Promise<{ success: boolean; user?: any; message?: string }> {
+    try {
+      const response = await this.fetchWithAuth(`${API_BASE_URL}/users/profile`);
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, message: data.message || 'Error al obtener perfil' };
+      }
+      return { success: true, user: data.data };
+    } catch (error: any) {
+      return { success: false, message: error.message || 'Error de conexión con el servidor.' };
+    }
+  },
+
+  /**
+   * Actualizar datos básicos de perfil (nombre, apellido, teléfono, documento)
+   */
+  async updateProfile(profileData: {
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    documentType?: string;
+    documentNumber?: string;
+  }): Promise<{ success: boolean; user?: any; message?: string }> {
+    try {
+      const response = await this.fetchWithAuth(`${API_BASE_URL}/users/profile`, {
+        method: 'PUT',
+        body: JSON.stringify(profileData),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, message: data.message || 'Error al actualizar perfil' };
+      }
+      if (data.data) {
+        const current = await getUserData();
+        const updatedUser = {
+          ...current,
+          ...data.data,
+          nombre: `${data.data.firstName || ''} ${data.data.lastName || ''}`.trim() || current?.nombre,
+        };
+        await saveUserData(updatedUser);
+      }
+      return { success: true, user: data.data, message: data.message || 'Perfil actualizado exitosamente' };
+    } catch (error: any) {
+      return { success: false, message: error.message || 'Error de conexión con el servidor.' };
     }
   },
 };

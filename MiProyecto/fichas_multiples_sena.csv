@@ -1,0 +1,14 @@
+tipoDocumento,numeroDocumento,nombres,apellidos,correo,ficha,programa
+CC,1001002001,Carlos Eduardo,Perez Gomez,carlosperez@gmail.com,2845670,Análisis y Desarrollo de Software
+CC,1001002002,Maria Alejandra,Gomez Sanchez,mariagomez@gmail.com,2845670,Análisis y Desarrollo de Software
+TI,1001002003,Juan David,Rodriguez Lopez,juanrodriguez@gmail.com,2845670,Análisis y Desarrollo de Software
+CC,1001003001,Ana Sofia,Ramirez Castro,anaramirez@gmail.com,2845671,Redes y Telecomunicaciones
+CC,1001003002,Diego Fernando,Torres Morales,diegotorres@gmail.com,2845671,Redes y Telecomunicaciones
+TI,1001004001,Laura Vanessa,Martinez Ortiz,lauramartinez@gmail.com,2845672,Sistemas de Información
+CC,1001004002,Andres Felipe,Lopez Herrera,andreslopez@gmail.com,2845672,Sistemas de Información
+CC,1001005001,Camilo Andres,Rios Mendoza,camilorios@gmail.com,2845673,Ciberseguridad y Datos
+TI,1001005002,Valentina,Gutierrez Silva,valentinagutierrez@gmail.com,2845673,Ciberseguridad y Datos
+CC,1001006001,Mateo,Jaramillo Ospina,mateojaramillo@gmail.com,2845674,Inteligencia Artificial
+CC,1001006002,Isabella,Vargas Ruiz,isabellavargas@gmail.com,2845674,Inteligencia Artificial
+TI,1001007001,Santiago,Zapata Londono,santiagozapata@gmail.com,2845675,Diseño y Desarrollo Web
+CC,1001007002,Daniela,Cardona Mejia,danielacardona@gmail.com,2845675,Diseño y Desarrollo Web

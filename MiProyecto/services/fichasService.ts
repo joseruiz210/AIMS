@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import { authService } from './authService';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
@@ -16,22 +17,35 @@ export interface Ficha {
 }
 
 export const fichasService = {
-  async getFichas(params: { search?: string } = {}): Promise<Ficha[]> {
+  async getFichas(params: { search?: string; publicOnly?: boolean } = {}): Promise<Ficha[]> {
     try {
       const query = params.search ? `?search=${encodeURIComponent(params.search)}` : '';
-      const response = await authService.fetchWithAuth(`${API_BASE_URL}/fichas${query}`);
+      let response: Response | null = null;
+      if (!params.publicOnly) {
+        try {
+          const authRes = await authService.fetchWithAuth(`${API_BASE_URL}/fichas${query}`);
+          if (authRes.ok) {
+            response = authRes;
+          }
+        } catch {
+          // Fallback if not authenticated
+        }
+      }
+      if (!response || !response.ok) {
+        response = await fetch(`${API_BASE_URL}/fichas/public${query}`);
+      }
       const data = await response.json();
       if (!response.ok || !data.data || data.data.length === 0) {
         return [];
       }
       return data.data.map((item: any) => ({
         id: item.id || item.codigo,
-        codigo: item.codigo || item.numero || 'N/A',
-        numero: item.numero || item.codigo || '2845670',
+        codigo: item.badgeCode || item.codigo || item.numero || 'N/A',
+        numero: item.numero || item.codigo || '',
         programaNombre: item.programa?.nombre || item.programaTitle || 'Programa Formación',
         instructorNombre: item.instructor ? `${item.instructor.firstName} ${item.instructor.lastName}` : (item.instructorNombre || 'Sin asignar'),
         jornada: item.jornada || item.shift || 'Jornada Mañana',
-        aprendicesCount: item.aprendicesCount ?? (item._count?.matriculas || 0),
+        aprendicesCount: item.aprendicesCount ?? (item._count?.matriculas ?? 0),
         estado: item.estado || item.status || 'Activo',
       }));
     } catch {
@@ -77,5 +91,84 @@ export const fichasService = {
     const data = await response.json();
     if (!response.ok) throw new Error(data.message || 'Error al eliminar ficha');
     return true;
+  },
+
+  async importAprendices(fichaId: string, file: File | Blob | any) {
+    const formData = new FormData();
+    if (file.uri && Platform.OS !== 'web') {
+      formData.append('archivo', {
+        uri: file.uri,
+        name: file.name || 'aprendices.csv',
+        type: file.type || 'text/csv',
+      } as any);
+    } else {
+      formData.append('archivo', file);
+    }
+
+    const { token } = await authService.checkSession();
+    const response = await fetch(`${API_BASE_URL}/fichas/${fichaId}/aprendices/carga`, {
+      method: 'POST',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: formData,
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      const errorMsg = data.errors && data.errors.length ? data.errors.join('\n') : (data.message || 'Error al cargar archivo');
+      throw new Error(errorMsg);
+    }
+    return data.data;
+  },
+
+  async importAprendicesGeneral(file: File | Blob | any) {
+    const formData = new FormData();
+    if (file.uri && Platform.OS !== 'web') {
+      formData.append('archivo', {
+        uri: file.uri,
+        name: file.name || 'aprendices.csv',
+        type: file.type || 'text/csv',
+      } as any);
+    } else {
+      formData.append('archivo', file);
+    }
+
+    const { token } = await authService.checkSession();
+    const response = await fetch(`${API_BASE_URL}/fichas/carga`, {
+      method: 'POST',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: formData,
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      const errorMsg = data.errors && data.errors.length ? data.errors.join('\n') : (data.message || 'Error al cargar archivo');
+      throw new Error(errorMsg);
+    }
+    return data.data;
+  },
+
+  async getInstructores(): Promise<any[]> {
+    try {
+      const response = await authService.fetchWithAuth(`${API_BASE_URL}/users?role=INSTRUCTOR`);
+      const data = await response.json();
+      if (!response.ok || !data.data) return [];
+      return Array.isArray(data.data) ? data.data : (data.data.users || []);
+    } catch {
+      return [];
+    }
+  },
+
+  async assignInstructor(fichaId: string, instructorId: string, isLeader: boolean = true) {
+    const response = await authService.fetchWithAuth(`${API_BASE_URL}/fichas/${fichaId}/instructores`, {
+      method: 'POST',
+      body: JSON.stringify({ instructorId, isLeader }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Error al asignar instructor');
+    return data.data;
   }
 };

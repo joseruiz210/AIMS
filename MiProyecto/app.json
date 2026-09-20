@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "MiProyecto",
-    "slug": "MiProyecto",
+    "name": "AIMS",
+    "slug": "aims",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -12,9 +12,10 @@
       "supportsTablet": true
     },
     "android": {
-        "package": "com.miproyecto.aims",
+      "package": "com.sena.aims",
+      "versionCode": 1,
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#0F1026",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -49,6 +50,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "64c410fe-19f6-47bd-9837-a66bb8d3ce23"
+      }
     }
   }
 }

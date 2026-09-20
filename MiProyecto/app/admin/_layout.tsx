@@ -23,12 +23,13 @@ const GOLD_LIGHT = 'rgba(212, 175, 55, 0.15)';
 const menuItems = [
   { name: 'Inicio', path: '/admin', icon: 'home-outline' as const },
   { name: 'Usuarios', path: '/admin/usuarios', icon: 'people-outline' as const },
-  { name: 'Programas', path: '/admin/programas', icon: 'grid-outline' as const },
   { name: 'Fichas', path: '/admin/fichas', icon: 'folder-open-outline' as const },
-  { name: 'Aprendices', path: '/admin/aprendices', icon: 'school-outline' as const },
+  { name: 'Horarios', path: '/admin/horarios', icon: 'time-outline' as const },
   { name: 'Instructores', path: '/admin/instructores', icon: 'briefcase-outline' as const },
-  { name: 'Matrículas', path: '/admin/matriculas', icon: 'document-text-outline' as const },
-  { name: 'Asistencia', path: '/admin/asistencia', icon: 'checkbox-outline' as const },
+  { name: 'Aprendices', path: '/admin/aprendices', icon: 'school-outline' as const },
+  { name: 'Matrículas', path: '/admin/matriculas', icon: 'id-card-outline' as const },
+  { name: 'Programas', path: '/admin/programas', icon: 'library-outline' as const },
+  { name: 'Asistencia', path: '/admin/asistencia', icon: 'calendar-outline' as const },
   { name: 'Calificaciones', path: '/admin/calificaciones', icon: 'bar-chart-outline' as const },
   { name: 'Comunicación', path: '/admin/comunicacion', icon: 'chatbubbles-outline' as const },
   { name: 'Reportes', path: '/admin/reportes', icon: 'document-text-outline' as const },
@@ -38,18 +39,22 @@ const menuItems = [
 const bottomNavItems = [
   { name: 'Inicio', path: '/admin', icon: 'home-outline' as const },
   { name: 'Usuarios', path: '/admin/usuarios', icon: 'people-outline' as const },
+  { name: 'Fichas', path: '/admin/fichas', icon: 'folder-open-outline' as const },
+  { name: 'Horarios', path: '/admin/horarios', icon: 'time-outline' as const },
+  { name: 'Calificaciones', path: '/admin/calificaciones', icon: 'bar-chart-outline' as const },
   { name: 'Reportes', path: '/admin/reportes', icon: 'document-text-outline' as const },
-  { name: 'Config', path: '/admin/configuracion', icon: 'settings-outline' as const },
 ];
 
 function SidebarContent({
   pathname,
   router,
+  role,
   onClose,
   onLogout,
 }: {
   pathname: string;
   router: any;
+  role?: string;
   onClose?: () => void;
   onLogout: () => void;
 }) {
@@ -100,12 +105,12 @@ function SidebarContent({
         <View style={styles.logoWrapper}>
           <Image
             source={require('../../assets/images/logo.jpeg')}
-            style={styles.logoImage}
             resizeMode="contain"
+            style={styles.logoImage}
           />
         </View>
         <View style={styles.roleBadge}>
-          <Text style={styles.roleSubtitle}>Administrador</Text>
+          <Text style={styles.roleSubtitle}>{role === 'SUPERADMIN' ? 'Superadmin' : 'Administrador'}</Text>
         </View>
       </View>
 
@@ -150,12 +155,12 @@ export default function AdminLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
-    if (!isLoading && user && user.role !== 'ADMIN') {
+    if (!isLoading && user && user.role !== 'ADMIN' && user.role !== 'SUPERADMIN') {
       router.replace('/');
     }
   }, [isLoading, router, user]);
 
-  if (isLoading || (user && user.role !== 'ADMIN')) {
+  if (isLoading || (user && user.role !== 'ADMIN' && user.role !== 'SUPERADMIN')) {
     return <View style={styles.container} />;
   }
 
@@ -168,14 +173,7 @@ export default function AdminLayout() {
             <Ionicons name="menu" size={26} color={NAVY} />
           </Pressable>
           <Text style={styles.mobileHeaderTitle}>AIMS</Text>
-          <View style={styles.mobileHeaderRight}>
-            <Pressable
-              style={styles.headerIconBtn}
-              onPress={() => router.push('/admin/configuracion' as any)}
-            >
-              <Ionicons name="person-circle" size={28} color={NAVY} />
-            </Pressable>
-          </View>
+          <View style={styles.mobileHeaderRight} />
         </View>
 
         {/* Content */}
@@ -231,6 +229,7 @@ export default function AdminLayout() {
               <SidebarContent
                 pathname={pathname}
                 router={router}
+                role={user?.role}
                 onClose={() => setDrawerOpen(false)}
                 onLogout={() => {
                   setDrawerOpen(false);
@@ -261,6 +260,7 @@ export default function AdminLayout() {
         <SidebarContent
           pathname={pathname}
           router={router}
+          role={user?.role}
           onLogout={() => setShowLogoutModal(true)}
         />
       </View>

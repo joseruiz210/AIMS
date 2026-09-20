@@ -1,5 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Pressable,
+  TextInput,
+  ActivityIndicator,
+  useWindowDimensions,
+  RefreshControl,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { fichasService } from '../../services/fichasService';
 
@@ -21,17 +31,15 @@ interface Apprentice {
 }
 
 export default function AprendicesScreenPremium() {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [aprendices, setAprendices] = useState<Apprentice[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedApprentice, setSelectedApprentice] = useState<Apprentice | null>(null);
 
-  useEffect(() => {
-    loadAprendices();
-  }, []);
-
-  const loadAprendices = async () => {
-    setLoading(true);
+  const loadAprendices = useCallback(async () => {
     try {
       const fichas = await fichasService.getFichas();
       const list: Apprentice[] = [];
@@ -67,10 +75,19 @@ export default function AprendicesScreenPremium() {
       }
     } catch (err) {
       console.error('Error cargando aprendices desde BD:', err);
-    } finally {
-      setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    setLoading(true);
+    loadAprendices().finally(() => setLoading(false));
+  }, [loadAprendices]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadAprendices();
+    setRefreshing(false);
+  }, [loadAprendices]);
 
   const filtered = aprendices.filter(item => {
     const q = searchQuery.toLowerCase();
@@ -80,7 +97,19 @@ export default function AprendicesScreenPremium() {
   });
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[styles.contentContainer, isMobile && { paddingHorizontal: 14, paddingVertical: 14 }]}
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={GOLD}
+          colors={[GOLD, NAVY]}
+        />
+      }
+    >
       {/* Title */}
       <View style={styles.headerRow}>
         <View>

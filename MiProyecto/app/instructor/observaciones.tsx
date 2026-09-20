@@ -1,75 +1,470 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useState, useCallback } from 'react';
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, RefreshControl, Platform, Alert } from 'react-native';
 import { fichasService } from '../../services/fichasService';
 import { ObservacionItem, observacionesService } from '../../services/observacionesService';
 
+const GOLD = '#D4AF37';
 const NAVY = '#0F1026';
-type Filter = 'TODAS' | 'ACADEMICA' | 'DISCIPLINARIA' | 'RECONOCIMIENTO';
+
+const TYPES: Array<{ label: string; value: ObservacionItem['tipo'] }> = [
+  { label: 'Académica', value: 'ACADEMICA' },
+  { label: 'Disciplinaria', value: 'DISCIPLINARIA' },
+  { label: 'Reconocimiento', value: 'RECONOCIMIENTO' },
+  { label: 'Otra', value: 'OTRO' },
+];
+
 type Apprentice = { id: string; firstName: string; lastName?: string };
 
 export default function ObservacionesScreen() {
   const [observations, setObservations] = useState<ObservacionItem[]>([]);
   const [apprentices, setApprentices] = useState<Apprentice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
+  const [selectedAprendizId, setSelectedAprendizId] = useState('');
+  const [buscarAprendiz, setBuscarAprendiz] = useState('');
+  const [tipo, setTipo] = useState<ObservacionItem['tipo']>('ACADEMICA');
+  const [materia, setMateria] = useState('');
+  const [descripcion, setDescripcion] = useState('');
   const [toast, setToast] = useState<string | null>(null);
-  const [filter, setFilter] = useState<Filter>('TODAS');
-  const [selectedApprentice, setSelectedApprentice] = useState('');
-  const [type, setType] = useState<ObservacionItem['tipo']>('ACADEMICA');
-  const [subject, setSubject] = useState('');
-  const [description, setDescription] = useState('');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const showToast = (message: string) => { setToast(message); setTimeout(() => setToast(null), 2500); };
+  useEffect(() => {
+    let isMounted = true;
+    loadData().finally(() => { if (!isMounted) return; });
+    return () => { isMounted = false; };
+  }, []);
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2500);
+  };
 
   const loadData = async () => {
     setLoading(true);
+    setErrorMsg(null);
     try {
-      const [items, fichas] = await Promise.all([observacionesService.getMisObservaciones(), fichasService.getFichas()]);
+      const [items, fichas] = await Promise.all([
+        observacionesService.getMisObservaciones(),
+        fichasService.getFichas(),
+      ]);
       setObservations(items);
       if (fichas[0]) {
         const detail = await fichasService.getFichaById(fichas[0].id);
-        const list = (detail?.matriculas || []).map((item: any) => ({ id: item.aprendiz.id, firstName: item.aprendiz.firstName, lastName: item.aprendiz.lastName }));
+        const list = (detail?.matriculas || []).map((item: any) => ({
+          id: item.aprendiz.id,
+          firstName: item.aprendiz.firstName,
+          lastName: item.aprendiz.lastName,
+        }));
         setApprentices(list);
-        if (!selectedApprentice && list[0]) setSelectedApprentice(list[0].id);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error cargando observaciones:', error);
-      showToast('No se pudieron cargar las observaciones');
-    } finally { setLoading(false); }
+      setErrorMsg(error?.message || 'No se pudieron cargar las observaciones. Verifica tu conexión.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  useEffect(() => { void loadData(); }, []);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    setErrorMsg(null);
+    try {
+      const [items, fichas] = await Promise.all([
+        observacionesService.getMisObservaciones(),
+        fichasService.getFichas(),
+      ]);
+      setObservations(items);
+      if (fichas[0]) {
+        const detail = await fichasService.getFichaById(fichas[0].id);
+        const list = (detail?.matriculas || []).map((item: any) => ({
+          id: item.aprendiz.id,
+          firstName: item.aprendiz.firstName,
+          lastName: item.aprendiz.lastName,
+        }));
+        setApprentices(list);
+      }
+    } catch (error: any) {
+      setErrorMsg(error?.message || 'No se pudieron cargar las observaciones.');
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
 
-  const addObservation = async () => {
-    if (!selectedApprentice || description.trim().length < 5) { showToast('Selecciona un aprendiz y escribe al menos 5 caracteres'); return; }
+  const createObservation = async () => {
+    if (!selectedAprendizId || !descripcion.trim()) {
+      showToast('Selecciona un aprendiz y escribe una descripción');
+      return;
+    }
     setSaving(true);
     try {
-      await observacionesService.crearObservacion({ aprendizId: selectedApprentice, tipo: type, materia: subject.trim() || undefined, descripcion: description.trim() });
-      setModalVisible(false); setSubject(''); setDescription(''); await loadData(); showToast('Observación guardada');
-    } catch (error: any) { showToast(error?.message || 'Error al guardar'); } finally { setSaving(false); }
+      const created = await observacionesService.crearObservacion({
+        aprendizId: selectedAprendizId,
+        tipo,
+        materia: materia.trim() || undefined,
+        descripcion: descripcion.trim(),
+      });
+      setObservations(previous => [created, ...previous]);
+      setModalVisible(false);
+      setSelectedAprendizId('');
+      setMateria('');
+      setDescripcion('');
+      showToast('Observación guardada correctamente');
+    } catch (error: any) {
+      showToast(error?.message || 'No se pudo guardar la observación');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const deleteObservation = async (id: string) => {
-    try { await observacionesService.eliminarObservacion(id); setObservations((items) => items.filter((item) => item.id !== id)); showToast('Observación eliminada'); }
-    catch (error: any) { showToast(error?.message || 'Error al eliminar'); }
+  const handleDeleteObservation = (id: string) => {
+    const confirmDelete = () => {
+      observacionesService.eliminarObservacion(id)
+        .then(() => {
+          setObservations(prev => prev.filter(o => o.id !== id));
+          showToast('Observación eliminada correctamente');
+        })
+        .catch(err => {
+          showToast(err?.message || 'Error al eliminar la observación');
+        });
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm('¿Deseas eliminar esta observación pedagógica?')) {
+        confirmDelete();
+      }
+    } else {
+      Alert.alert(
+        'Eliminar Observación',
+        '¿Estás seguro de que deseas eliminar esta observación pedagógica?',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Eliminar', style: 'destructive', onPress: confirmDelete },
+        ]
+      );
+    }
   };
 
-  if (loading) return <View style={styles.loading}><ActivityIndicator size="large" color="#D4AF37" /><Text>Cargando observaciones...</Text></View>;
-  const filtered = observations.filter((item) => filter === 'TODAS' || item.tipo === filter);
+  if (loading) {
+    return <View style={styles.loading}><ActivityIndicator size="large" color={GOLD} /><Text style={styles.loadingText}>Cargando observaciones...</Text></View>;
+  }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.header}><View><Text style={styles.title}>Registro de observaciones</Text><Text style={styles.subtitle}>Anotaciones formativas y disciplinarias</Text></View><Pressable style={styles.add} onPress={() => setModalVisible(true)}><Ionicons name="add" size={18} color="#FFFFFF" /><Text style={styles.addText}>Nueva</Text></Pressable></View>
-      {toast && <Text style={styles.toast}>{toast}</Text>}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filters}>{(['TODAS', 'ACADEMICA', 'DISCIPLINARIA', 'RECONOCIMIENTO'] as Filter[]).map((item) => <Pressable key={item} style={[styles.filter, filter === item && styles.filterActive]} onPress={() => setFilter(item)}><Text style={filter === item ? styles.filterTextActive : styles.filterText}>{item}</Text></Pressable>)}</ScrollView>
-      {filtered.length === 0 ? <View style={styles.empty}><Ionicons name="chatbubble-ellipses-outline" size={44} color="#94A3B8" /><Text style={styles.cardTitle}>No hay observaciones</Text></View> : filtered.map((item) => <View key={item.id} style={styles.card}><View style={styles.cardHeader}><View style={styles.flex}><Text style={styles.cardTitle}>{item.aprendizNombre || 'Aprendiz'}</Text><Text style={styles.muted}>{item.fecha} - {item.tipo}</Text></View><Pressable onPress={() => void deleteObservation(item.id)}><Ionicons name="trash-outline" size={20} color="#B91C1C" /></Pressable></View>{item.materia && <Text style={styles.subject}>{item.materia}</Text>}<Text style={styles.description}>{item.descripcion}</Text></View>)}
-      <Modal visible={modalVisible} transparent animationType="fade" onRequestClose={() => setModalVisible(false)}><View style={styles.backdrop}><View style={styles.modal}><View style={styles.cardHeader}><Text style={styles.cardTitle}>Nueva observación</Text><Pressable onPress={() => setModalVisible(false)}><Ionicons name="close" size={22} color="#64748B" /></Pressable></View><Text style={styles.label}>Aprendiz</Text><ScrollView horizontal>{apprentices.map((item) => <Pressable key={item.id} style={[styles.chip, selectedApprentice === item.id && styles.chipActive]} onPress={() => setSelectedApprentice(item.id)}><Text>{item.firstName} {item.lastName || ''}</Text></Pressable>)}</ScrollView><Text style={styles.label}>Tipo</Text><View style={styles.types}>{(['ACADEMICA', 'DISCIPLINARIA', 'RECONOCIMIENTO'] as const).map((item) => <Pressable key={item} style={[styles.chip, type === item && styles.chipActive]} onPress={() => setType(item)}><Text>{item}</Text></Pressable>)}</View><TextInput style={styles.input} placeholder="Materia (opcional)" value={subject} onChangeText={setSubject} /><TextInput style={[styles.input, styles.textArea]} placeholder="Detalle de la observación" multiline value={description} onChangeText={setDescription} /><View style={styles.actions}><Pressable onPress={() => setModalVisible(false)} disabled={saving}><Text>Cancelar</Text></Pressable><Pressable style={styles.save} onPress={() => void addObservation()} disabled={saving}>{saving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.saveText}>Guardar</Text>}</Pressable></View></View></View></Modal>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={GOLD}
+          colors={[GOLD, NAVY]}
+        />
+      }
+    >
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.title}>Observaciones</Text>
+          <Text style={styles.subtitle}>Seguimiento académico y formativo</Text>
+        </View>
+        <Pressable style={styles.addButton} onPress={() => setModalVisible(true)}>
+          <Ionicons name="add" size={18} color="#FFFFFF" />
+          <Text style={styles.addText}>Nueva</Text>
+        </Pressable>
+      </View>
+
+      {toast && <View style={styles.toastWrap}><Ionicons name="checkmark-circle" size={16} color="#92400E" /><Text style={styles.toastText}>{toast}</Text></View>}
+
+      {errorMsg && (
+        <View style={styles.errorWrap}>
+          <Ionicons name="cloud-offline-outline" size={20} color="#DC2626" />
+          <Text style={styles.errorText}>{errorMsg}</Text>
+          <Pressable style={styles.retryBtn} onPress={loadData}>
+            <Text style={styles.retryText}>Reintentar</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {observations.length === 0 && !errorMsg ? (
+        <View style={styles.empty}>
+          <View style={styles.emptyIconWrap}>
+            <Ionicons name="document-text-outline" size={48} color={GOLD} />
+          </View>
+          <Text style={styles.emptyTitle}>Sin observaciones registradas</Text>
+          <Text style={styles.emptySubtitle}>Registra la primera observación académica o formativa de tus aprendices.</Text>
+          <Pressable style={styles.emptyAction} onPress={() => setModalVisible(true)}>
+            <Ionicons name="add-circle-outline" size={18} color="#FFFFFF" />
+            <Text style={styles.emptyActionText}>Crear primera observación</Text>
+          </Pressable>
+        </View>
+      ) : observations.map(item => (
+        <View key={item.id} style={styles.card}>
+          <View style={styles.cardTop}>
+            <Text style={styles.student}>{item.aprendizNombre || 'Aprendiz'}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <Text style={styles.date}>{item.fecha}</Text>
+              <Pressable
+                style={styles.cardDeleteBtn}
+                onPress={() => handleDeleteObservation(item.id)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="trash-outline" size={16} color="#DC2626" />
+              </Pressable>
+            </View>
+          </View>
+          <Text style={styles.type}>{item.tipo}</Text>
+          {item.materia && <Text style={styles.subject}>{item.materia}</Text>}
+          <Text style={styles.description}>{item.descripcion}</Text>
+        </View>
+      ))}
+
+      <Modal visible={modalVisible} transparent animationType="fade" onRequestClose={() => setModalVisible(false)}>
+        <View style={styles.backdrop}>
+          <View style={styles.modal}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Nueva observación</Text>
+              <Pressable onPress={() => setModalVisible(false)}>
+                <Ionicons name="close" size={22} color="#64748B" />
+              </Pressable>
+            </View>
+
+            <ScrollView style={{ maxHeight: 480 }} showsVerticalScrollIndicator={false}>
+              <Text style={styles.label}>Buscar y Seleccionar Aprendiz</Text>
+              
+              {/* Barra de búsqueda de aprendiz */}
+              <View style={styles.searchBox}>
+                <Ionicons name="search-outline" size={16} color="#64748B" style={{ marginRight: 6 }} />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Buscar por nombre o apellido..."
+                  placeholderTextColor="#94A3B8"
+                  value={buscarAprendiz}
+                  onChangeText={setBuscarAprendiz}
+                />
+                {buscarAprendiz ? (
+                  <Pressable onPress={() => setBuscarAprendiz('')}>
+                    <Ionicons name="close-circle" size={16} color="#94A3B8" />
+                  </Pressable>
+                ) : null}
+              </View>
+
+              {/* Indicador de aprendiz seleccionado */}
+              {(() => {
+                const sel = apprentices.find((a) => a.id === selectedAprendizId);
+                if (!sel) return null;
+                return (
+                  <View style={styles.selectedAprendizChip}>
+                    <Ionicons name="checkmark-circle" size={16} color="#047857" style={{ marginRight: 6 }} />
+                    <Text style={styles.selectedAprendizText}>
+                      Seleccionado: {sel.firstName} {sel.lastName || ''}
+                    </Text>
+                    <Pressable onPress={() => setSelectedAprendizId('')} style={{ marginLeft: 8 }}>
+                      <Ionicons name="close-circle-outline" size={16} color="#047857" />
+                    </Pressable>
+                  </View>
+                );
+              })()}
+
+              {/* Lista filtrada de aprendices */}
+              <View style={styles.apprenticesContainer}>
+                {apprentices
+                  .filter((a) =>
+                    `${a.firstName} ${a.lastName || ''}`
+                      .toLowerCase()
+                      .includes(buscarAprendiz.toLowerCase().trim())
+                  )
+                  .map((apprentice) => {
+                    const isSelected = selectedAprendizId === apprentice.id;
+                    return (
+                      <Pressable
+                        key={apprentice.id}
+                        style={[styles.apprenticeItem, isSelected && styles.apprenticeItemSelected]}
+                        onPress={() => setSelectedAprendizId(apprentice.id)}
+                      >
+                        <View style={[styles.apprenticeAvatar, isSelected && { backgroundColor: GOLD }]}>
+                          <Text style={[styles.apprenticeAvatarText, isSelected && { color: NAVY }]}>
+                            {apprentice.firstName.charAt(0).toUpperCase()}
+                          </Text>
+                        </View>
+                        <Text style={[styles.apprenticeName, isSelected && { fontWeight: '700', color: NAVY }]}>
+                          {apprentice.firstName} {apprentice.lastName || ''}
+                        </Text>
+                        {isSelected ? (
+                          <Ionicons name="checkmark" size={18} color="#047857" style={{ marginLeft: 'auto' }} />
+                        ) : null}
+                      </Pressable>
+                    );
+                  })}
+              </View>
+
+              <Text style={[styles.label, { marginTop: 14 }]}>Tipo de Observación</Text>
+              <View style={styles.selector}>
+                {TYPES.map((option) => (
+                  <Pressable
+                    key={option.value}
+                    style={[styles.chip, tipo === option.value && styles.chipActive]}
+                    onPress={() => setTipo(option.value)}
+                  >
+                    <Text style={tipo === option.value ? styles.chipActiveText : undefined}>
+                      {option.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              <TextInput
+                style={styles.input}
+                placeholder="Materia o competencia (opcional)"
+                placeholderTextColor="#94A3B8"
+                value={materia}
+                onChangeText={setMateria}
+              />
+
+              <TextInput
+                style={[styles.input, styles.multiline]}
+                placeholder="Descripción detallada de la observación pedagógica..."
+                placeholderTextColor="#94A3B8"
+                value={descripcion}
+                onChangeText={setDescripcion}
+                multiline
+              />
+            </ScrollView>
+
+            <View style={styles.actions}>
+              <Pressable style={styles.cancel} onPress={() => setModalVisible(false)} disabled={saving}>
+                <Text>Cancelar</Text>
+              </Pressable>
+              <Pressable style={styles.save} onPress={createObservation} disabled={saving}>
+                {saving ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.saveText}>Guardar</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' }, content: { padding: 28, paddingBottom: 48, gap: 12 }, loading: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 }, header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 16 }, title: { color: NAVY, fontSize: 25, fontWeight: '700' }, subtitle: { color: '#64748B', marginTop: 5 }, add: { flexDirection: 'row', alignItems: 'center', gap: 5, padding: 11, borderRadius: 8, backgroundColor: NAVY }, addText: { color: '#FFFFFF', fontWeight: '700' }, toast: { color: '#FFFFFF', backgroundColor: NAVY, padding: 12, borderRadius: 8 }, filters: { marginBottom: 4 }, filter: { paddingHorizontal: 13, paddingVertical: 9, borderRadius: 20, backgroundColor: '#E2E8F0', marginRight: 8 }, filterActive: { backgroundColor: NAVY }, filterText: { color: '#475569', fontSize: 12 }, filterTextActive: { color: '#FFFFFF', fontSize: 12 }, card: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 18, gap: 7 }, cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 }, cardTitle: { color: NAVY, fontSize: 16, fontWeight: '700' }, flex: { flex: 1 }, muted: { color: '#64748B', fontSize: 13 }, subject: { color: '#D4AF37', fontWeight: '600' }, description: { color: '#334155', lineHeight: 21 }, empty: { alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 12, padding: 32, gap: 10 }, backdrop: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, backgroundColor: 'rgba(0,0,0,0.45)' }, modal: { width: '100%', maxWidth: 520, backgroundColor: '#FFFFFF', borderRadius: 12, padding: 22, gap: 12 }, label: { color: NAVY, fontWeight: '600' }, types: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, chip: { paddingHorizontal: 12, paddingVertical: 9, backgroundColor: '#E2E8F0', borderRadius: 18, marginRight: 8 }, chipActive: { backgroundColor: '#D4AF37' }, input: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, padding: 12, color: NAVY }, textArea: { minHeight: 90, textAlignVertical: 'top' }, actions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, alignItems: 'center' }, save: { backgroundColor: NAVY, borderRadius: 8, paddingHorizontal: 18, paddingVertical: 12 }, saveText: { color: '#FFFFFF', fontWeight: '700' },
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  content: { padding: 28, gap: 16, paddingBottom: 40 },
+  loading: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12, backgroundColor: '#F8FAFC' },
+  loadingText: { color: '#64748B', marginTop: 8 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  title: { fontSize: 24, fontWeight: '700', color: '#0F172A' },
+  subtitle: { color: '#64748B', marginTop: 4 },
+  addButton: { flexDirection: 'row', gap: 5, alignItems: 'center', backgroundColor: NAVY, padding: 10, paddingHorizontal: 14, borderRadius: 10 },
+  addText: { color: '#FFFFFF', fontWeight: '700' },
+  toastWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FEF3C7', padding: 12, borderRadius: 10 },
+  toastText: { color: '#92400E', fontWeight: '600', flex: 1 },
+  errorWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#FEF2F2', padding: 14, borderRadius: 12, borderWidth: 1, borderColor: '#FECACA' },
+  errorText: { color: '#DC2626', flex: 1, fontSize: 13 },
+  retryBtn: { backgroundColor: '#DC2626', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
+  retryText: { color: '#FFFFFF', fontWeight: '700', fontSize: 12 },
+  empty: { alignItems: 'center', padding: 40, backgroundColor: '#FFFFFF', borderRadius: 20, gap: 10, borderWidth: 1, borderColor: '#E2E8F0' },
+  emptyIconWrap: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  emptyTitle: { color: '#0F172A', fontWeight: '700', fontSize: 17 },
+  emptySubtitle: { color: '#64748B', textAlign: 'center', lineHeight: 20, paddingHorizontal: 10 },
+  emptyAction: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: NAVY, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 10, marginTop: 6 },
+  emptyActionText: { color: '#FFFFFF', fontWeight: '700' },
+  card: { backgroundColor: '#FFFFFF', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#E2E8F0', gap: 6 },
+  cardTop: { flexDirection: 'row', justifyContent: 'space-between' },
+  student: { color: '#0F172A', fontWeight: '700' },
+  date: { color: '#94A3B8', fontSize: 12 },
+  type: { color: '#B45309', fontSize: 12, fontWeight: '700' },
+  subject: { color: '#64748B', fontSize: 12 },
+  description: { color: '#334155' },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 20 },
+  modal: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 20, maxHeight: '90%', width: '100%', maxWidth: 540, alignSelf: 'center' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14 },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: '#0F172A' },
+  label: { color: '#334155', fontWeight: '600', marginTop: 8, marginBottom: 6 },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: '#0F172A',
+    padding: 0,
+  },
+  selectedAprendizChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#86EFAC',
+    marginBottom: 8,
+  },
+  selectedAprendizText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#047857',
+    flex: 1,
+  },
+  apprenticesContainer: {
+    maxHeight: 130,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginBottom: 4,
+  },
+  apprenticeItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    backgroundColor: '#FFFFFF',
+  },
+  apprenticeItemSelected: {
+    backgroundColor: '#FEF3C7',
+  },
+  apprenticeAvatar: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#E2E8F0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  apprenticeAvatarText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  apprenticeName: {
+    fontSize: 13,
+    color: '#1E293B',
+  },
+  selector: { flexDirection: 'row', flexWrap: 'wrap' },
+  chip: { padding: 8, backgroundColor: '#F1F5F9', borderRadius: 8, marginRight: 6, marginBottom: 6 },
+  chipActive: { backgroundColor: '#FEF3C7', borderWidth: 1, borderColor: GOLD },
+  chipActiveText: { color: '#92400E', fontWeight: '600' },
+  input: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, padding: 10, marginTop: 10, color: '#0F172A' },
+  multiline: { minHeight: 90, textAlignVertical: 'top' },
+  actions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 18 },
+  cancel: { padding: 10, backgroundColor: '#F1F5F9', borderRadius: 8 },
+  save: { minWidth: 110, alignItems: 'center', padding: 10, backgroundColor: NAVY, borderRadius: 8 },
+  saveText: { color: '#FFFFFF', fontWeight: '700' },
 });

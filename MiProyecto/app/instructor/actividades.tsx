@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   TextInput,
   ActivityIndicator,
   Alert,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { evidenciasService, EvidenciaItem } from '../../services/evidenciasService';
@@ -27,6 +28,7 @@ export default function ActividadesInstructorScreen() {
   const [fichas, setFichas] = useState<Ficha[]>([]);
   const [selectedFichaId, setSelectedFichaId] = useState<string>('all');
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Modal para Crear Nueva Actividad
   const [modalCreateVisible, setModalCreateVisible] = useState(false);
@@ -39,6 +41,7 @@ export default function ActividadesInstructorScreen() {
   const [creating, setCreating] = useState(false);
   const [aiGenerating, setAiGenerating] = useState(false);
   const [temaIa, setTemaIa] = useState('');
+  const [recursoUrl, setRecursoUrl] = useState('');
 
   // Modal para Ver Entregas de una Actividad
   const [modalEntregasVisible, setModalEntregasVisible] = useState(false);
@@ -49,28 +52,38 @@ export default function ActividadesInstructorScreen() {
   // Modal para ver feedback de una entrega específica
   const [selectedEntregaFeedback, setSelectedEntregaFeedback] = useState<any | null>(null);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    setLoading(true);
-    const [evidenciasData, fichasData] = await Promise.all([
-      evidenciasService.getEvidenciasInstructor(),
-      fichasService.getFichas(),
-    ]);
-    setEvidencias(evidenciasData);
-    setFichas(fichasData);
-    if (fichasData.length > 0 && !fichaId) {
-      setFichaId(fichasData[0].id);
+  const loadData = useCallback(async () => {
+    try {
+      const [evidenciasData, fichasData] = await Promise.all([
+        evidenciasService.getEvidenciasInstructor(),
+        fichasService.getFichas(),
+      ]);
+      setEvidencias(evidenciasData);
+      setFichas(fichasData);
+      if (fichasData.length > 0 && !fichaId) {
+        setFichaId(fichasData[0].id);
+      }
+    } catch (e) {
+      console.error('Error cargando actividades:', e);
     }
-    setLoading(false);
-  };
+  }, [fichaId]);
+
+  useEffect(() => {
+    setLoading(true);
+    loadData().finally(() => setLoading(false));
+  }, [loadData]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  }, [loadData]);
 
   const handleOpenCreateModal = () => {
     setTitulo('');
     setDescripcion('');
     setTemaIa('');
+    setRecursoUrl('');
     if (fichas.length > 0 && !fichaId) {
       setFichaId(fichas[0].id);
     }
@@ -123,6 +136,7 @@ export default function ActividadesInstructorScreen() {
         fichaId: fichaSeleccionada,
         ponderacion,
         formatoEntrega,
+        recursoUrl: recursoUrl.trim() || undefined,
       });
 
       // Recargar lista real de actividades desde la base de datos
@@ -159,7 +173,19 @@ export default function ActividadesInstructorScreen() {
   const pad = isDesktop ? 24 : 14;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { padding: pad, paddingTop: isDesktop ? 32 : 20 }]}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[styles.content, { padding: pad, paddingTop: isDesktop ? 32 : 20 }]}
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={GOLD}
+          colors={[GOLD, NAVY]}
+        />
+      }
+    >
       {/* Header Principal */}
       <View style={styles.headerRow}>
         <View style={{ flex: 1 }}>
@@ -409,6 +435,17 @@ export default function ActividadesInstructorScreen() {
                     />
                   </View>
                 </View>
+
+                {/* Enlace o recurso de apoyo (OPCIONAL) */}
+                <Text style={styles.fieldLabel}>ENLACE O MATERIAL DE APOYO (OPCIONAL)</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  value={recursoUrl}
+                  onChangeText={setRecursoUrl}
+                  placeholder="https://drive.google.com/... o enlace de material complementario"
+                  placeholderTextColor="#94A3B8"
+                  autoCapitalize="none"
+                />
               </View>
             </ScrollView>
 

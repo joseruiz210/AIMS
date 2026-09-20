@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
-  Pressable,
+  ActivityIndicator,
   useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { fichasService, Ficha } from '../../services/fichasService';
 
 const NAVY = '#12103C';
 const GOLD = '#cfa235';
@@ -21,23 +22,54 @@ interface FichaAsistencia {
   estado: 'Activo' | 'Riesgo' | 'Critico';
 }
 
-const PROGRAMAS_BARS = [
-  { name: 'ADSO', pct: 93 },
-  { name: 'AE', pct: 75 },
-  { name: 'CF', pct: 90 },
-  { name: 'DG', pct: 85 },
-];
-
-const RESUMEN_FICHAS: FichaAsistencia[] = [
-  { ficha: '123432', programa: 'ADSO', instructor: 'R. López', aprendices: 26, asistenciaPct: 91, estado: 'Activo' },
-  { ficha: '284568', programa: 'AE', instructor: 'C. López', aprendices: 24, asistenciaPct: 75, estado: 'Riesgo' },
-  { ficha: '284569', programa: 'CF', instructor: 'J. Pinzón', aprendices: 22, asistenciaPct: 90, estado: 'Activo' },
-  { ficha: '284570', programa: 'DG', instructor: 'M. Ruiz', aprendices: 20, asistenciaPct: 85, estado: 'Activo' },
-];
-
 export default function AsistenciaAdminScreen() {
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
+
+  const [loading, setLoading] = useState(true);
+  const [fichas, setFichas] = useState<FichaAsistencia[]>([]);
+  const [programasBars, setProgramasBars] = useState<Array<{ name: string; pct: number }>>([]);
+  const [promedioGlobal, setPromedioGlobal] = useState<number>(0);
+  const [mejorPrograma, setMejorPrograma] = useState<string>('Sin datos');
+  const [totalSesiones, setTotalSesiones] = useState<number>(0);
+  const [fichasCriticas, setFichasCriticas] = useState<number>(0);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const rawFichas = await fichasService.getFichas();
+      if (rawFichas && rawFichas.length > 0) {
+        const mapped: FichaAsistencia[] = rawFichas.map((f: any) => {
+          const instructorLeader = f.instructores?.find((i: any) => i.isLeader) || f.instructores?.[0];
+          const instructorName = instructorLeader?.user
+            ? `${instructorLeader.user.firstName || ''} ${instructorLeader.user.lastName || ''}`.trim()
+            : 'Sin asignar';
+
+          return {
+            ficha: f.numero,
+            programa: f.programaNombre || f.programaCodigo || 'SENA',
+            instructor: instructorName,
+            aprendices: f.aprendicesCount || 0,
+            asistenciaPct: 0,
+            estado: 'Activo',
+          };
+        });
+
+        setFichas(mapped);
+      } else {
+        setFichas([]);
+      }
+    } catch (err) {
+      console.error('Error cargando asistencia admin:', err);
+      setFichas([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
@@ -50,19 +82,19 @@ export default function AsistenciaAdminScreen() {
       <View style={styles.metricsGrid}>
         <View style={styles.metricCard}>
           <Text style={styles.metricLabel}>Promedio Global</Text>
-          <Text style={styles.metricValueGold}>90%</Text>
+          <Text style={styles.metricValueGold}>{promedioGlobal}%</Text>
         </View>
         <View style={styles.metricCard}>
           <Text style={styles.metricLabel}>Mejor Programa</Text>
-          <Text style={styles.metricValueDark}>ADSO</Text>
+          <Text style={styles.metricValueDark}>{mejorPrograma}</Text>
         </View>
         <View style={styles.metricCard}>
           <Text style={styles.metricLabel}>Total sesiones</Text>
-          <Text style={styles.metricValueGold}>1.012</Text>
+          <Text style={styles.metricValueGold}>{totalSesiones}</Text>
         </View>
         <View style={styles.metricCard}>
           <Text style={styles.metricLabel}>Fichas críticas</Text>
-          <Text style={styles.metricValueDark}>2</Text>
+          <Text style={styles.metricValueDark}>{fichasCriticas}</Text>
         </View>
       </View>
 
@@ -70,85 +102,110 @@ export default function AsistenciaAdminScreen() {
       <View style={styles.chartBox}>
         <Text style={styles.chartTitle}>ASISTENCIA POR PROGRAMA</Text>
 
-        <View style={styles.barsContainer}>
-          {PROGRAMAS_BARS.map((item) => (
-            <View key={item.name} style={styles.barRow}>
-              <Text style={styles.progLabel}>{item.name}</Text>
-              <View style={styles.trackBar}>
-                <View style={[styles.fillBar, { width: `${item.pct}%` }]} />
-              </View>
-              <Text style={styles.pctLabel}>{item.pct}%</Text>
+        {programasBars.length === 0 ? (
+          <View style={{ padding: 24, alignItems: 'center' }}>
+            <Ionicons name="bar-chart-outline" size={36} color="#94A3B8" style={{ marginBottom: 6 }} />
+            <Text style={{ color: '#64748B', fontSize: 13 }}>No hay registros de asistencia por programa aún.</Text>
+          </View>
+        ) : (
+          <>
+            <View style={styles.barsContainer}>
+              {programasBars.map((item) => (
+                <View key={item.name} style={styles.barRow}>
+                  <Text style={styles.progLabel}>{item.name}</Text>
+                  <View style={styles.trackBar}>
+                    <View style={[styles.fillBar, { width: `${item.pct}%` }]} />
+                  </View>
+                  <Text style={styles.pctLabel}>{item.pct}%</Text>
+                </View>
+              ))}
             </View>
-          ))}
-        </View>
 
-        {/* X Axis Scale */}
-        <View style={styles.xAxisRow}>
-          <Text style={styles.axisText}>0</Text>
-          <Text style={styles.axisText}>25</Text>
-          <Text style={styles.axisText}>50</Text>
-          <Text style={styles.axisText}>75</Text>
-          <Text style={styles.axisText}>100</Text>
-        </View>
+            {/* X Axis Scale */}
+            <View style={styles.xAxisRow}>
+              <Text style={styles.axisText}>0</Text>
+              <Text style={styles.axisText}>25</Text>
+              <Text style={styles.axisText}>50</Text>
+              <Text style={styles.axisText}>75</Text>
+              <Text style={styles.axisText}>100</Text>
+            </View>
+          </>
+        )}
       </View>
 
       {/* Resumen Por Ficha Section */}
       <View style={styles.tableBox}>
         <Text style={styles.tableTitle}>Resumen por ficha</Text>
 
-        {/* Table Header */}
-        <View style={styles.tableHeader}>
-          <Text style={[styles.thText, { flex: 1 }]}>Ficha</Text>
-          <Text style={[styles.thText, { flex: 1 }]}>Programa</Text>
-          <Text style={[styles.thText, { flex: 1.5 }]}>Instructor</Text>
-          <Text style={[styles.thText, { flex: 1, textAlign: 'center' }]}>Aprendices</Text>
-          <Text style={[styles.thText, { flex: 2 }]}>Asistencia</Text>
-          <Text style={[styles.thText, { flex: 1, textAlign: 'right' }]}>Estado</Text>
-        </View>
-
-        {/* Table Body */}
-        {RESUMEN_FICHAS.map((row, idx) => (
-          <View
-            key={row.ficha}
-            style={[
-              styles.tableRow,
-              idx % 2 === 0 ? styles.tableRowEven : styles.tableRowOdd,
-            ]}
-          >
-            <Text style={[styles.tdText, { flex: 1, fontWeight: '700', color: NAVY }]}>
-              {row.ficha}
+        {loading ? (
+          <View style={{ padding: 30, alignItems: 'center' }}>
+            <ActivityIndicator size="small" color={GOLD} />
+          </View>
+        ) : fichas.length === 0 ? (
+          <View style={{ padding: 32, alignItems: 'center' }}>
+            <Ionicons name="school-outline" size={40} color="#94A3B8" style={{ marginBottom: 8 }} />
+            <Text style={{ fontSize: 14, fontWeight: '700', color: NAVY }}>Sin fichas registradas</Text>
+            <Text style={{ color: '#64748B', fontSize: 13, marginTop: 4, textAlign: 'center' }}>
+              No hay fichas de formación creadas aún. Cuando registres fichas y asistencias, aparecerán aquí.
             </Text>
-            <Text style={[styles.tdText, { flex: 1, fontWeight: '600' }]}>{row.programa}</Text>
-            <Text style={[styles.tdText, { flex: 1.5, color: '#475569' }]}>{row.instructor}</Text>
-            <Text style={[styles.tdText, { flex: 1, textAlign: 'center' }]}>{row.aprendices}</Text>
-
-            {/* Asistencia Progress Bar inside table */}
-            <View style={{ flex: 2, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <View style={styles.miniTrack}>
-                <View style={[styles.miniFill, { width: `${row.asistenciaPct}%` }]} />
-              </View>
-              <Text style={styles.miniPctText}>{row.asistenciaPct}%</Text>
+          </View>
+        ) : (
+          <>
+            {/* Table Header */}
+            <View style={styles.tableHeader}>
+              <Text style={[styles.thText, { flex: 1 }]}>Ficha</Text>
+              <Text style={[styles.thText, { flex: 1 }]}>Programa</Text>
+              <Text style={[styles.thText, { flex: 1.5 }]}>Instructor</Text>
+              <Text style={[styles.thText, { flex: 1, textAlign: 'center' }]}>Aprendices</Text>
+              <Text style={[styles.thText, { flex: 2 }]}>Asistencia</Text>
+              <Text style={[styles.thText, { flex: 1, textAlign: 'right' }]}>Estado</Text>
             </View>
 
-            <View style={{ flex: 1, alignItems: 'flex-end' }}>
+            {/* Table Body */}
+            {fichas.map((row, idx) => (
               <View
+                key={row.ficha}
                 style={[
-                  styles.statusBadge,
-                  row.estado === 'Riesgo' ? styles.badgeRiesgo : styles.badgeActivo,
+                  styles.tableRow,
+                  idx % 2 === 0 ? styles.tableRowEven : styles.tableRowOdd,
                 ]}
               >
-                <Text
-                  style={[
-                    styles.statusText,
-                    row.estado === 'Riesgo' ? styles.textRiesgo : styles.textActivo,
-                  ]}
-                >
-                  {row.estado}
+                <Text style={[styles.tdText, { flex: 1, fontWeight: '700', color: NAVY }]}>
+                  {row.ficha}
                 </Text>
+                <Text style={[styles.tdText, { flex: 1, fontWeight: '600' }]}>{row.programa}</Text>
+                <Text style={[styles.tdText, { flex: 1.5, color: '#475569' }]}>{row.instructor}</Text>
+                <Text style={[styles.tdText, { flex: 1, textAlign: 'center' }]}>{row.aprendices}</Text>
+
+                {/* Asistencia Progress Bar inside table */}
+                <View style={{ flex: 2, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={styles.miniTrack}>
+                    <View style={[styles.miniFill, { width: `${row.asistenciaPct}%` }]} />
+                  </View>
+                  <Text style={styles.miniPctText}>{row.asistenciaPct}%</Text>
+                </View>
+
+                <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                  <View
+                    style={[
+                      styles.statusBadge,
+                      row.estado === 'Riesgo' ? styles.badgeRiesgo : styles.badgeActivo,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.statusText,
+                        row.estado === 'Riesgo' ? styles.textRiesgo : styles.textActivo,
+                      ]}
+                    >
+                      {row.estado}
+                    </Text>
+                  </View>
+                </View>
               </View>
-            </View>
-          </View>
-        ))}
+            ))}
+          </>
+        )}
       </View>
     </ScrollView>
   );
