@@ -5,11 +5,7 @@ import { authService, User, RegisterData } from '../services/authService';
 type AuthContextType = {
   user: User | null;
   isLoading: boolean;
-<<<<<<< HEAD
-  login: (credentials: { correo: string; contrasenia: string; role: 'INSTRUCTOR' | 'APRENDIZ'; documento?: string }) => Promise<{ success: boolean; message?: string }>;
-=======
   login: (credentials: { correo: string; contrasenia: string }) => Promise<{ success: boolean; message?: string }>;
->>>>>>> a2470226edae0863cccfdcd982557dbbef0a094e
   setSession: (user: User) => void;
   register: (data: RegisterData) => Promise<{ success: boolean; message?: string }>;
   logout: () => Promise<void>;
@@ -73,15 +69,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { success: true };
   }, []);
 
-<<<<<<< HEAD
-  const register = async (data: RegisterData) => {
-    return authService.register(data);
-  };
-=======
   const register = useCallback(async (data: RegisterData) => {
     return authService.register(data);
   }, []);
->>>>>>> a2470226edae0863cccfdcd982557dbbef0a094e
 
   const logout = useCallback(async () => {
     await authService.logout();

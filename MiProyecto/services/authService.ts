@@ -318,11 +318,7 @@ async googleLogin(idToken: string): Promise<AuthResponse> {
   } catch (error: any) {
     return { success: false, message: error.message || 'Error de conexión con el servidor.' };
   }
-<<<<<<< HEAD
-},
-=======
   },
->>>>>>> a2470226edae0863cccfdcd982557dbbef0a094e
 
   /**
    * Actualizar Expo Push Token para notificaciones móviles
