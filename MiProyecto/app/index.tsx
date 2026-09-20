@@ -101,6 +101,7 @@ export default function AuthScreen() {
   
 
  const [request, response, promptAsync] = Google.useAuthRequest({
+   androidClientId: '801203695881-gv5vvikcfpbjkpvthpqd1babkk512b4h.apps.googleusercontent.com',
   webClientId:
     '801203695881-vjkbm79n28utn02fkiei3tmrieqmkd37.apps.googleusercontent.com',
   responseType: 'id_token',
@@ -294,13 +295,9 @@ useEffect(() => {
             {(isLoading || isSubmitting) && (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#C59427" />
-<<<<<<< HEAD
                 <Text style={styles.loadingText}>
                   {isLoading ? 'Verificando sesión...' : 'Procesando solicitud...'}
                 </Text>
-=======
-                <Text style={styles.loadingText}>Procesando solicitud...</Text>
->>>>>>> 73ee7842ad18e133f6032a127c51fc3148683cdd
               </View>
             )}
 

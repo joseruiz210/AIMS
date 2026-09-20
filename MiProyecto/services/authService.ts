@@ -153,10 +153,17 @@ export const authService = {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
 
-    return fetch(url, {
+    const response = await fetch(url, {
       ...options,
       headers,
     });
+
+    if (response.status === 401) {
+      await removeToken();
+      await removeUserData();
+    }
+
+    return response;
   },
 
   /**
@@ -281,7 +288,9 @@ async googleLogin(idToken: string): Promise<AuthResponse> {
     await saveUserData(data.data.user);
     return { success: true, token: data.data.accessToken, user: data.data.user, message: data.message };
   } catch (error: any) {
-  },
+    return { success: false, message: error.message || 'Error de conexión con el servidor.' };
+  }
+},
 
   /**
    * Actualizar Expo Push Token para notificaciones móviles

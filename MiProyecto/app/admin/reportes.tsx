@@ -8,6 +8,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { getToken } from '../../utils/storage';
 
 const NAVY = '#12103C';
 const GOLD = '#cfa235';
@@ -18,25 +19,48 @@ const MONTHLY_ENROLLMENTS = [
   { month: 'Abr', count: 52 },
   { month: 'May', count: 28 },
   { month: 'Jun', count: 55 },
-  { month: 'Jul', count: 27 },
 ];
 
 export default function ReportesAdminScreen() {
-  const { width } = useWindowDimensions();
+  const exportReport = async (type: 'asistencia' | 'academico' | 'riesgo') => {
+    try {
+      const token = await getToken();
+      const baseUrl = typeof window !== 'undefined' ? `http://${window.location.hostname}:3000/api/v1` : 'http://localhost:3000/api/v1';
+      const url = `${baseUrl}/reportes/exportar?type=${type}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
+      if (typeof window !== 'undefined') {
+        window.open(url, '_blank');
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       {/* Top Header */}
       <View style={styles.topHeader}>
-        <Text style={styles.pageTitle}>Reportes</Text>
+        <Text style={styles.pageTitle}>Reportes e Indicadores</Text>
         <View style={styles.btnGroup}>
-          <Pressable style={({ hovered }: any) => [styles.btn, hovered && styles.btnHover]}>
-            <Ionicons name="print-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-            <Text style={styles.btnText}>Imprimir</Text>
+          <Pressable
+            style={({ hovered }: any) => [styles.btn, hovered && styles.btnHover]}
+            onPress={() => exportReport('asistencia')}
+          >
+            <Ionicons name="document-text-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+            <Text style={styles.btnText}>PDF Asistencia</Text>
           </Pressable>
-          <Pressable style={({ hovered }: any) => [styles.btn, hovered && styles.btnHover]}>
-            <Ionicons name="download-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-            <Text style={styles.btnText}>Exportar</Text>
+          <Pressable
+            style={({ hovered }: any) => [styles.btn, hovered && styles.btnHover]}
+            onPress={() => exportReport('academico')}
+          >
+            <Ionicons name="school-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+            <Text style={styles.btnText}>PDF Académico</Text>
+          </Pressable>
+          <Pressable
+            style={({ hovered }: any) => [styles.btn, hovered && styles.btnHover]}
+            onPress={() => exportReport('riesgo')}
+          >
+            <Ionicons name="warning-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+            <Text style={styles.btnText}>PDF Riesgos</Text>
           </Pressable>
         </View>
       </View>

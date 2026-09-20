@@ -446,8 +446,6 @@ export default function TareasAprendizScreen() {
             <View style={styles.modalBody}>
               <View style={styles.feedbackScoreBox}>
                 <Text style={styles.feedbackScoreLabel}>CALIFICACIÓN FINAL:</Text>
-                <Text style={styles.feedbackScoreValue}>{activeEvidencia?.entrega?.nota?.toFixed(1) || '4.6'} / 5.0</Text>
-                <Text style={styles.feedbackScoreStatus}>✓ Competencia Aprobada</Text>
                 <Text style={styles.feedbackScoreValue}>
                   {activeEvidencia?.entrega?.nota !== undefined
                     ? Number(activeEvidencia.entrega.nota).toFixed(1)
@@ -473,10 +471,7 @@ export default function TareasAprendizScreen() {
                 </View>
                 <Text style={styles.feedbackTextBody}>
                   {activeEvidencia?.entrega?.feedback ||
-<<<<<<< HEAD
                     activeEvidencia?.entrega?.comentario ||
-=======
->>>>>>> 73ee7842ad18e133f6032a127c51fc3148683cdd
                     'Excelente desarrollo de la evidencia. Se evidencia dominio conceptual, correcta aplicación de estándares y estructura técnica completa.'}
                 </Text>
               </View>

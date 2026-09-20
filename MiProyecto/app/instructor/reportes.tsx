@@ -1,11 +1,25 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { getToken } from '../../utils/storage';
 
 const GOLD = '#D4AF37';
 const BG_PAGE = '#F8FAFC';
 
 export default function ReportesScreenPremium() {
+  const exportReport = async (type: 'asistencia' | 'academico' | 'riesgo') => {
+    try {
+      const token = await getToken();
+      const baseUrl = typeof window !== 'undefined' ? `http://${window.location.hostname}:3000/api/v1` : 'http://localhost:3000/api/v1';
+      const url = `${baseUrl}/reportes/exportar?type=${type}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
+      if (typeof window !== 'undefined') {
+        window.open(url, '_blank');
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       <Text style={styles.pageTitle}>Reportes</Text>
@@ -18,9 +32,9 @@ export default function ReportesScreenPremium() {
           </View>
           <Text style={styles.cardTitle}>Consolidado de Asistencia</Text>
           <Text style={styles.cardText}>
-            Exporta el registro completo de asistencias e inasistencias en PDF o Excel.
+            Exporta el registro completo de asistencias e inasistencias en PDF oficial.
           </Text>
-          <Pressable style={styles.btnDownload}>
+          <Pressable style={styles.btnDownload} onPress={() => exportReport('asistencia')}>
             <Ionicons name="download-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
             <Text style={styles.btnDownloadText}>Descargar PDF</Text>
           </Pressable>
@@ -34,9 +48,9 @@ export default function ReportesScreenPremium() {
           <Text style={styles.cardText}>
             Resumen comparativo de promedios por competencia y aprendices destacados.
           </Text>
-          <Pressable style={styles.btnDownload}>
+          <Pressable style={styles.btnDownload} onPress={() => exportReport('academico')}>
             <Ionicons name="download-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-            <Text style={styles.btnDownloadText}>Generar Reporte</Text>
+            <Text style={styles.btnDownloadText}>Descargar PDF</Text>
           </Pressable>
         </View>
 
@@ -48,9 +62,9 @@ export default function ReportesScreenPremium() {
           <Text style={styles.cardText}>
             Fichas de alerta temprana para coordinación sobre aprendices en riesgo.
           </Text>
-          <Pressable style={styles.btnDownload}>
-            <Ionicons name="share-social-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-            <Text style={styles.btnDownloadText}>Enviar a Coordinación</Text>
+          <Pressable style={styles.btnDownload} onPress={() => exportReport('riesgo')}>
+            <Ionicons name="download-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+            <Text style={styles.btnDownloadText}>Descargar PDF</Text>
           </Pressable>
         </View>
       </View>
