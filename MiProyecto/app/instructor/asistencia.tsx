@@ -517,7 +517,6 @@ export default function AsistenciaAnimatedScreen() {
         </View>
       </View>
 
-<<<<<<< HEAD
       {/* Selector de Ficha Activa para el Instructor */}
       {fichas.length > 0 && (
         <View style={styles.fichaSelectorBar}>
@@ -542,10 +541,7 @@ export default function AsistenciaAnimatedScreen() {
         </View>
       )}
 
-      {/* Tema de la sesión + estado de autoguardado (reemplaza el botón "Guardar en BD") */}
-=======
-      {/* Tema de la sesión + estado de autoguardado + botón Guardar en BD */}
->>>>>>> 6597411ad521ddf784bf85f9c493596fb579613e
+      {/* Tema de la sesión + estado de autoguardado */}
       <View style={styles.temaBar}>
         <Ionicons name="book-outline" size={18} color={NAVY} style={{ marginRight: 8 }} />
         <TextInput

@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'expo-router';
 import { adminService, AdminUser } from '../../services/adminService';
 import ActionModal from '../../components/ActionModal';
 
@@ -8,6 +9,7 @@ const NAVY = '#12103C';
 const GOLD = '#cfa235';
 
 export default function UsuariosAdmin() {
+  const router = useRouter();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 1024;
 
@@ -28,12 +30,15 @@ export default function UsuariosAdmin() {
       ]);
       setUsers(list.users);
       setCounts({ admin: admins, instructor: instructores, aprendiz: aprendices });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error al cargar usuarios:', error);
+      if (error?.message?.includes('expirado') || error?.message?.includes('Token')) {
+        router.replace('/');
+      }
     } finally {
       setLoading(false);
     }
-  }, [search]);
+  }, [search, router]);
 
   useEffect(() => {
     const timeout = setTimeout(loadData, 400); // debounce del buscador

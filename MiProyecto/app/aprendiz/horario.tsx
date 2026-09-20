@@ -7,6 +7,7 @@ import {
   Pressable,
   useWindowDimensions,
   Modal,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
