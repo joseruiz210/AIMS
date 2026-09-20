@@ -145,20 +145,21 @@ export default function CalificacionesAdminScreen() {
 
             {/* Vertical Bars */}
             <View style={styles.barsFlexContainer}>
-              {barData.map((item) => {
-                // Scale value 3.0 to 5.0 onto 0% to 100% bar height
-                const heightPct = Math.max(0, Math.min(100, ((item.val - 3.0) / 2.0) * 100));
+              {barData.map((item, index) => {
+  const safeVal = Number.isFinite(item.val) ? item.val : 0;
+  // Scale value 3.0 to 5.0 onto 0% to 100% bar height
+  const heightPct = Math.max(0, Math.min(100, ((safeVal - 3.0) / 2.0) * 100));
 
-                return (
-                  <View key={item.label} style={styles.vBarColumn}>
-                    <Text style={styles.barValText}>{item.val}</Text>
-                    <View style={styles.vBarTrack}>
-                      <View style={[styles.vBarFill, { height: `${heightPct}%` }]} />
-                    </View>
-                    <Text style={styles.vBarLabel}>{item.label}</Text>
-                  </View>
-                );
-              })}
+  return (
+    <View key={`${item.label}-${index}`} style={styles.vBarColumn}>
+      <Text style={styles.barValText}>{safeVal.toFixed(1)}</Text>
+      <View style={styles.vBarTrack}>
+        <View style={[styles.vBarFill, { height: `${heightPct}%` }]} />
+      </View>
+      <Text style={styles.vBarLabel}>{item.label}</Text>
+    </View>
+  );
+})}
             </View>
           </View>
         )}
@@ -192,7 +193,7 @@ export default function CalificacionesAdminScreen() {
             {/* Table Body */}
             {summaryData.map((row, idx) => (
               <View
-                key={row.programa}
+                key={`${row.programa}-${idx}`}
                 style={[
                   styles.tableRow,
                   idx % 2 === 0 ? styles.tableRowEven : styles.tableRowOdd,
