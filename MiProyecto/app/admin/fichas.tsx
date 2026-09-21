@@ -241,7 +241,7 @@ export default function FichasScreenAdmin() {
 
                 <Pressable
                   style={styles.cardAssignBtn}
-                  onPress={() => router.push('/admin/horarios')}
+                  onPress={() => router.push('/admin/horarios' as any)}
                 >
                   <Ionicons name="time-outline" size={16} color={NAVY} style={{ marginRight: 6 }} />
                   <Text style={styles.cardAssignText}>Horario</Text>

@@ -377,6 +377,7 @@ const styles = StyleSheet.create({
   cardTop: { flexDirection: 'row', justifyContent: 'space-between' },
   student: { color: '#0F172A', fontWeight: '700' },
   date: { color: '#94A3B8', fontSize: 12 },
+  cardDeleteBtn: { padding: 4, borderRadius: 6, backgroundColor: '#FEE2E2', justifyContent: 'center', alignItems: 'center' },
   type: { color: '#B45309', fontSize: 12, fontWeight: '700' },
   subject: { color: '#64748B', fontSize: 12 },
   description: { color: '#334155' },

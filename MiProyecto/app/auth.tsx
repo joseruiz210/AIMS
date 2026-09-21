@@ -1120,10 +1120,6 @@ useEffect(() => {
 }
 
 const styles = StyleSheet.create({
-  outerContainer: {
-    flex: 1,
-    backgroundColor: '#020308',
-  },
   /* ─── CAMPOS ACADÉMICOS ─── */
   academicSectionHeader: {
     flexDirection: 'row',

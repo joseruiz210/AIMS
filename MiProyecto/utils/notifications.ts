@@ -14,7 +14,7 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
     // Import dinámico para no romper entornos donde expo-notifications no esté instalado
     let Notifications: any;
     try {
-      Notifications = await import('expo-notifications');
+      Notifications = await (Function('return import("expo-notifications")')());
     } catch {
       console.log('[Push] expo-notifications no está disponible en este entorno.');
       return null;
