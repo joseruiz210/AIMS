@@ -137,35 +137,39 @@ export default function UsuariosAdmin() {
         </View>
 
         <View style={styles.table}>
-          <View style={styles.tableHeader}>
-            <Text style={[styles.tableHeaderText, { flex: 2 }]}>NOMBRE</Text>
-            <Text style={[styles.tableHeaderText, { flex: 2 }]}>ROL</Text>
-            <Text style={[styles.tableHeaderText, { flex: 3 }]}>CORREO</Text>
-            <Text style={[styles.tableHeaderText, { flex: 1.5 }]}>ESTADO</Text>
-          </View>
-
-          {loading ? (
-            <View style={{ padding: 20, alignItems: 'center' }}>
-              <Text style={{ color: '#888' }}>Cargando usuarios...</Text>
-            </View>
-          ) : users.length === 0 ? (
-            <View style={{ padding: 20, alignItems: 'center' }}>
-              <Text style={{ color: '#888' }}>No se encontraron usuarios</Text>
-            </View>
-          ) : (
-            users.map((u) => (
-              <View key={u.id} style={styles.tableRow}>
-                <Text style={[styles.tableCell, { flex: 2, fontWeight: '600' }]}>
-                  {u.firstName} {u.lastName}
-                </Text>
-                <Text style={[styles.tableCell, { flex: 2 }]}>{u.role}</Text>
-                <Text style={[styles.tableCell, { flex: 3, color: '#666' }]}>{u.email}</Text>
-                <Text style={[styles.tableCell, { flex: 1.5, color: u.isActive ? '#10B981' : '#EF4444', fontWeight: '600' }]}>
-                  {u.isActive ? 'Activo' : 'Inactivo'}
-                </Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={{ minWidth: 550 }}>
+              <View style={styles.tableHeader}>
+                <Text style={[styles.tableHeaderText, { flex: 2 }]}>NOMBRE</Text>
+                <Text style={[styles.tableHeaderText, { flex: 2 }]}>ROL</Text>
+                <Text style={[styles.tableHeaderText, { flex: 3 }]}>CORREO</Text>
+                <Text style={[styles.tableHeaderText, { flex: 1.5 }]}>ESTADO</Text>
               </View>
-            ))
-          )}
+
+              {loading ? (
+                <View style={{ padding: 20, alignItems: 'center' }}>
+                  <Text style={{ color: '#888' }}>Cargando usuarios...</Text>
+                </View>
+              ) : users.length === 0 ? (
+                <View style={{ padding: 20, alignItems: 'center' }}>
+                  <Text style={{ color: '#888' }}>No se encontraron usuarios</Text>
+                </View>
+              ) : (
+                users.map((u) => (
+                  <View key={u.id} style={styles.tableRow}>
+                    <Text style={[styles.tableCell, { flex: 2, fontWeight: '600' }]}>
+                      {u.firstName} {u.lastName}
+                    </Text>
+                    <Text style={[styles.tableCell, { flex: 2 }]}>{u.role}</Text>
+                    <Text style={[styles.tableCell, { flex: 3, color: '#666' }]}>{u.email}</Text>
+                    <Text style={[styles.tableCell, { flex: 1.5, color: u.isActive ? '#10B981' : '#EF4444', fontWeight: '600' }]}>
+                      {u.isActive ? 'Activo' : 'Inactivo'}
+                    </Text>
+                  </View>
+                ))
+              )}
+            </View>
+          </ScrollView>
         </View>
       </View>
 
@@ -194,14 +198,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#F4F6F9',
   },
   content: {
-    padding: 30,
-    paddingBottom: 50,
+    padding: 16,
+    paddingBottom: 40,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 28,
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 20,
   },
   subtitle: {
     fontSize: 14,

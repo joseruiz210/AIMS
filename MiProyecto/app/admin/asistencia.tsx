@@ -151,59 +151,63 @@ export default function AsistenciaAdminScreen() {
           </View>
         ) : (
           <>
-            {/* Table Header */}
-            <View style={styles.tableHeader}>
-              <Text style={[styles.thText, { flex: 1 }]}>Ficha</Text>
-              <Text style={[styles.thText, { flex: 1 }]}>Programa</Text>
-              <Text style={[styles.thText, { flex: 1.5 }]}>Instructor</Text>
-              <Text style={[styles.thText, { flex: 1, textAlign: 'center' }]}>Aprendices</Text>
-              <Text style={[styles.thText, { flex: 2 }]}>Asistencia</Text>
-              <Text style={[styles.thText, { flex: 1, textAlign: 'right' }]}>Estado</Text>
-            </View>
-
-            {/* Table Body */}
-            {fichas.map((row, idx) => (
-              <View
-                key={row.ficha}
-                style={[
-                  styles.tableRow,
-                  idx % 2 === 0 ? styles.tableRowEven : styles.tableRowOdd,
-                ]}
-              >
-                <Text style={[styles.tdText, { flex: 1, fontWeight: '700', color: NAVY }]}>
-                  {row.ficha}
-                </Text>
-                <Text style={[styles.tdText, { flex: 1, fontWeight: '600' }]}>{row.programa}</Text>
-                <Text style={[styles.tdText, { flex: 1.5, color: '#475569' }]}>{row.instructor}</Text>
-                <Text style={[styles.tdText, { flex: 1, textAlign: 'center' }]}>{row.aprendices}</Text>
-
-                {/* Asistencia Progress Bar inside table */}
-                <View style={{ flex: 2, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <View style={styles.miniTrack}>
-                    <View style={[styles.miniFill, { width: `${row.asistenciaPct}%` }]} />
-                  </View>
-                  <Text style={styles.miniPctText}>{row.asistenciaPct}%</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={{ minWidth: 600 }}>
+                {/* Table Header */}
+                <View style={styles.tableHeader}>
+                  <Text style={[styles.thText, { flex: 1 }]}>Ficha</Text>
+                  <Text style={[styles.thText, { flex: 1 }]}>Programa</Text>
+                  <Text style={[styles.thText, { flex: 1.5 }]}>Instructor</Text>
+                  <Text style={[styles.thText, { flex: 1, textAlign: 'center' }]}>Aprendices</Text>
+                  <Text style={[styles.thText, { flex: 2 }]}>Asistencia</Text>
+                  <Text style={[styles.thText, { flex: 1, textAlign: 'right' }]}>Estado</Text>
                 </View>
 
-                <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                {/* Table Body */}
+                {fichas.map((row, idx) => (
                   <View
+                    key={row.ficha}
                     style={[
-                      styles.statusBadge,
-                      row.estado === 'Riesgo' ? styles.badgeRiesgo : styles.badgeActivo,
+                      styles.tableRow,
+                      idx % 2 === 0 ? styles.tableRowEven : styles.tableRowOdd,
                     ]}
                   >
-                    <Text
-                      style={[
-                        styles.statusText,
-                        row.estado === 'Riesgo' ? styles.textRiesgo : styles.textActivo,
-                      ]}
-                    >
-                      {row.estado}
+                    <Text style={[styles.tdText, { flex: 1, fontWeight: '700', color: NAVY }]}>
+                      {row.ficha}
                     </Text>
+                    <Text style={[styles.tdText, { flex: 1, fontWeight: '600' }]}>{row.programa}</Text>
+                    <Text style={[styles.tdText, { flex: 1.5, color: '#475569' }]}>{row.instructor}</Text>
+                    <Text style={[styles.tdText, { flex: 1, textAlign: 'center' }]}>{row.aprendices}</Text>
+
+                    {/* Asistencia Progress Bar inside table */}
+                    <View style={{ flex: 2, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <View style={styles.miniTrack}>
+                        <View style={[styles.miniFill, { width: `${row.asistenciaPct}%` }]} />
+                      </View>
+                      <Text style={styles.miniPctText}>{row.asistenciaPct}%</Text>
+                    </View>
+
+                    <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                      <View
+                        style={[
+                          styles.statusBadge,
+                          row.estado === 'Riesgo' ? styles.badgeRiesgo : styles.badgeActivo,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.statusText,
+                            row.estado === 'Riesgo' ? styles.textRiesgo : styles.textActivo,
+                          ]}
+                        >
+                          {row.estado}
+                        </Text>
+                      </View>
+                    </View>
                   </View>
-                </View>
+                ))}
               </View>
-            ))}
+            </ScrollView>
           </>
         )}
       </View>

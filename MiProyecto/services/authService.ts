@@ -1,5 +1,6 @@
 import { saveToken, getToken, removeToken, saveUserData, getUserData, removeUserData } from '../utils/storage';
 import { validatePassword, verifyEmailDomainExistence } from '../utils/validation';
+import { getApiBaseUrl } from './api';
 
 export interface User {
   id: string;
@@ -38,8 +39,7 @@ export interface RegisterData {
 }
 
 // Configuración de URL base para la API Backend
-// Se carga desde .env con EXPO_PUBLIC_API_URL
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+const API_BASE_URL = getApiBaseUrl();
 /**
  * Servicio de Autenticación JWT y Gestión de Cuenta
  */

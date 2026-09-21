@@ -1,6 +1,7 @@
 import { authService } from './authService';
+import { getApiBaseUrl } from './api';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+const API_BASE_URL = getApiBaseUrl();
 
 export interface HorarioItem {
   id: string;

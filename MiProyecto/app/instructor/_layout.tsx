@@ -175,7 +175,7 @@ export default function InstructorLayout() {
 
   if (!isDesktop) {
     return (
-      <SafeAreaView style={styles.mobileContainer} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={styles.mobileContainer} edges={['top', 'bottom', 'left', 'right']}>
         {/* Mobile Header Bar */}
         <View style={styles.mobileHeader}>
           <Pressable onPress={() => setDrawerOpen(true)} style={styles.hamburgerBtn}>

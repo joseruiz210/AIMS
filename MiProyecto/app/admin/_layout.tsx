@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { useEffect, useState } from 'react';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import LogoutModal from '../../components/LogoutModal';
@@ -166,7 +167,7 @@ export default function AdminLayout() {
 
   if (!isDesktop) {
     return (
-      <View style={styles.mobileContainer}>
+      <SafeAreaView style={styles.mobileContainer} edges={['top', 'bottom', 'left', 'right']}>
         {/* Mobile Header */}
         <View style={styles.mobileHeader}>
           <Pressable style={styles.hamburgerBtn} onPress={() => setDrawerOpen(true)}>
@@ -248,7 +249,7 @@ export default function AdminLayout() {
             logout();
           }}
         />
-      </View>
+      </SafeAreaView>
     );
   }
 

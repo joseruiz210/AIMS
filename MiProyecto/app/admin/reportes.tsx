@@ -284,6 +284,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 12,
     marginBottom: 16,
   },
   pageTitle: {
@@ -293,6 +295,7 @@ const styles = StyleSheet.create({
   },
   btnGroup: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 10,
   },
   btn: {
@@ -369,7 +372,7 @@ const styles = StyleSheet.create({
   },
   metricCard: {
     flex: 1,
-    minWidth: 150,
+    minWidth: 130,
     backgroundColor: '#E5E7EB',
     paddingVertical: 16,
     paddingHorizontal: 18,

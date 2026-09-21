@@ -188,10 +188,10 @@ const styles = StyleSheet.create({
   },
   metricCard: {
     flex: 1,
-    minWidth: 160,
+    minWidth: 130,
     backgroundColor: '#FFFFFF',
-    paddingVertical: 16,
-    paddingHorizontal: 18,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',

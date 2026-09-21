@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { router } from 'expo-router';
 import { authService, User, RegisterData } from '../services/authService';
+import { registerForPushNotificationsAsync } from '../services/pushNotificationService';
 
 type AuthContextType = {
   user: User | null;
@@ -39,6 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (isMounted && storedUser) {
           const normalizedUser = normalizeUser(storedUser);
           setUser(normalizedUser);
+          registerForPushNotificationsAsync().catch(() => {});
         }
       } catch {
         // error al verificar sesión previa
@@ -62,6 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const loggedUser = normalizeUser(result.user);
     setUser(loggedUser);
+    registerForPushNotificationsAsync().catch(() => {});
 
     const destination = ROLE_ROUTES[loggedUser.role] ?? '/(tabs)';
     router.replace(destination as any);

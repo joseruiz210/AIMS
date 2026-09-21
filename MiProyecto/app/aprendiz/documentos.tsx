@@ -187,8 +187,7 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   docCard: {
-    flex: 1,
-    minWidth: 280,
+    width: '100%',
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 20,
@@ -198,7 +197,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.10,
     shadowRadius: 8,
-    justifyContent: 'space-between',
+    marginBottom: 4,
   },
   cardTop: {
     flexDirection: 'row',

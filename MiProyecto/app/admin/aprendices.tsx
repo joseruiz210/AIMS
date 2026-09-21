@@ -127,82 +127,87 @@ export default function AprendicesScreen() {
           </View>
         </View>
 
-        {/* Table Header */}
-        <View style={styles.tableHeader}>
-          <Text style={[styles.thText, { flex: 2 }]}>NOMBRE</Text>
-          <Text style={[styles.thText, { flex: 1 }]}>FICHA</Text>
-          <Text style={[styles.thText, { flex: 1 }]}>PROGRAMA</Text>
-          <Text style={[styles.thText, { flex: 1, textAlign: 'center' }]}>NOTA</Text>
-          <Text style={[styles.thText, { flex: 1, textAlign: 'right' }]}>ESTADO</Text>
-        </View>
-
-        {/* Table Body */}
-        {filteredAprendices.map((row, idx) => (
-          <View
-            key={row.id}
-            style={[
-              styles.tableRow,
-              idx % 2 === 0 ? styles.tableRowEven : styles.tableRowOdd,
-            ]}
-          >
-            <View style={{ flex: 2, flexDirection: 'row', alignItems: 'center' }}>
-              <View style={styles.avatarMini}>
-                <Text style={styles.avatarMiniText}>
-                  {row.nombre
-                    .split(' ')
-                    .map((n) => n[0])
-                    .join('')
-                    .substring(0, 2)}
-                </Text>
-              </View>
-              <Text style={styles.tdName}>{row.nombre}</Text>
+        {/* Scrollable Table Area */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={{ minWidth: 580 }}>
+            {/* Table Header */}
+            <View style={styles.tableHeader}>
+              <Text style={[styles.thText, { flex: 2 }]}>NOMBRE</Text>
+              <Text style={[styles.thText, { flex: 1 }]}>FICHA</Text>
+              <Text style={[styles.thText, { flex: 1 }]}>PROGRAMA</Text>
+              <Text style={[styles.thText, { flex: 1, textAlign: 'center' }]}>NOTA</Text>
+              <Text style={[styles.thText, { flex: 1, textAlign: 'right' }]}>ESTADO</Text>
             </View>
 
-            <Text style={[styles.tdText, { flex: 1 }]}>{row.ficha}</Text>
-            <Text style={[styles.tdText, { flex: 1, fontWeight: '600' }]}>{row.programa}</Text>
-
-            <View style={{ flex: 1, alignItems: 'center' }}>
-              <Text
-                style={[
-                  styles.tdGrade,
-                  row.nota >= 4.0
-                    ? styles.gradeHigh
-                    : row.nota >= 3.0
-                    ? styles.gradeMid
-                    : styles.gradeLow,
-                ]}
-              >
-                {row.nota.toFixed(1)}
-              </Text>
-            </View>
-
-            <View style={{ flex: 1, alignItems: 'flex-end' }}>
+            {/* Table Body */}
+            {filteredAprendices.map((row, idx) => (
               <View
+                key={row.id}
                 style={[
-                  styles.statusTag,
-                  row.estado === 'Activo'
-                    ? styles.tagActivo
-                    : row.estado === 'En Riesgo'
-                    ? styles.tagRiesgo
-                    : styles.tagCritico,
+                  styles.tableRow,
+                  idx % 2 === 0 ? styles.tableRowEven : styles.tableRowOdd,
                 ]}
               >
-                <Text
-                  style={[
-                    styles.tagText,
-                    row.estado === 'Activo'
-                      ? styles.tagTextActivo
-                      : row.estado === 'En Riesgo'
-                      ? styles.tagTextRiesgo
-                      : styles.tagTextCritico,
-                  ]}
-                >
-                  {row.estado}
-                </Text>
+                <View style={{ flex: 2, flexDirection: 'row', alignItems: 'center' }}>
+                  <View style={styles.avatarMini}>
+                    <Text style={styles.avatarMiniText}>
+                      {row.nombre
+                        .split(' ')
+                        .map((n) => n[0])
+                        .join('')
+                        .substring(0, 2)}
+                    </Text>
+                  </View>
+                  <Text style={styles.tdName}>{row.nombre}</Text>
+                </View>
+
+                <Text style={[styles.tdText, { flex: 1 }]}>{row.ficha}</Text>
+                <Text style={[styles.tdText, { flex: 1, fontWeight: '600' }]}>{row.programa}</Text>
+
+                <View style={{ flex: 1, alignItems: 'center' }}>
+                  <Text
+                    style={[
+                      styles.tdGrade,
+                      row.nota >= 4.0
+                        ? styles.gradeHigh
+                        : row.nota >= 3.0
+                        ? styles.gradeMid
+                        : styles.gradeLow,
+                    ]}
+                  >
+                    {row.nota.toFixed(1)}
+                  </Text>
+                </View>
+
+                <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                  <View
+                    style={[
+                      styles.statusTag,
+                      row.estado === 'Activo'
+                        ? styles.tagActivo
+                        : row.estado === 'En Riesgo'
+                        ? styles.tagRiesgo
+                        : styles.tagCritico,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.tagText,
+                        row.estado === 'Activo'
+                          ? styles.tagTextActivo
+                          : row.estado === 'En Riesgo'
+                          ? styles.tagTextRiesgo
+                          : styles.tagTextCritico,
+                      ]}
+                    >
+                      {row.estado}
+                    </Text>
+                  </View>
+                </View>
               </View>
-            </View>
+            ))}
           </View>
-        ))}
+        </ScrollView>
       </View>
 
       <ActionModal
@@ -235,6 +240,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 12,
     marginBottom: 20,
   },
   pageTitle: {

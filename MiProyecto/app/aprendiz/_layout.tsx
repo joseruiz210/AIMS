@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { useState } from 'react';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import LogoutModal from '../../components/LogoutModal';
@@ -148,7 +149,7 @@ export default function AprendizLayout() {
 
   if (!isDesktop) {
     return (
-      <View style={styles.mobileContainer}>
+      <SafeAreaView style={styles.mobileContainer} edges={['top', 'bottom', 'left', 'right']}>
         {/* Mobile Header */}
         <View style={styles.mobileHeader}>
           <Pressable style={styles.hamburgerBtn} onPress={() => setDrawerOpen(true)}>
@@ -236,7 +237,7 @@ export default function AprendizLayout() {
             logout();
           }}
         />
-      </View>
+      </SafeAreaView>
     );
   }
 

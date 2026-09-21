@@ -1,10 +1,22 @@
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import { getToken, saveToken, removeToken, getUserData, saveUserData, removeUserData } from '../utils/storage';
+
+// Determina la IP del host dinámicamente para Expo Go en dispositivos físicos
+const getDynamicHostIp = (): string => {
+  const hostUri = Constants.expoConfig?.hostUri || (Constants as any).manifest2?.extra?.expoGo?.debuggerHost;
+  if (hostUri) {
+    return hostUri.split(':')[0];
+  }
+  return 'localhost';
+};
 
 // URL base de la API backend
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || (Platform.OS === 'web'
   ? (typeof window !== 'undefined' ? `http://${window.location.hostname}:3000/api/v1` : 'http://localhost:3000/api/v1')
-  : 'http://10.0.2.2:3000/api/v1');
+  : (Platform.OS === 'android' && getDynamicHostIp() === 'localhost'
+    ? 'http://10.0.2.2:3000/api/v1'
+    : `http://${getDynamicHostIp()}:3000/api/v1`));
 
 export const getApiBaseUrl = () => API_BASE_URL;
 

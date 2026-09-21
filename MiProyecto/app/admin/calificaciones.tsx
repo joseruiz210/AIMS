@@ -181,39 +181,43 @@ export default function CalificacionesAdminScreen() {
           </View>
         ) : (
           <>
-            {/* Table Header */}
-            <View style={styles.tableHeader}>
-              <Text style={[styles.thText, { flex: 2 }]}>PROGRAMA</Text>
-              <Text style={[styles.thText, { flex: 1, textAlign: 'center' }]}>APRENDICES</Text>
-              <Text style={[styles.thText, { flex: 1, textAlign: 'center' }]}>PROMEDIO</Text>
-              <Text style={[styles.thText, { flex: 1, textAlign: 'center' }]}>APROBADOS</Text>
-              <Text style={[styles.thText, { flex: 1, textAlign: 'right' }]}>EN RIESGO</Text>
-            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={{ minWidth: 550 }}>
+                {/* Table Header */}
+                <View style={styles.tableHeader}>
+                  <Text style={[styles.thText, { flex: 2 }]}>PROGRAMA</Text>
+                  <Text style={[styles.thText, { flex: 1, textAlign: 'center' }]}>APRENDICES</Text>
+                  <Text style={[styles.thText, { flex: 1, textAlign: 'center' }]}>PROMEDIO</Text>
+                  <Text style={[styles.thText, { flex: 1, textAlign: 'center' }]}>APROBADOS</Text>
+                  <Text style={[styles.thText, { flex: 1, textAlign: 'right' }]}>EN RIESGO</Text>
+                </View>
 
-            {/* Table Body */}
-            {summaryData.map((row, idx) => (
-              <View
-                key={`${row.programa}-${idx}`}
-                style={[
-                  styles.tableRow,
-                  idx % 2 === 0 ? styles.tableRowEven : styles.tableRowOdd,
-                ]}
-              >
-                <Text style={[styles.tdText, { flex: 2, fontWeight: '700', color: NAVY }]}>
-                  {row.programa}
-                </Text>
-                <Text style={[styles.tdText, { flex: 1, textAlign: 'center' }]}>{row.aprendices}</Text>
-                <Text style={[styles.tdText, { flex: 1, textAlign: 'center', fontWeight: '700', color: GOLD }]}>
-                  {row.promedio > 0 ? row.promedio.toFixed(1) : '0.0'}
-                </Text>
-                <Text style={[styles.tdText, { flex: 1, textAlign: 'center', color: '#10B981', fontWeight: '600' }]}>
-                  {row.aprobados}
-                </Text>
-                <Text style={[styles.tdText, { flex: 1, textAlign: 'right', color: '#EF4444', fontWeight: '600' }]}>
-                  {row.enRiesgo}
-                </Text>
+                {/* Table Body */}
+                {summaryData.map((row, idx) => (
+                  <View
+                    key={`${row.programa}-${idx}`}
+                    style={[
+                      styles.tableRow,
+                      idx % 2 === 0 ? styles.tableRowEven : styles.tableRowOdd,
+                    ]}
+                  >
+                    <Text style={[styles.tdText, { flex: 2, fontWeight: '700', color: NAVY }]}>
+                      {row.programa}
+                    </Text>
+                    <Text style={[styles.tdText, { flex: 1, textAlign: 'center' }]}>{row.aprendices}</Text>
+                    <Text style={[styles.tdText, { flex: 1, textAlign: 'center', fontWeight: '700', color: GOLD }]}>
+                      {row.promedio.toFixed(1)}
+                    </Text>
+                    <Text style={[styles.tdText, { flex: 1, textAlign: 'center', color: '#10B981', fontWeight: '600' }]}>
+                      {row.aprobados}
+                    </Text>
+                    <Text style={[styles.tdText, { flex: 1, textAlign: 'right', color: '#EF4444', fontWeight: '600' }]}>
+                      {row.enRiesgo}
+                    </Text>
+                  </View>
+                ))}
               </View>
-            ))}
+            </ScrollView>
           </>
         )}
       </View>

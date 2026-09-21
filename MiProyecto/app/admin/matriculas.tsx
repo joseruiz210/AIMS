@@ -124,72 +124,77 @@ export default function MatriculasScreen() {
           </View>
         </View>
 
-        {/* Table Header */}
-        <View style={styles.tableHeader}>
-          <Text style={[styles.thText, { flex: 2 }]}>APRENDIZ</Text>
-          <Text style={[styles.thText, { flex: 1 }]}>FICHA</Text>
-          <Text style={[styles.thText, { flex: 1 }]}>PROGRAMA</Text>
-          <Text style={[styles.thText, { flex: 1.5 }]}>FECHA MATRICULA</Text>
-          <Text style={[styles.thText, { flex: 1, textAlign: 'right' }]}>ESTADO</Text>
-        </View>
-
-        {/* Table Body */}
-        {filteredMatriculas.map((row, idx) => (
-          <View
-            key={row.id}
-            style={[
-              styles.tableRow,
-              idx % 2 === 0 ? styles.tableRowEven : styles.tableRowOdd,
-            ]}
-          >
-            <View style={{ flex: 2, flexDirection: 'row', alignItems: 'center' }}>
-              <View style={styles.avatarMini}>
-                <Text style={styles.avatarMiniText}>
-                  {row.aprendiz
-                    .split(' ')
-                    .map((n) => n[0])
-                    .join('')
-                    .substring(0, 2)}
-                </Text>
-              </View>
-              <Text style={styles.tdName}>{row.aprendiz}</Text>
+        {/* Scrollable Table Area */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={{ minWidth: 600 }}>
+            {/* Table Header */}
+            <View style={styles.tableHeader}>
+              <Text style={[styles.thText, { flex: 2 }]}>APRENDIZ</Text>
+              <Text style={[styles.thText, { flex: 1 }]}>FICHA</Text>
+              <Text style={[styles.thText, { flex: 1 }]}>PROGRAMA</Text>
+              <Text style={[styles.thText, { flex: 1.5 }]}>FECHA MATRICULA</Text>
+              <Text style={[styles.thText, { flex: 1, textAlign: 'right' }]}>ESTADO</Text>
             </View>
 
-            <Text style={[styles.tdText, { flex: 1 }]}>{row.ficha}</Text>
-            <Text style={[styles.tdText, { flex: 1, fontWeight: '600' }]}>{row.programa}</Text>
-            <Text style={[styles.tdText, { flex: 1.5, color: '#64748B' }]}>{row.fechaMatricula}</Text>
-
-            <View style={{ flex: 1, alignItems: 'flex-end' }}>
+            {/* Table Body */}
+            {filteredMatriculas.map((row, idx) => (
               <View
+                key={row.id}
                 style={[
-                  styles.statusTag,
-                  row.estado === 'Activo'
-                    ? styles.tagActivo
-                    : row.estado === 'Pendiente'
-                    ? styles.tagPendiente
-                    : row.estado === 'Retirado'
-                    ? styles.tagRetirado
-                    : styles.tagCritico,
+                  styles.tableRow,
+                  idx % 2 === 0 ? styles.tableRowEven : styles.tableRowOdd,
                 ]}
               >
-                <Text
-                  style={[
-                    styles.tagText,
-                    row.estado === 'Activo'
-                      ? styles.tagTextActivo
-                      : row.estado === 'Pendiente'
-                      ? styles.tagTextPendiente
-                      : row.estado === 'Retirado'
-                      ? styles.tagTextRetirado
-                      : styles.tagTextCritico,
-                  ]}
-                >
-                  {row.estado}
-                </Text>
+                <View style={{ flex: 2, flexDirection: 'row', alignItems: 'center' }}>
+                  <View style={styles.avatarMini}>
+                    <Text style={styles.avatarMiniText}>
+                      {row.aprendiz
+                        .split(' ')
+                        .map((n) => n[0])
+                        .join('')
+                        .substring(0, 2)}
+                    </Text>
+                  </View>
+                  <Text style={styles.tdName}>{row.aprendiz}</Text>
+                </View>
+
+                <Text style={[styles.tdText, { flex: 1 }]}>{row.ficha}</Text>
+                <Text style={[styles.tdText, { flex: 1, fontWeight: '600' }]}>{row.programa}</Text>
+                <Text style={[styles.tdText, { flex: 1.5, color: '#64748B' }]}>{row.fechaMatricula}</Text>
+
+                <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                  <View
+                    style={[
+                      styles.statusTag,
+                      row.estado === 'Activo'
+                        ? styles.tagActivo
+                        : row.estado === 'Pendiente'
+                        ? styles.tagPendiente
+                        : row.estado === 'Retirado'
+                        ? styles.tagRetirado
+                        : styles.tagCritico,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.tagText,
+                        row.estado === 'Activo'
+                          ? styles.tagTextActivo
+                          : row.estado === 'Pendiente'
+                          ? styles.tagTextPendiente
+                          : row.estado === 'Retirado'
+                          ? styles.tagTextRetirado
+                          : styles.tagTextCritico,
+                      ]}
+                    >
+                      {row.estado}
+                    </Text>
+                  </View>
+                </View>
               </View>
-            </View>
+            ))}
           </View>
-        ))}
+        </ScrollView>
       </View>
 
       <ActionModal

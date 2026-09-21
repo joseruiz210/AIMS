@@ -12,8 +12,9 @@ import { Ionicons } from '@expo/vector-icons';
 import ActionModal from '../../components/ActionModal';
 import { comunicadosService } from '../../services/comunicadosService';
 import { authService } from '../../services/authService';
+import { getApiBaseUrl } from '../../services/api';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+const API_BASE_URL = getApiBaseUrl();
 
 const NAVY = '#12103C';
 const GOLD = '#cfa235';
