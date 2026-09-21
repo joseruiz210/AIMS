@@ -12,11 +12,7 @@
       "supportsTablet": true
     },
     "android": {
-        "expo": {
-    "scheme": "miproyecto"
-  },
-
-    "package": "com.sena.aims",
+      "package": "com.miproyecto.aims",
       "versionCode": 2,
       "adaptiveIcon": {
         "backgroundColor": "#0F1026",

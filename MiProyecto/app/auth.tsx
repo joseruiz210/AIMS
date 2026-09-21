@@ -145,15 +145,19 @@ export default function AuthScreen() {
 
   
 
-  const googleClientId =
-    process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ||
+  const googleWebClientId =
     process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
+    process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ||
     '801203695881-vjkbm79n28utn02fkiei3tmrieqmkd37.apps.googleusercontent.com';
 
+  const googleAndroidClientId =
+    process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ||
+    '801203695881-gv5vvikcfpbjkpvthpqd1babkk512b4h.apps.googleusercontent.com';
+
   const [request, response, promptAsync] = Google.useAuthRequest({
-    clientId: googleClientId,
-    webClientId: googleClientId,
-    androidClientId: googleClientId,
+    webClientId: googleWebClientId,
+    androidClientId: googleAndroidClientId,
+    clientId: Platform.OS === 'android' ? googleAndroidClientId : googleWebClientId,
     responseType: 'id_token',
     scopes: ['openid', 'profile', 'email'],
     redirectUri: AuthSession.makeRedirectUri({
