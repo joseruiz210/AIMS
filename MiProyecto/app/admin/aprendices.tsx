@@ -47,10 +47,12 @@ export default function AprendicesScreen() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [usersRes, stats] = await Promise.all([
-        adminService.getUsers({ role: 'APRENDIZ', limit: 1000 }),
-        adminService.getDashboardStats(),
-      ]);
+      let usersRes: any = { users: [], total: 0 };
+      try {
+        usersRes = await adminService.getUsers({ role: 'APRENDIZ', limit: 500 });
+      } catch {
+        usersRes = await adminService.getUsers({ role: 'APRENDIZ', limit: 100 });
+      }
 
       const rawUsers = usersRes.users || [];
       const mapped: AprendizRow[] = rawUsers.map((u: any, idx: number) => {
@@ -337,10 +339,10 @@ const styles = StyleSheet.create({
   },
   metricCard: {
     flex: 1,
-    minWidth: 140,
+    minWidth: '47%',
     backgroundColor: '#FFFFFF',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',

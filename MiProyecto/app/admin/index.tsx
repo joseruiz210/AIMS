@@ -474,7 +474,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   mobileCard: {
-    minWidth: '45%',
+    minWidth: '47%',
   },
   cardHeader: {
     marginBottom: 12,
@@ -531,7 +531,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(207, 162, 53, 0.15)',
   },
   mobileActionCard: {
-    minWidth: '45%',
+    minWidth: '47%',
   },
   actionIconWrap: {
     width: 48,

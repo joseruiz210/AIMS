@@ -38,8 +38,9 @@ export interface RegisterData {
   };
 }
 
-// Configuración de URL base para la API Backend
-const API_BASE_URL = getApiBaseUrl();
+// Configuración de URL base dinámica para la API Backend
+const getBaseUrl = () => getApiBaseUrl();
+
 /**
  * Servicio de Autenticación JWT y Gestión de Cuenta
  */
@@ -57,7 +58,7 @@ export const authService = {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      const response = await fetch(`${getBaseUrl()}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: correo, password: contrasenia }),
@@ -106,7 +107,6 @@ export const authService = {
       return { success: false, message: 'Las contraseñas no coinciden.' };
     }
 
-    // el backend espera firstName y lastName separados
     const parts = nombre.trim().split(/\s+/);
     const firstName = parts[0] || '';
     const lastName = parts.slice(1).join(' ') || firstName;
@@ -142,7 +142,7 @@ export const authService = {
         if (academicData.trimestre) payload.trimestre = academicData.trimestre;
       }
 
-      const response = await fetch(`${API_BASE_URL}/auth/register`, {
+      const response = await fetch(`${getBaseUrl()}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -153,7 +153,6 @@ export const authService = {
         return { success: false, message: data.message || 'Error al registrar usuario.' };
       }
 
-      // el registro NO devuelve token (solo retorna el user creado y su matrícula si aplica)
       return { success: true, user: data.data, message: data.message };
     } catch (error: any) {
       return { success: false, message: error.message || 'Error al conectar con el servidor.' };
@@ -199,7 +198,7 @@ export const authService = {
    */
   async verifyEmailToken(token: string): Promise<AuthResponse> {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/verify-email`, {
+      const response = await fetch(`${getBaseUrl()}/auth/verify-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token }),
@@ -219,7 +218,7 @@ export const authService = {
    */
   async forgotPassword(correo: string): Promise<AuthResponse> {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+      const response = await fetch(`${getBaseUrl()}/auth/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: correo }),
@@ -239,7 +238,7 @@ export const authService = {
    */
   async resetPassword(token: string, newPassword: string): Promise<AuthResponse> {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+      const response = await fetch(`${getBaseUrl()}/auth/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, newPassword }),
@@ -252,72 +251,70 @@ export const authService = {
     } catch (error: any) {
       return { success: false, message: error.message || 'Error de conexión con el servidor.' };
     }
-
-    
   },
 
   /**
- * Enviar Magic Link al correo (login sin contraseña)
- */
-async sendMagicLink(correo: string): Promise<AuthResponse> {
-  try {
-    const response = await fetch(`${API_BASE_URL}/auth/magic-link`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: correo }),
-    });
-    const data = await response.json();
-    if (!response.ok) {
-      return { success: false, message: data.message || 'Error al enviar el enlace.' };
+   * Enviar Magic Link al correo (login sin contraseña)
+   */
+  async sendMagicLink(correo: string): Promise<AuthResponse> {
+    try {
+      const response = await fetch(`${getBaseUrl()}/auth/magic-link`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: correo }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, message: data.message || 'Error al enviar el enlace.' };
+      }
+      return { success: true, message: data.message };
+    } catch (error: any) {
+      return { success: false, message: error.message || 'Error de conexión con el servidor.' };
     }
-    return { success: true, message: data.message };
-  } catch (error: any) {
-    return { success: false, message: error.message || 'Error de conexión con el servidor.' };
-  }
-},
+  },
 
-/**
- * Verificar el token del Magic Link y obtener sesión
- */
-async verifyMagicLinkToken(token: string): Promise<AuthResponse> {
-  try {
-    const response = await fetch(`${API_BASE_URL}/auth/magic-link/verify`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token }),
-    });
-    const data = await response.json();
-    if (!response.ok) {
-      return { success: false, message: data.message || 'Enlace inválido o expirado.' };
+  /**
+   * Verificar el token del Magic Link y obtener sesión
+   */
+  async verifyMagicLinkToken(token: string): Promise<AuthResponse> {
+    try {
+      const response = await fetch(`${getBaseUrl()}/auth/magic-link/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, message: data.message || 'Enlace inválido o expirado.' };
+      }
+      await saveToken(data.data.accessToken);
+      await saveUserData(data.data.user);
+      return { success: true, token: data.data.accessToken, user: data.data.user, message: data.message };
+    } catch (error: any) {
+      return { success: false, message: error.message || 'Error de conexión con el servidor.' };
     }
-    await saveToken(data.data.accessToken);
-    await saveUserData(data.data.user);
-    return { success: true, token: data.data.accessToken, user: data.data.user, message: data.message };
-  } catch (error: any) {
-    return { success: false, message: error.message || 'Error de conexión con el servidor.' };
-  }
-},
+  },
 
-/**
- * Iniciar sesión con Google usando el idToken de expo-auth-session
- */
-async googleLogin(idToken: string): Promise<AuthResponse> {
-  try {
-    const response = await fetch(`${API_BASE_URL}/auth/google`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idToken }),
-    });
-    const data = await response.json();
-    if (!response.ok) {
-      return { success: false, message: data.message || 'Error al iniciar sesión con Google.' };
+  /**
+   * Iniciar sesión con Google usando el idToken de expo-auth-session
+   */
+  async googleLogin(idToken: string): Promise<AuthResponse> {
+    try {
+      const response = await fetch(`${getBaseUrl()}/auth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, message: data.message || 'Error al iniciar sesión con Google.' };
+      }
+      await saveToken(data.data.accessToken);
+      await saveUserData(data.data.user);
+      return { success: true, token: data.data.accessToken, user: data.data.user, message: data.message };
+    } catch (error: any) {
+      return { success: false, message: error.message || 'Error de conexión con el servidor.' };
     }
-    await saveToken(data.data.accessToken);
-    await saveUserData(data.data.user);
-    return { success: true, token: data.data.accessToken, user: data.data.user, message: data.message };
-  } catch (error: any) {
-    return { success: false, message: error.message || 'Error de conexión con el servidor.' };
-  }
   },
 
   /**
@@ -328,7 +325,7 @@ async googleLogin(idToken: string): Promise<AuthResponse> {
       const token = await getToken();
       if (!token) return false;
 
-      const response = await fetch(`${API_BASE_URL}/users/push-token`, {
+      const response = await fetch(`${getBaseUrl()}/users/push-token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -347,7 +344,7 @@ async googleLogin(idToken: string): Promise<AuthResponse> {
    */
   async getProfile(): Promise<{ success: boolean; user?: any; message?: string }> {
     try {
-      const response = await this.fetchWithAuth(`${API_BASE_URL}/users/profile`);
+      const response = await this.fetchWithAuth(`${getBaseUrl()}/users/profile`);
       const data = await response.json();
       if (!response.ok) {
         return { success: false, message: data.message || 'Error al obtener perfil' };
@@ -369,7 +366,7 @@ async googleLogin(idToken: string): Promise<AuthResponse> {
     documentNumber?: string;
   }): Promise<{ success: boolean; user?: any; message?: string }> {
     try {
-      const response = await this.fetchWithAuth(`${API_BASE_URL}/users/profile`, {
+      const response = await this.fetchWithAuth(`${getBaseUrl()}/users/profile`, {
         method: 'PUT',
         body: JSON.stringify(profileData),
       });
