@@ -158,8 +158,8 @@ export default function AuthScreen() {
     webClientId: googleWebClientId,
     androidClientId: googleAndroidClientId,
     clientId: Platform.OS === 'android' ? googleAndroidClientId : googleWebClientId,
-    responseType: 'id_token',
     scopes: ['openid', 'profile', 'email'],
+    ...(Platform.OS === 'web' ? { responseType: 'id_token' } : {}),
   });
 useEffect(() => {
   const handleGoogleResponse = async () => {
