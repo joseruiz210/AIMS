@@ -2,7 +2,11 @@ import { useEffect } from 'react';
 import { Platform } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import * as WebBrowser from 'expo-web-browser';
 import { AuthProvider } from '../context/AuthContext';
+
+// Permite capturar los callbacks de OAuth en ventanas emergentes (Google Auth) y cerrarlas automáticamente
+WebBrowser.maybeCompleteAuthSession();
 
 export default function RootLayout() {
   useEffect(() => {

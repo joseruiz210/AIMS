@@ -145,16 +145,21 @@ export default function AuthScreen() {
 
   
 
- const [request, response, promptAsync] = Google.useAuthRequest({
-  clientId:
+  const googleClientId =
+    process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ||
     process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
-    '801203695881-vjkbm79n28utn02fkiei3tmrieqmkd37.apps.googleusercontent.com',
-  responseType: 'id_token',
-  scopes: ['openid', 'profile', 'email'],
-  redirectUri: AuthSession.makeRedirectUri({
-    scheme: 'miproyecto',
-  }),
-});
+    '801203695881-vjkbm79n28utn02fkiei3tmrieqmkd37.apps.googleusercontent.com';
+
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    clientId: googleClientId,
+    webClientId: googleClientId,
+    androidClientId: googleClientId,
+    responseType: 'id_token',
+    scopes: ['openid', 'profile', 'email'],
+    redirectUri: AuthSession.makeRedirectUri({
+      scheme: 'miproyecto',
+    }),
+  });
 useEffect(() => {
   const handleGoogleResponse = async () => {
     if (response?.type === 'success') {
