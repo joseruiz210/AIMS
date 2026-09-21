@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -49,6 +49,12 @@ function getPasswordValidation(password: string) {
 export default function ResetPasswordScreen() {
   const { token: paramToken } = useLocalSearchParams<{ token: string }>();
   const [token, setToken] = useState(paramToken || '');
+
+  useEffect(() => {
+    if (paramToken) {
+      setToken(paramToken);
+    }
+  }, [paramToken]);
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [showPassword, setShowPassword] = useState(false);
