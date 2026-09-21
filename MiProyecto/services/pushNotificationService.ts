@@ -1,31 +1,59 @@
 import { Platform } from 'react-native';
-import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
-import Constants from 'expo-constants';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { authService } from './authService';
 
-// Configurar el comportamiento de las notificaciones flotantes (in-app banner, sonido e insignia)
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+// Detectar si la aplicación se ejecuta dentro de Expo Go
+const isExpoGo =
+  Constants.appOwnership === 'expo' ||
+  Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+
+let NotificationsModule: any = null;
+
+function getNotifications(): any {
+  if (isExpoGo || Platform.OS === 'web') return null;
+  if (NotificationsModule) return NotificationsModule;
+  try {
+    NotificationsModule = require('expo-notifications');
+    return NotificationsModule;
+  } catch {
+    console.log('[Push] expo-notifications no está disponible en este entorno.');
+    return null;
+  }
+}
 
 /**
  * Solicita permisos de notificación al usuario, configura el canal prioritario en Android,
- * obtiene el Expo Push Token del dispositivo y lo envía automáticamente al backend de Azure.
+ * obtiene el Expo Push Token del dispositivo y lo envía automáticamente al backend.
  */
 export async function registerForPushNotificationsAsync(): Promise<string | null> {
-  // En entorno Web se omite limpiamente
-  if (Platform.OS === 'web') {
+  // En Web o Expo Go (SDK 53+) se omite de forma segura sin romper la aplicación
+  if (Platform.OS === 'web' || isExpoGo) {
+    if (isExpoGo) {
+      console.log('[Push] Notificaciones push omitidas en Expo Go (SDK 53+ requiere build de desarrollo / APK).');
+    }
     return null;
   }
 
+  const Notifications = getNotifications();
+  if (!Notifications) return null;
+
   try {
+    // Configurar el comportamiento de notificaciones de forma segura
+    try {
+      Notifications.setNotificationHandler({
+        handleNotification: async () => ({
+          shouldShowAlert: true,
+          shouldPlaySound: true,
+          shouldSetBadge: true,
+          shouldShowBanner: true,
+          shouldShowList: true,
+        }),
+      });
+    } catch {
+      // Ignorar si el manejador no está disponible en este entorno
+    }
+
     // Configurar canal de notificación prioritaria en Android (requerido para Android 8.0+)
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('default', {
@@ -60,7 +88,7 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
     const pushToken = tokenData.data;
 
     if (pushToken) {
-      // Registrar el pushToken en el backend en Azure mediante el endpoint /users/push-token
+      // Registrar el pushToken en el backend mediante el endpoint /users/push-token
       await authService.updatePushToken(pushToken);
     }
 
@@ -70,3 +98,5 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
     return null;
   }
 }
+
+

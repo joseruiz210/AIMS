@@ -85,8 +85,9 @@ export default function UsuariosAdmin() {
         email,
         role,
       });
-    } catch {
-      // Guardado local
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || 'No se pudo guardar el usuario en la base de datos');
     }
   };
 

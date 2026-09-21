@@ -67,7 +67,7 @@ export const evidenciasService = {
                 comentario: entrega.comentario,
                 fechaEntrega: entrega.fechaEntrega ? new Date(entrega.fechaEntrega).toLocaleDateString('es-CO') : 'Hoy',
                 nota: entrega.nota !== undefined && entrega.nota !== null ? Number(entrega.nota) : undefined,
-                feedback: entrega.comentario || undefined,
+                feedback: entrega.feedback || entrega.comentario || undefined,
               }
             : undefined,
         };

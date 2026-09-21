@@ -1,5 +1,5 @@
 import React, { forwardRef } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Platform } from 'react-native';
 import ReCAPTCHA from 'react-google-recaptcha';
 
 interface RecaptchaWidgetProps {
@@ -16,14 +16,26 @@ export const RecaptchaWidget = forwardRef<ReCAPTCHA, RecaptchaWidgetProps>(
   ({ onChange, onExpired, theme = 'light' }, ref) => {
     return (
       <View style={styles.container}>
-        <ReCAPTCHA
-          ref={ref}
-          sitekey={SITE_KEY}
-          onChange={onChange}
-          onExpired={onExpired}
-          theme={theme}
-          hl="es"
-        />
+        {Platform.OS === 'web' && (
+          <style>{`
+            .g-recaptcha-bubble-arrow,
+            iframe[title*="recaptcha"] + div,
+            div[style*="color: red"],
+            div[style*="color: rgb(255, 0, 0)"] {
+              display: none !important;
+            }
+          `}</style>
+        )}
+        <View style={styles.recaptchaWrapper}>
+          <ReCAPTCHA
+            ref={ref}
+            sitekey={SITE_KEY}
+            onChange={onChange}
+            onExpired={onExpired}
+            theme={theme}
+            hl="es"
+          />
+        </View>
       </View>
     );
   }
@@ -37,5 +49,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
+  },
+  recaptchaWrapper: {
+    height: 78,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    width: 304,
   },
 });

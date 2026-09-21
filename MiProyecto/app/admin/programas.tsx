@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,12 +10,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ActionModal from '../../components/ActionModal';
-
 import { programasService } from '../../services/programasService';
 
 const NAVY = '#12103C';
 const GOLD = '#cfa235';
-const GOLD_LIGHT = 'rgba(207, 162, 53, 0.12)';
 
 interface ProgramItem {
   id: string;
@@ -37,8 +35,8 @@ const INITIAL_PROGRAMAS: ProgramItem[] = [
     id: '1',
     badge: 'ADSO',
     badgeColor: GOLD,
-    title: 'Análisis y Desarrollo de Software',
-    level: 'Tecnólogo - 24 meses',
+    title: 'An\u00e1lisis y Desarrollo de Software',
+    level: 'Tecn\u00f3logo - 24 meses',
     status: 'ACTIVO',
     fichas: 8,
     aprendices: 108,
@@ -51,8 +49,8 @@ const INITIAL_PROGRAMAS: ProgramItem[] = [
     id: '2',
     badge: 'DG',
     badgeColor: '#A855F7',
-    title: 'Diseño Gráfico',
-    level: 'Técnico - 18 meses',
+    title: 'Dise\u00f1o Gr\u00e1fico',
+    level: 'T\u00e9cnico - 18 meses',
     status: 'ACTIVO',
     fichas: 4,
     aprendices: 101,
@@ -65,8 +63,8 @@ const INITIAL_PROGRAMAS: ProgramItem[] = [
     id: '3',
     badge: 'AE',
     badgeColor: '#3B82F6',
-    title: 'Administración de Empresas',
-    level: 'Tecnólogo - 24 meses',
+    title: 'Administraci\u00f3n de Empresas',
+    level: 'Tecn\u00f3logo - 24 meses',
     status: 'ACTIVO',
     fichas: 6,
     aprendices: 180,
@@ -80,7 +78,7 @@ const INITIAL_PROGRAMAS: ProgramItem[] = [
     badge: 'CF',
     badgeColor: '#10B981',
     title: 'Contabilidad y Finanzas',
-    level: 'Tecnólogo - 24 meses',
+    level: 'Tecn\u00f3logo - 24 meses',
     status: 'ACTIVO',
     fichas: 5,
     aprendices: 140,
@@ -94,7 +92,7 @@ const INITIAL_PROGRAMAS: ProgramItem[] = [
     badge: 'MRK',
     badgeColor: '#EC4899',
     title: 'Mercadeo Digital',
-    level: 'Técnico - 12 meses',
+    level: 'T\u00e9cnico - 12 meses',
     status: 'ACTIVO',
     fichas: 3,
     aprendices: 60,
@@ -113,17 +111,17 @@ export default function ProgramasScreen() {
   const [programas, setProgramas] = useState<ProgramItem[]>(INITIAL_PROGRAMAS);
   const [modalVisible, setModalVisible] = useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
     (async () => {
       const data = await programasService.getProgramas();
       if (data.length > 0) {
         setProgramas(
           data.map((p) => ({
             id: p.id,
-            badge: p.codigo.slice(0, 4) || 'PRG',
+            badge: (p.codigo || 'PRG').slice(0, 4).toUpperCase(),
             badgeColor: GOLD,
             title: p.nombre,
-            level: `${p.nivel} - ${p.duracionMeses} meses`,
+            level: `${p.nivel || 'Tecn\u00f3logo'} - ${p.duracionMeses || 24} meses`,
             status: (p.estado as any) || 'ACTIVO',
             fichas: p.fichasActivasCount || 1,
             aprendices: 30,
@@ -168,7 +166,7 @@ export default function ProgramasScreen() {
         duracionMeses: parseInt(nivelDuracion.replace(/[^0-9]/g, '') || '24', 10),
       });
     } catch {
-      // Guardado local
+      // Local fallback
     }
   };
 
@@ -181,16 +179,20 @@ export default function ProgramasScreen() {
   const totalProgramas = programas.length;
   const totalFichas = programas.reduce((acc, p) => acc + p.fichas, 0);
   const totalAprendices = programas.reduce((acc, p) => acc + p.aprendices, 0);
-  const promedioGlobal = (
+  const promedioGlobal = totalProgramas > 0 ? (
     programas.reduce((acc, p) => acc + p.promedioNotas, 0) / totalProgramas
-  ).toFixed(1);
+  ).toFixed(1) : '4.2';
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={true}>
       {/* Top Action Bar */}
       <View style={styles.topHeader}>
-        <Text style={styles.pageTitle}>Programas</Text>
-        <Pressable 
+        <View>
+          <Text style={styles.pageTitle}>Programas</Text>
+          <Text style={styles.pageSubtitle}>Programas de formación académica tecnológica SENA.</Text>
+        </View>
+
+        <Pressable
           style={({ hovered }: any) => [styles.newBtn, hovered && styles.newBtnHover]}
           onPress={() => setModalVisible(true)}
         >
@@ -241,7 +243,7 @@ export default function ProgramasScreen() {
                 <View style={[styles.badgePill, { backgroundColor: prog.badgeColor }]}>
                   <Text style={styles.badgeText}>{prog.badge}</Text>
                 </View>
-                <View style={{ marginLeft: 12 }}>
+                <View style={{ marginLeft: 12, flex: 1 }}>
                   <Text style={styles.programTitle}>{prog.title}</Text>
                   <Text style={styles.programLevel}>{prog.level}</Text>
                 </View>
@@ -325,19 +327,26 @@ const styles = StyleSheet.create({
     backgroundColor: '#F4F6F9',
   },
   contentContainer: {
-    padding: 24,
-    paddingBottom: 40,
+    padding: 20,
+    paddingBottom: 50,
   },
   topHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 12,
     marginBottom: 20,
   },
   pageTitle: {
     fontSize: 26,
     fontWeight: '700',
     color: NAVY,
+  },
+  pageSubtitle: {
+    fontSize: 13,
+    color: '#64748B',
+    marginTop: 2,
   },
   newBtn: {
     flexDirection: 'row',
@@ -346,11 +355,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 10,
-    shadowColor: GOLD,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 3,
   },
   newBtnHover: {
     backgroundColor: '#b88d2a',
@@ -363,25 +367,28 @@ const styles = StyleSheet.create({
   metricsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 14,
-    marginBottom: 22,
+    gap: 12,
+    marginBottom: 20,
   },
   metricCard: {
     flex: 1,
-    minWidth: 150,
-    backgroundColor: '#E5E7EB',
+    minWidth: 140,
+    backgroundColor: '#FFFFFF',
     paddingVertical: 16,
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   metricLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#4B5563',
-    letterSpacing: 0.8,
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+    letterSpacing: 0.5,
     marginBottom: 6,
+    textAlign: 'center',
   },
   metricValueGold: {
     fontSize: 24,
@@ -400,13 +407,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    marginBottom: 22,
+    marginBottom: 20,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
   },
   searchInput: {
     flex: 1,
@@ -414,32 +417,31 @@ const styles = StyleSheet.create({
     color: NAVY,
   },
   listContainer: {
-    gap: 18,
+    gap: 16,
   },
   programCard: {
-    backgroundColor: '#EAEAEA',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    padding: 20,
+    padding: 18,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
+    borderColor: '#E2E8F0',
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
+    flexWrap: 'wrap',
+    gap: 10,
   },
   titleGroup: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
   badgePill: {
-    width: 54,
-    height: 38,
+    width: 50,
+    height: 36,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
@@ -447,50 +449,53 @@ const styles = StyleSheet.create({
   badgeText: {
     color: '#FFFFFF',
     fontWeight: '800',
-    fontSize: 14,
+    fontSize: 13,
   },
   programTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '700',
     color: NAVY,
   },
   programLevel: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#64748B',
     marginTop: 2,
   },
   statusBadgeActive: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#ECFDF5',
     paddingVertical: 4,
     paddingHorizontal: 12,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#A7F3D0',
   },
   statusTextActive: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
-    color: '#64748B',
+    color: '#047857',
   },
   cardMetricsGrid: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F8FAFC',
     borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
     marginBottom: 16,
+    flexWrap: 'wrap',
+    gap: 10,
   },
   cardMetricItem: {
     alignItems: 'center',
+    minWidth: 60,
   },
   cardMetricValue: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '700',
     color: NAVY,
   },
   cardMetricLabel: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#64748B',
     marginTop: 2,
   },
@@ -503,23 +508,23 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   progressLabel: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#475569',
   },
   progressValue: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
     color: NAVY,
   },
   trackBar: {
-    height: 12,
-    backgroundColor: '#D1D5DB',
-    borderRadius: 6,
+    height: 10,
+    backgroundColor: '#E2E8F0',
+    borderRadius: 5,
     overflow: 'hidden',
   },
   fillBar: {
     height: '100%',
-    borderRadius: 6,
+    borderRadius: 5,
   },
   gradeRow: {
     flexDirection: 'row',
@@ -528,11 +533,11 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   gradeLabel: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#475569',
   },
   gradeValue: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
     color: NAVY,
   },
