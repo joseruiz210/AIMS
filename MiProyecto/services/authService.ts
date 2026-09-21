@@ -214,6 +214,26 @@ export const authService = {
   },
 
   /**
+   * Reenviar correo de verificación de cuenta
+   */
+  async resendVerification(correo: string): Promise<AuthResponse> {
+    try {
+      const response = await fetch(`${getBaseUrl()}/auth/resend-verification`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: correo.trim().toLowerCase() }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, message: data.message || 'Error al reenviar correo de verificación.' };
+      }
+      return { success: true, message: data.message };
+    } catch (error: any) {
+      return { success: false, message: error.message || 'Error de conexión con el servidor.' };
+    }
+  },
+
+  /**
    * Solicitar recuperación de contraseña (envía el correo con el enlace)
    */
   async forgotPassword(correo: string): Promise<AuthResponse> {
@@ -221,7 +241,7 @@ export const authService = {
       const response = await fetch(`${getBaseUrl()}/auth/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: correo }),
+        body: JSON.stringify({ email: correo.trim().toLowerCase() }),
       });
       const data = await response.json();
       if (!response.ok) {

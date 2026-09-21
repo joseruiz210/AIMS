@@ -64,6 +64,7 @@ export default function AuthScreen() {
   // Feedback Messages
   const [feedback, setFeedback] = useState<{ text: string; type: 'error' | 'success' } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showResendBtn, setShowResendBtn] = useState(false);
 
   // Campos académicos para Aprendices
   const [regFichaNumero, setRegFichaNumero] = useState('');
@@ -145,22 +146,15 @@ export default function AuthScreen() {
   
 
  const [request, response, promptAsync] = Google.useAuthRequest({
-    webClientId:
-      process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
-      '801203695881-vjkbm79n28utn02fkiei3tmrieqmkd37.apps.googleusercontent.com',
-    androidClientId:
-      process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ||
-      '801203695881-gv5vvikcfpbjkpvthpqd1babkk512b4h.apps.googleusercontent.com',
-    iosClientId:
-      process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ||
-      '801203695881-vjkbm79n28utn02fkiei3tmrieqmkd37.apps.googleusercontent.com',
-    responseType: 'id_token',
-    scopes: ['openid', 'profile', 'email'],
-    redirectUri: AuthSession.makeRedirectUri({
-      scheme: 'miproyecto',
-      preferLocalhost: true,
-    }),
-  });
+  clientId:
+    process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
+    '801203695881-vjkbm79n28utn02fkiei3tmrieqmkd37.apps.googleusercontent.com',
+  responseType: 'id_token',
+  scopes: ['openid', 'profile', 'email'],
+  redirectUri: AuthSession.makeRedirectUri({
+    scheme: 'miproyecto',
+  }),
+});
 useEffect(() => {
   const handleGoogleResponse = async () => {
     if (response?.type === 'success') {
@@ -220,8 +214,21 @@ useEffect(() => {
   setFeedback({ text: res.message || '', type: res.success ? 'success' : 'error' });
 };
 
+  const handleResendVerification = async () => {
+    const cleanEmail = loginCorreo.trim().toLowerCase();
+    if (!cleanEmail) {
+      setFeedback({ text: 'Ingresa tu correo para reenviar el enlace de verificación.', type: 'error' });
+      return;
+    }
+    setIsSubmitting(true);
+    const res = await authService.resendVerification(cleanEmail);
+    setIsSubmitting(false);
+    setFeedback({ text: res.message || 'Correo de verificación reenviado.', type: res.success ? 'success' : 'error' });
+  };
+
   const handleLogin = async () => {
     setFeedback(null);
+    setShowResendBtn(false);
     if (!loginCorreo || !loginPassword) {
       setFeedback({ text: 'Por favor completa todos los campos.', type: 'error' });
       return;
@@ -249,8 +256,11 @@ useEffect(() => {
     setIsSubmitting(false);
 
     if (!res.success) {
+      const isUnverified = (res.message || '').toLowerCase().includes('verificar');
+      setShowResendBtn(isUnverified);
       setFeedback({ text: res.message || 'Error al iniciar sesión', type: 'error' });
     } else {
+      setShowResendBtn(false);
       // Guardar o eliminar credenciales según estado de Recordar mis datos
       if (rememberMe) {
         await saveRememberedAuth({
@@ -355,17 +365,14 @@ useEffect(() => {
       setIsSubmitting(false);
       setFeedback({ text: res.message || 'Error al registrar la cuenta.', type: 'error' });
     } else {
-      setFeedback({ text: '¡Cuenta creada con éxito! Entrando al sistema...', type: 'success' });
-      const loginRes = await login({
-        correo: regCorreo.trim(),
-        contrasenia: regPassword,
-      });
       setIsSubmitting(false);
-      if (!loginRes.success) {
-        setLoginCorreo(regCorreo.trim());
-        setFeedback({ text: '¡Cuenta creada! Ya puedes iniciar sesión con tus credenciales.', type: 'success' });
-        setCurrentScreen('login');
-      }
+      setLoginCorreo(regCorreo.trim().toLowerCase());
+      setShowResendBtn(true);
+      setFeedback({
+        text: res.message || '¡Cuenta creada con éxito! Te hemos enviado un correo de verificación. Por favor confirma tu cuenta en tu correo antes de iniciar sesión.',
+        type: 'success',
+      });
+      setCurrentScreen('login');
     }
   };
   return (
@@ -444,15 +451,37 @@ useEffect(() => {
 
             {/* Banner de Feedback Error/Éxito */}
             {feedback && !isLoading && !isSubmitting && (
-              <View style={[styles.feedbackBanner, feedback.type === 'error' ? styles.feedbackError : styles.feedbackSuccess]}>
-                <Ionicons 
-                  name={feedback.type === 'error' ? 'alert-circle-outline' : 'checkmark-circle-outline'} 
-                  size={20} 
-                  color={feedback.type === 'error' ? '#EF4444' : '#10B981'} 
-                />
-                <Text style={[styles.feedbackText, feedback.type === 'error' ? styles.feedbackTextError : styles.feedbackTextSuccess]}>
-                  {feedback.text}
-                </Text>
+              <View style={{ width: '100%', marginBottom: 12 }}>
+                <View style={[styles.feedbackBanner, feedback.type === 'error' ? styles.feedbackError : styles.feedbackSuccess]}>
+                  <Ionicons 
+                    name={feedback.type === 'error' ? 'alert-circle-outline' : 'checkmark-circle-outline'} 
+                    size={20} 
+                    color={feedback.type === 'error' ? '#EF4444' : '#10B981'} 
+                  />
+                  <Text style={[styles.feedbackText, feedback.type === 'error' ? styles.feedbackTextError : styles.feedbackTextSuccess]}>
+                    {feedback.text}
+                  </Text>
+                </View>
+                {showResendBtn && (
+                  <TouchableOpacity
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: '#C59427',
+                      paddingVertical: 10,
+                      paddingHorizontal: 16,
+                      borderRadius: 8,
+                      marginTop: 8,
+                      alignSelf: 'center',
+                    }}
+                    activeOpacity={0.85}
+                    onPress={handleResendVerification}
+                  >
+                    <Ionicons name="mail-unread-outline" size={16} color="#0B1220" style={{ marginRight: 6 }} />
+                    <Text style={{ color: '#0B1220', fontWeight: '800', fontSize: 13 }}>Reenviar correo de verificación</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             )}
 

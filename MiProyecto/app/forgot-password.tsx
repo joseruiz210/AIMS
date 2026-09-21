@@ -18,12 +18,28 @@ export default function ForgotPasswordScreen() {
   const [correo, setCorreo] = useState('');
   const [message, setMessage] = useState<{ text: string; isError: boolean } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
 
   const handleSubmit = async () => {
+    const cleanEmail = correo.trim().toLowerCase();
+    if (!cleanEmail) {
+      setMessage({ text: 'Por favor ingresa tu correo electrónico.', isError: true });
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(cleanEmail)) {
+      setMessage({ text: 'Por favor ingresa un formato de correo válido.', isError: true });
+      return;
+    }
+
     setLoading(true);
     setMessage(null);
-    const res = await authService.forgotPassword(correo);
+    const res = await authService.forgotPassword(cleanEmail);
     setMessage({ text: res.message || '', isError: !res.success });
+    if (res.success) {
+      setEmailSent(true);
+    }
     setLoading(false);
   };
 
@@ -50,7 +66,7 @@ export default function ForgotPasswordScreen() {
             <Text style={styles.brand}>AIMS</Text>
             <Text style={styles.title}>RECUPERAR CONTRASEÑA</Text>
             <Text style={styles.subtitle}>
-              Ingresa tu correo y te enviaremos un enlace para restablecerla.
+              Ingresa tu correo institucional o personal registrado y te enviaremos el enlace y token para restablecerla.
             </Text>
 
             <Text style={styles.label}>Correo Institucional / Matrícula</Text>
@@ -61,22 +77,50 @@ export default function ForgotPasswordScreen() {
                 placeholder="correo@institucion.edu"
                 placeholderTextColor="#94A3B8"
                 value={correo}
-                onChangeText={setCorreo}
+                onChangeText={(t) => {
+                  setCorreo(t);
+                  if (message) setMessage(null);
+                }}
                 autoCapitalize="none"
                 keyboardType="email-address"
               />
             </View>
 
             {message && (
-              <Text style={message.isError ? styles.errorText : styles.successText}>
-                {message.text}
-              </Text>
+              <View style={message.isError ? styles.errorBox : styles.successBox}>
+                <Ionicons
+                  name={message.isError ? 'alert-circle-outline' : 'checkmark-circle-outline'}
+                  size={20}
+                  color={message.isError ? '#EF4444' : '#22C55E'}
+                  style={{ marginRight: 8 }}
+                />
+                <Text style={message.isError ? styles.errorText : styles.successText}>
+                  {message.text}
+                </Text>
+              </View>
+            )}
+
+            {emailSent && (
+              <View style={styles.infoBox}>
+                <Ionicons name="information-circle-outline" size={18} color="#C59427" style={{ marginRight: 6 }} />
+                <Text style={styles.infoText}>
+                  Revisa tu bandeja de entrada o spam. Copia el token de recuperación recibido y haz clic abajo para ingresar tu nueva contraseña.
+                </Text>
+              </View>
             )}
 
             <TouchableOpacity style={styles.button} onPress={handleSubmit} disabled={loading}>
               <Text style={styles.buttonText}>
-                {loading ? 'Enviando...' : 'Enviar enlace →'}
+                {loading ? 'Enviando...' : emailSent ? 'Reenviar enlace' : 'Enviar enlace y código →'}
               </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={() => router.push('/reset-password')}
+            >
+              <Ionicons name="key-outline" size={16} color="#C59427" style={{ marginRight: 6 }} />
+              <Text style={styles.secondaryButtonText}>Ya tengo un código de recuperación →</Text>
             </TouchableOpacity>
 
             <TouchableOpacity onPress={() => router.replace('/')} style={styles.linkWrapper}>
@@ -193,8 +237,55 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   buttonText: { color: NAVY, fontWeight: '800', fontSize: 14 },
+  secondaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: GOLD,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    width: '100%',
+    marginTop: 12,
+  },
+  secondaryButtonText: { color: GOLD, fontWeight: '700', fontSize: 13 },
   linkWrapper: { marginTop: 18 },
   link: { color: '#64748B', fontSize: 13 },
-  errorText: { color: '#EF4444', marginBottom: 12, fontSize: 13, textAlign: 'center' },
-  successText: { color: '#22C55E', marginBottom: 12, fontSize: 13, textAlign: 'center' },
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 14,
+    width: '100%',
+  },
+  errorText: { color: '#DC2626', fontSize: 13, flex: 1 },
+  successBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#86EFAC',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 14,
+    width: '100%',
+  },
+  successText: { color: '#16A34A', fontSize: 13, flex: 1, fontWeight: '600' },
+  infoBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 14,
+    width: '100%',
+  },
+  infoText: { color: '#92400E', fontSize: 12, lineHeight: 17, flex: 1 },
 });

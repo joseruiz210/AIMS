@@ -47,7 +47,8 @@ function getPasswordValidation(password: string) {
 }
 
 export default function ResetPasswordScreen() {
-  const { token } = useLocalSearchParams<{ token: string }>();
+  const { token: paramToken } = useLocalSearchParams<{ token: string }>();
+  const [token, setToken] = useState(paramToken || '');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -60,6 +61,12 @@ export default function ResetPasswordScreen() {
 
   const handleSubmit = async () => {
     setMessage(null);
+
+    const cleanToken = token.trim();
+    if (!cleanToken) {
+      setMessage({ text: 'Por favor ingresa o pega el token de recuperación que recibiste por correo.', isError: true });
+      return;
+    }
 
     if (!password || !confirm) {
       setMessage({ text: 'Por favor completa todos los campos.', isError: true });
@@ -76,17 +83,12 @@ export default function ResetPasswordScreen() {
       return;
     }
 
-    if (!token) {
-      setMessage({ text: 'Token no encontrado en el enlace.', isError: true });
-      return;
-    }
-
     setLoading(true);
-    const res = await authService.resetPassword(token, password);
+    const res = await authService.resetPassword(cleanToken, password);
     setMessage({ text: res.message || '', isError: !res.success });
     setLoading(false);
     if (res.success) {
-      setTimeout(() => router.replace('/'), 1500);
+      setTimeout(() => router.replace('/'), 2000);
     }
   };
 
@@ -111,7 +113,24 @@ export default function ResetPasswordScreen() {
             />
             <Text style={styles.brand}>AIMS</Text>
             <Text style={styles.title}>NUEVA CONTRASEÑA</Text>
-            <Text style={styles.subtitle}>Crea una nueva contraseña para tu cuenta.</Text>
+            <Text style={styles.subtitle}>Ingresa el código que recibiste por correo y crea tu nueva contraseña.</Text>
+
+            <Text style={styles.label}>Token / Código de recuperación</Text>
+            <View style={styles.inputWrapper}>
+              <Ionicons name="key-outline" size={18} color="#64748B" style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Pega aquí el token recibido"
+                placeholderTextColor="#94A3B8"
+                value={token}
+                onChangeText={(t) => {
+                  setToken(t);
+                  if (message) setMessage(null);
+                }}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
 
             <Text style={styles.label}>Nueva contraseña</Text>
             <View style={styles.inputWrapper}>
@@ -249,6 +268,14 @@ export default function ResetPasswordScreen() {
               <Text style={styles.buttonText}>
                 {loading ? 'Guardando...' : 'Restablecer contraseña →'}
               </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={() => router.push('/forgot-password')} style={styles.secondaryLinkWrapper}>
+              <Text style={styles.secondaryLink}>¿No tienes un token? Solicitar nuevo enlace</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={() => router.replace('/')} style={styles.linkWrapper}>
+              <Text style={styles.link}>← Volver al inicio de sesión</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -427,5 +454,23 @@ const styles = StyleSheet.create({
   },
   matchError: {
     color: '#F87171',
+  },
+  secondaryLinkWrapper: {
+    marginTop: 16,
+    alignItems: 'center',
+  },
+  secondaryLink: {
+    color: '#64748B',
+    fontSize: 13,
+    textDecorationLine: 'underline',
+  },
+  linkWrapper: {
+    marginTop: 14,
+    alignItems: 'center',
+  },
+  link: {
+    color: GOLD,
+    fontSize: 13,
+    fontWeight: '700',
   },
 });
