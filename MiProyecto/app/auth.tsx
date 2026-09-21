@@ -160,9 +160,6 @@ export default function AuthScreen() {
     clientId: Platform.OS === 'android' ? googleAndroidClientId : googleWebClientId,
     responseType: 'id_token',
     scopes: ['openid', 'profile', 'email'],
-    redirectUri: AuthSession.makeRedirectUri({
-      scheme: 'miproyecto',
-    }),
   });
 useEffect(() => {
   const handleGoogleResponse = async () => {
