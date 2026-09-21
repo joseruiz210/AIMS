@@ -161,12 +161,12 @@ export default function ObservacionesAprendizScreen() {
           visible={modalVisible}
           onClose={() => setModalVisible(false)}
           title={`Observación: ${selectedObs.tipo}`}
-          subtitle={`${selectedObs.materia} • ${selectedObs.instructor}`}
+          subtitle={`${selectedObs.materia || 'General'} • ${selectedObs.instructorNombre || 'Instructor'}`}
           iconName="eye-outline"
           confirmText="Aceptar"
           fields={[
             { label: 'Tipo', placeholder: selectedObs.tipo },
-            { label: 'Instructor', placeholder: selectedObs.instructor },
+            { label: 'Instructor', placeholder: selectedObs.instructorNombre || 'Instructor' },
             { label: 'Fecha de Registro', placeholder: selectedObs.fecha },
             { label: 'Detalle Completo', placeholder: selectedObs.descripcion, type: 'multiline' },
           ]}
