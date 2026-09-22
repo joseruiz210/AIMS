@@ -11,27 +11,42 @@ const getDynamicHost = (): string => {
   return 'localhost';
 };
 
-// URL base de la API backend calculada dinámicamente según el entorno
+// URL base de la API backend calculada dinámicamente según el entorno (Local / Azure)
 export const getApiBaseUrl = (): string => {
-  if (process.env.EXPO_PUBLIC_API_URL) {
-    return process.env.EXPO_PUBLIC_API_URL;
+  const rawUrl =
+    process.env.EXPO_PUBLIC_API_URL ||
+    process.env.EXPO_PUBLIC_API_URI ||
+    process.env.VITE_API_URI;
+
+  if (rawUrl && typeof rawUrl === 'string' && rawUrl.trim() !== '') {
+    let clean = rawUrl.trim().replace(/\/+$/, '');
+    if (!clean.endsWith('/api/v1')) {
+      clean = `${clean}/api/v1`;
+    }
+    return clean;
   }
+
   if (Platform.OS === 'web') {
     return typeof window !== 'undefined'
       ? `http://${window.location.hostname}:3000/api/v1`
       : 'http://localhost:3000/api/v1';
   }
+
   const dynamicHost = getDynamicHost();
   if (dynamicHost === 'localhost' || dynamicHost === '127.0.0.1') {
     return Platform.OS === 'android' ? 'http://10.0.2.2:3000/api/v1' : 'http://localhost:3000/api/v1';
   }
+
   const isLocalIp = /^(\d{1,3}\.){3}\d{1,3}$/.test(dynamicHost);
   if (isLocalIp) {
     return `http://${dynamicHost}:3000/api/v1`;
   }
+
   // Si es un túnel (ngrok, exp.direct, expo.dev), conectar al backend desplegado en Azure
   return 'https://academicaimsapp-edh3c3g2eabtgqc2.westus-01.azurewebsites.net/api/v1';
 };
+
+const API_BASE_URL = getApiBaseUrl();
 
 // ─── Cache en memoria con TTL ────────────────────────────────────────────────
 // Evita llamadas HTTP redundantes a la API para peticiones GET identicas.
