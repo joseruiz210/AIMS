@@ -11,12 +11,35 @@ const getDynamicHostIp = (): string => {
   return 'localhost';
 };
 
-// URL base de la API backend
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || (Platform.OS === 'web'
-  ? (typeof window !== 'undefined' ? `http://${window.location.hostname}:3000/api/v1` : 'http://localhost:3000/api/v1')
-  : (Platform.OS === 'android' && getDynamicHostIp() === 'localhost'
-    ? 'http://10.0.2.2:3000/api/v1'
-    : `http://${getDynamicHostIp()}:3000/api/v1`));
+// URL base de la API backend con resolución flexible para Expo / Azure
+const resolveApiBaseUrl = (): string => {
+  const rawUrl =
+    process.env.EXPO_PUBLIC_API_URL ||
+    process.env.EXPO_PUBLIC_API_URI ||
+    process.env.VITE_API_URI;
+
+  if (rawUrl && typeof rawUrl === 'string' && rawUrl.trim() !== '') {
+    let clean = rawUrl.trim().replace(/\/+$/, '');
+    if (!clean.endsWith('/api/v1')) {
+      clean = `${clean}/api/v1`;
+    }
+    return clean;
+  }
+
+  if (Platform.OS === 'web') {
+    return typeof window !== 'undefined'
+      ? `http://${window.location.hostname}:3000/api/v1`
+      : 'http://localhost:3000/api/v1';
+  }
+
+  if (Platform.OS === 'android' && getDynamicHostIp() === 'localhost') {
+    return 'http://10.0.2.2:3000/api/v1';
+  }
+
+  return `http://${getDynamicHostIp()}:3000/api/v1`;
+};
+
+const API_BASE_URL = resolveApiBaseUrl();
 
 export const getApiBaseUrl = () => API_BASE_URL;
 
