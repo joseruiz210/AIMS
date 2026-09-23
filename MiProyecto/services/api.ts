@@ -3,7 +3,7 @@ import Constants from 'expo-constants';
 import { getToken, saveToken, removeToken, getUserData, saveUserData, removeUserData } from '../utils/storage';
 
 // Determina la IP del host dinámicamente para Expo Go en dispositivos físicos
-const getDynamicHostIp = (): string => {
+const getDynamicHost = (): string => {
   const hostUri = Constants.expoConfig?.hostUri || (Constants as any).manifest2?.extra?.expoGo?.debuggerHost;
   if (hostUri) {
     return hostUri.split(':')[0];
@@ -11,8 +11,8 @@ const getDynamicHostIp = (): string => {
   return 'localhost';
 };
 
-// URL base de la API backend con resolución flexible para Expo / Azure
-const resolveApiBaseUrl = (): string => {
+// URL base de la API backend calculada dinámicamente según el entorno (Local / Azure)
+export const getApiBaseUrl = (): string => {
   const rawUrl =
     process.env.EXPO_PUBLIC_API_URL ||
     process.env.EXPO_PUBLIC_API_URI ||
@@ -32,16 +32,21 @@ const resolveApiBaseUrl = (): string => {
       : 'http://localhost:3000/api/v1';
   }
 
-  if (Platform.OS === 'android' && getDynamicHostIp() === 'localhost') {
-    return 'http://10.0.2.2:3000/api/v1';
+  const dynamicHost = getDynamicHost();
+  if (dynamicHost === 'localhost' || dynamicHost === '127.0.0.1') {
+    return Platform.OS === 'android' ? 'http://10.0.2.2:3000/api/v1' : 'http://localhost:3000/api/v1';
   }
 
-  return `http://${getDynamicHostIp()}:3000/api/v1`;
+  const isLocalIp = /^(\d{1,3}\.){3}\d{1,3}$/.test(dynamicHost);
+  if (isLocalIp) {
+    return `http://${dynamicHost}:3000/api/v1`;
+  }
+
+  // Si es un túnel (ngrok, exp.direct, expo.dev), conectar al backend desplegado en Azure
+  return 'https://academicaimsapp-edh3c3g2eabtgqc2.westus-01.azurewebsites.net/api/v1';
 };
 
-const API_BASE_URL = resolveApiBaseUrl();
-
-export const getApiBaseUrl = () => API_BASE_URL;
+const API_BASE_URL = getApiBaseUrl();
 
 // ─── Cache en memoria con TTL ────────────────────────────────────────────────
 // Evita llamadas HTTP redundantes a la API para peticiones GET identicas.
@@ -125,8 +130,9 @@ export async function apiFetch<T = any>(
   try {
     const method = (options.method || 'GET').toUpperCase();
     const isReadOnly = method === 'GET';
+    const baseUrl = getApiBaseUrl();
     const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-    const cacheKey = `${API_BASE_URL}${cleanEndpoint}`;
+    const cacheKey = `${baseUrl}${cleanEndpoint}`;
 
     // Servir desde cache si es GET y hay una entrada valida
     if (isReadOnly) {
@@ -146,10 +152,22 @@ export async function apiFetch<T = any>(
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${API_BASE_URL}${cleanEndpoint}`, {
-      ...options,
-      headers,
-    });
+    const targetUrl = `${baseUrl}${cleanEndpoint}`;
+    console.log(`[API] ${method} -> ${targetUrl}`);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+    let response: Response;
+    try {
+      response = await fetch(targetUrl, {
+        ...options,
+        headers,
+        signal: options.signal || controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     const result = await response.json().catch(() => ({}));
 
@@ -178,9 +196,14 @@ export async function apiFetch<T = any>(
 
     return resultObj;
   } catch (error: any) {
+    const baseUrl = getApiBaseUrl();
+    const isTimeout = error.name === 'AbortError';
+    console.warn(`[API Error] ${options.method || 'GET'} ${endpoint}:`, isTimeout ? `Timeout (12s) alcanzado conectando a ${baseUrl}` : (error.message || error));
     return {
       success: false,
-      message: error.message || 'Error de conexión con el servidor AIMS API',
+      message: isTimeout
+        ? `Tiempo de espera agotado al conectar con el servidor backend (${baseUrl}). Verifica que esté accesible.`
+        : (error.message || 'Error de conexión con el servidor AIMS API'),
       error,
     };
   }

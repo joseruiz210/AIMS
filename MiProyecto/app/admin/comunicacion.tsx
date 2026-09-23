@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,8 +7,12 @@ import {
   Pressable,
   TextInput,
   useWindowDimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { comunicadosService, ComunicadoItem } from '../../services/comunicadosService';
+import { authService } from '../../services/authService';
+import { getApiBaseUrl } from '../../services/api';
 
 const NAVY = '#12103C';
 const GOLD = '#cfa235';
@@ -21,30 +25,6 @@ interface ComunicadoEnviado {
   leidos: number;
 }
 
-const INITIAL_ENVIADOS: ComunicadoEnviado[] = [
-  {
-    id: '1',
-    titulo: 'Recordatorio de entrega final',
-    destinatario: 'Todos los aprendices',
-    fecha: '28 Jul',
-    leidos: 648,
-  },
-  {
-    id: '2',
-    titulo: 'Reunión de coordinación - agosto',
-    destinatario: 'Instructores',
-    fecha: '22 Jul',
-    leidos: 37,
-  },
-  {
-    id: '3',
-    titulo: 'Cambio de salón para mañana',
-    destinatario: 'Ficha 1234321',
-    fecha: '18 Jul',
-    leidos: 26,
-  },
-];
-
 export default function ComunicacionAdminScreen() {
   const { width } = useWindowDimensions();
   const isDesktop = width >= 850;
@@ -52,23 +32,56 @@ export default function ComunicacionAdminScreen() {
   const [destinatario, setDestinatario] = useState('Todos los aprendices');
   const [asunto, setAsunto] = useState('');
   const [mensaje, setMensaje] = useState('');
-  const [enviados, setEnviados] = useState<ComunicadoEnviado[]>(INITIAL_ENVIADOS);
+  const [enviados, setEnviados] = useState<ComunicadoEnviado[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
   const [feedback, setFeedback] = useState(false);
+  const [sending, setSending] = useState(false);
 
-  const handleEnviar = () => {
+  useEffect(() => {
+    loadComunicados();
+  }, []);
+
+  const loadComunicados = async () => {
+    setLoadingHistory(true);
+    try {
+      const data = await comunicadosService.getComunicados();
+      setEnviados(
+        data.map((c: ComunicadoItem) => ({
+          id: c.id,
+          titulo: c.titulo,
+          destinatario: c.destinatario || 'Todos los usuarios',
+          fecha: c.fecha || 'Sin fecha',
+          leidos: c.leidos || 0,
+        }))
+      );
+    } catch (err) {
+      console.error('Error al cargar comunicados:', err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  const handleEnviar = async () => {
     if (!asunto || !mensaje) return;
-    const nuevo: ComunicadoEnviado = {
-      id: Date.now().toString(),
-      titulo: asunto,
-      destinatario: destinatario || 'Todos los usuarios',
-      fecha: 'Hoy',
-      leidos: 0,
-    };
-    setEnviados([nuevo, ...enviados]);
-    setAsunto('');
-    setMensaje('');
-    setFeedback(true);
-    setTimeout(() => setFeedback(false), 3000);
+    setSending(true);
+    try {
+      const API_BASE_URL = getApiBaseUrl();
+      const response = await authService.fetchWithAuth(`${API_BASE_URL}/comunicados`, {
+        method: 'POST',
+        body: JSON.stringify({ titulo: asunto, mensaje }),
+      });
+      if (response.ok) {
+        setAsunto('');
+        setMensaje('');
+        setFeedback(true);
+        setTimeout(() => setFeedback(false), 3000);
+        await loadComunicados();
+      }
+    } catch (err) {
+      console.error('Error al enviar comunicado:', err);
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -137,11 +150,16 @@ export default function ComunicacionAdminScreen() {
 
           {/* Submit Button */}
           <Pressable
-            style={({ hovered }: any) => [styles.sendBtn, hovered && styles.sendBtnHover]}
+            style={({ hovered }: any) => [styles.sendBtn, (hovered || sending) && styles.sendBtnHover]}
             onPress={handleEnviar}
+            disabled={sending}
           >
-            <Ionicons name="paper-plane-outline" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
-            <Text style={styles.sendBtnText}>Enviar comunicado</Text>
+            {sending ? (
+              <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 8 }} />
+            ) : (
+              <Ionicons name="paper-plane-outline" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+            )}
+            <Text style={styles.sendBtnText}>{sending ? 'Enviando...' : 'Enviar comunicado'}</Text>
           </Pressable>
         </View>
 
@@ -149,6 +167,14 @@ export default function ComunicacionAdminScreen() {
         <View style={styles.historyCard}>
           <Text style={styles.cardHeaderTitleDark}>Comunicados enviados</Text>
 
+          {loadingHistory ? (
+            <ActivityIndicator size="small" color="#cfa235" style={{ marginVertical: 20 }} />
+          ) : enviados.length === 0 ? (
+            <View style={{ padding: 20, alignItems: 'center' }}>
+              <Ionicons name="chatbubble-outline" size={36} color="#94A3B8" />
+              <Text style={{ color: '#64748B', marginTop: 8, fontSize: 13 }}>No hay comunicados enviados</Text>
+            </View>
+          ) : (
           <View style={styles.historyList}>
             {enviados.map((item) => (
               <View key={item.id} style={styles.historyItem}>
@@ -167,6 +193,7 @@ export default function ComunicacionAdminScreen() {
               </View>
             ))}
           </View>
+          )}
         </View>
       </View>
     </ScrollView>

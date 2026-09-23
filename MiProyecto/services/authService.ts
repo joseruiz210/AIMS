@@ -41,6 +41,14 @@ export interface RegisterData {
 // Configuración de URL base dinámica para la API Backend
 const getBaseUrl = () => getApiBaseUrl();
 
+// Enviar origen del cliente web para que el backend construya enlaces web válidos
+const getClientOriginHeader = (): Record<string, string> => {
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return { 'X-Client-Origin': window.location.origin };
+  }
+  return {};
+};
+
 /**
  * Servicio de Autenticación JWT y Gestión de Cuenta
  */
@@ -144,7 +152,7 @@ export const authService = {
 
       const response = await fetch(`${getBaseUrl()}/auth/register`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getClientOriginHeader() },
         body: JSON.stringify(payload),
       });
       const data = await response.json();
@@ -220,7 +228,7 @@ export const authService = {
     try {
       const response = await fetch(`${getBaseUrl()}/auth/resend-verification`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getClientOriginHeader() },
         body: JSON.stringify({ email: correo.trim().toLowerCase() }),
       });
       const data = await response.json();
@@ -240,7 +248,7 @@ export const authService = {
     try {
       const response = await fetch(`${getBaseUrl()}/auth/forgot-password`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getClientOriginHeader() },
         body: JSON.stringify({ email: correo.trim().toLowerCase() }),
       });
       const data = await response.json();
@@ -280,7 +288,7 @@ export const authService = {
     try {
       const response = await fetch(`${getBaseUrl()}/auth/magic-link`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getClientOriginHeader() },
         body: JSON.stringify({ email: correo }),
       });
       const data = await response.json();

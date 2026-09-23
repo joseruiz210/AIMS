@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,9 +7,11 @@ import {
   Pressable,
   TextInput,
   useWindowDimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ActionModal from '../../components/ActionModal';
+import { matriculasService, MatriculaItem } from '../../services/matriculasService';
 
 const NAVY = '#12103C';
 const GOLD = '#cfa235';
@@ -23,23 +25,43 @@ interface MatriculaRow {
   estado: 'Activo' | 'Pendiente' | 'Retirado' | 'Critico';
 }
 
-const INITIAL_MATRICULAS: MatriculaRow[] = [
-  { id: '1', aprendiz: 'Valentina Torres', ficha: '2845671', programa: 'ADSO', fechaMatricula: '2024-02-05', estado: 'Activo' },
-  { id: '2', aprendiz: 'Carlos Mendoza', ficha: '2845671', programa: 'ADSO', fechaMatricula: '2024-02-05', estado: 'Activo' },
-  { id: '3', aprendiz: 'Laura Jiménez', ficha: '2845671', programa: 'ADSO', fechaMatricula: '2024-02-12', estado: 'Critico' },
-  { id: '4', aprendiz: 'Sofía Herrera', ficha: '2845671', programa: 'ADSO', fechaMatricula: '2024-01-20', estado: 'Activo' },
-  { id: '5', aprendiz: 'Andrés Reyes', ficha: '2845680', programa: 'AE', fechaMatricula: '2024-02-01', estado: 'Retirado' },
-  { id: '6', aprendiz: 'Felipe Gómez', ficha: '2845690', programa: 'CF', fechaMatricula: '2024-02-15', estado: 'Pendiente' },
-];
-
 export default function MatriculasScreen() {
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'Todos' | 'Activo' | 'Pendiente' | 'Retirado'>('Todos');
-  const [matriculas] = useState<MatriculaRow[]>(INITIAL_MATRICULAS);
+  const [matriculas, setMatriculas] = useState<MatriculaRow[]>([]);
+  const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
+
+  useEffect(() => {
+    loadMatriculas();
+  }, []);
+
+  const loadMatriculas = async () => {
+    setLoading(true);
+    try {
+      const result = await matriculasService.getMatriculas({ limit: 200 });
+      const mapped: MatriculaRow[] = result.matriculas.map((m: MatriculaItem) => ({
+        id: m.id,
+        aprendiz: m.aprendiz || 'Aprendiz',
+        ficha: m.ficha || '-',
+        programa: m.programa || '-',
+        fechaMatricula: m.fechaMatricula || '-',
+        estado: (m.estado || 'Activo') as MatriculaRow['estado'],
+      }));
+      setMatriculas(mapped);
+    } catch (err) {
+      console.error('Error al cargar matrículas:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const activosCount = matriculas.filter((m) => m.estado === 'Activo' || m.estado === 'Critico').length;
+  const pendientesCount = matriculas.filter((m) => m.estado === 'Pendiente').length;
+  const retiradosCount = matriculas.filter((m) => m.estado === 'Retirado').length;
 
   const filteredMatriculas = matriculas.filter((m) => {
     const matchesSearch =
@@ -73,15 +95,15 @@ export default function MatriculasScreen() {
       <View style={styles.metricsGrid}>
         <View style={styles.metricCard}>
           <Text style={styles.metricLabel}>ACTIVOS</Text>
-          <Text style={styles.metricValueGold}>5</Text>
+          <Text style={styles.metricValueGold}>{loading ? '-' : activosCount}</Text>
         </View>
         <View style={styles.metricCard}>
           <Text style={styles.metricLabel}>PENDIENTES</Text>
-          <Text style={styles.metricValueDark}>1</Text>
+          <Text style={styles.metricValueDark}>{loading ? '-' : pendientesCount}</Text>
         </View>
         <View style={styles.metricCard}>
           <Text style={styles.metricLabel}>RETIRADOS</Text>
-          <Text style={styles.metricValueGold}>1</Text>
+          <Text style={styles.metricValueGold}>{loading ? '-' : retiradosCount}</Text>
         </View>
       </View>
 
@@ -125,6 +147,17 @@ export default function MatriculasScreen() {
         </View>
 
         {/* Scrollable Table Area */}
+        {loading ? (
+          <View style={{ padding: 30, alignItems: 'center' }}>
+            <ActivityIndicator size="large" color="#cfa235" />
+            <Text style={{ marginTop: 10, color: '#64748B', fontWeight: '600' }}>Cargando matrículas...</Text>
+          </View>
+        ) : filteredMatriculas.length === 0 ? (
+          <View style={{ padding: 30, alignItems: 'center' }}>
+            <Ionicons name="document-text-outline" size={40} color="#94A3B8" />
+            <Text style={{ marginTop: 10, color: '#64748B', fontWeight: '600' }}>No hay matrículas registradas</Text>
+          </View>
+        ) : (
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View style={{ minWidth: 600 }}>
             {/* Table Header */}
@@ -195,6 +228,7 @@ export default function MatriculasScreen() {
             ))}
           </View>
         </ScrollView>
+        )}
       </View>
 
       <ActionModal

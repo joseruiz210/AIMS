@@ -5,19 +5,39 @@
     "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "miproyecto",
+    "scheme": [
+      "miproyecto",
+      "com.miproyecto.aims",
+      "aims"
+    ],
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true
     },
     "android": {
-        "expo": {
-    "scheme": "miproyecto"
-  },
-
-    "package": "com.sena.aims",
+      "package": "com.miproyecto.aims",
       "versionCode": 2,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "miproyecto"
+            },
+            {
+              "scheme": "aims"
+            },
+            {
+              "scheme": "com.miproyecto.aims"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#0F1026",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
