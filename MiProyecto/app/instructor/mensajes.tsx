@@ -24,8 +24,10 @@ export default function MensajesInstructorScreen() {
   const { width } = useWindowDimensions();
   const isDesktop = width >= 850;
 
-  // Pestañas: 'publicar' (Emisión y mis comunicados) | 'recibidos' (Bandeja institucional)
-  const [activeTab, setActiveTab] = useState<'publicar' | 'recibidos'>('publicar');
+  // Pestañas:
+  // En Desktop: 'publicar' (muestra Formulario a la izquierda e Historial a la derecha) | 'recibidos'
+  // En Móvil: 'publicar' (Formulario) | 'emitidos' (Historial) | 'recibidos' (Bandeja)
+  const [activeTab, setActiveTab] = useState<'publicar' | 'emitidos' | 'recibidos'>('publicar');
 
   // Estados de datos
   const [recibidos, setRecibidos] = useState<ComunicadoItem[]>([]);
@@ -138,10 +140,10 @@ export default function MensajesInstructorScreen() {
       setMensaje('');
       setFormFeedback(`¡Comunicado publicado con éxito para ${destinatarioTexto}!`);
 
-      // Ocultar banner de éxito después de 4 segundos
+      // Ocultar banner de éxito después de 5 segundos
       setTimeout(() => {
         setFormFeedback(null);
-      }, 4000);
+      }, 5000);
     } catch (error: any) {
       setFormError('Ocurrió un error al publicar el comunicado. Inténtalo de nuevo.');
     } finally {
@@ -171,10 +173,16 @@ export default function MensajesInstructorScreen() {
     );
   }
 
+  // Visibilidad de secciones según dispositivo y pestaña activa
+  const showForm = activeTab === 'publicar';
+  const showEmitidos = activeTab === 'emitidos' || (isDesktop && activeTab === 'publicar');
+  const showRecibidos = activeTab === 'recibidos';
+
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={[styles.contentContainer, { padding: pad }]}
+      keyboardShouldPersistTaps="handled"
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
@@ -210,290 +218,366 @@ export default function MensajesInstructorScreen() {
         </View>
       )}
 
-      {/* Barra de Pestañas Segmentada */}
-      <View style={styles.tabsWrapper}>
-        <Pressable
-          style={[styles.tabButton, activeTab === 'publicar' && styles.tabButtonActive]}
-          onPress={() => setActiveTab('publicar')}
-        >
-          <Ionicons
-            name={activeTab === 'publicar' ? 'megaphone' : 'megaphone-outline'}
-            size={18}
-            color={activeTab === 'publicar' ? '#FFFFFF' : '#475569'}
-          />
-          <Text
-            style={[styles.tabButtonText, activeTab === 'publicar' && styles.tabButtonTextActive]}
+      {/* Barra de Pestañas */}
+      {isDesktop ? (
+        // Barra Desktop (2 Pestañas amplias)
+        <View style={styles.tabsWrapper}>
+          <Pressable
+            style={[styles.tabButton, activeTab !== 'recibidos' && styles.tabButtonActive]}
+            onPress={() => setActiveTab('publicar')}
           >
-            Publicar a mis Fichas
-          </Text>
-          {emitidos.length > 0 && (
-            <View
-              style={[
-                styles.tabCountBadge,
-                activeTab === 'publicar' ? styles.tabCountBadgeActive : styles.tabCountBadgeInactive,
-              ]}
+            <Ionicons
+              name={activeTab !== 'recibidos' ? 'megaphone' : 'megaphone-outline'}
+              size={18}
+              color={activeTab !== 'recibidos' ? '#FFFFFF' : '#475569'}
+            />
+            <Text
+              style={[styles.tabButtonText, activeTab !== 'recibidos' && styles.tabButtonTextActive]}
             >
-              <Text
+              Publicar y Emitidos
+            </Text>
+            {emitidos.length > 0 && (
+              <View
                 style={[
-                  styles.tabCountText,
-                  activeTab === 'publicar' ? styles.tabCountTextActive : styles.tabCountTextInactive,
+                  styles.tabCountBadge,
+                  activeTab !== 'recibidos' ? styles.tabCountBadgeActive : styles.tabCountBadgeInactive,
                 ]}
               >
-                {emitidos.length}
-              </Text>
-            </View>
-          )}
-        </Pressable>
-
-        <Pressable
-          style={[styles.tabButton, activeTab === 'recibidos' && styles.tabButtonActive]}
-          onPress={() => setActiveTab('recibidos')}
-        >
-          <Ionicons
-            name={activeTab === 'recibidos' ? 'mail' : 'mail-outline'}
-            size={18}
-            color={activeTab === 'recibidos' ? '#FFFFFF' : '#475569'}
-          />
-          <Text
-            style={[styles.tabButtonText, activeTab === 'recibidos' && styles.tabButtonTextActive]}
-          >
-            Bandeja de Entrada
-          </Text>
-          {recibidos.length > 0 && (
-            <View
-              style={[
-                styles.tabCountBadge,
-                activeTab === 'recibidos' ? styles.tabCountBadgeActive : styles.tabCountBadgeInactive,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.tabCountText,
-                  activeTab === 'recibidos' ? styles.tabCountTextActive : styles.tabCountTextInactive,
-                ]}
-              >
-                {recibidos.length}
-              </Text>
-            </View>
-          )}
-        </Pressable>
-      </View>
-
-      {/* CONTENIDO PESTAÑA: PUBLICAR A MIS FICHAS */}
-      {activeTab === 'publicar' && (
-        <View style={[styles.mainLayout, !isDesktop && styles.mainLayoutMobile]}>
-          {/* Columna Izquierda: Formulario de Emisión */}
-          <View style={styles.formCard}>
-            <View style={styles.formHeaderRow}>
-              <View style={styles.formIconWrap}>
-                <Ionicons name="create-outline" size={20} color={NAVY} />
-              </View>
-              <View>
-                <Text style={styles.formCardTitle}>NUEVO COMUNICADO A FICHAS</Text>
-                <Text style={styles.formCardSubtitle}>Emite avisos oficiales a tus grupos asignados</Text>
-              </View>
-            </View>
-
-            {/* Banner de Éxito */}
-            {formFeedback && (
-              <View style={styles.successBanner}>
-                <Ionicons name="checkmark-circle" size={18} color="#059669" style={{ marginRight: 8 }} />
-                <Text style={styles.successText}>{formFeedback}</Text>
-              </View>
-            )}
-
-            {/* Banner de Validación / Error */}
-            {formError && (
-              <View style={styles.errorInlineBanner}>
-                <Ionicons name="alert-circle-outline" size={18} color="#DC2626" style={{ marginRight: 8 }} />
-                <Text style={styles.errorInlineText}>{formError}</Text>
-              </View>
-            )}
-
-            {/* Selector de Destinatario (Fichas Asignadas) */}
-            <View style={styles.fieldGroup}>
-              <Text style={styles.label}>DESTINATARIO (SELECCIONA LA FICHA)</Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.fichasChipsRow}
-              >
-                <Pressable
+                <Text
                   style={[
-                    styles.fichaChip,
-                    selectedFicha === 'TODAS' && styles.fichaChipActive,
+                    styles.tabCountText,
+                    activeTab !== 'recibidos' ? styles.tabCountTextActive : styles.tabCountTextInactive,
                   ]}
-                  onPress={() => setSelectedFicha('TODAS')}
                 >
-                  <Ionicons
-                    name={selectedFicha === 'TODAS' ? 'people' : 'people-outline'}
-                    size={15}
-                    color={selectedFicha === 'TODAS' ? '#FFFFFF' : '#475569'}
-                  />
-                  <Text
-                    style={[
-                      styles.fichaChipText,
-                      selectedFicha === 'TODAS' && styles.fichaChipTextActive,
-                    ]}
-                  >
-                    Todas mis fichas
-                  </Text>
-                </Pressable>
-
-                {fichas.map((f) => {
-                  const isSelected = selectedFicha === f.id || selectedFicha === f.numero;
-                  return (
-                    <Pressable
-                      key={f.id}
-                      style={[styles.fichaChip, isSelected && styles.fichaChipActive]}
-                      onPress={() => setSelectedFicha(f.numero || f.id)}
-                    >
-                      <Ionicons
-                        name={isSelected ? 'school' : 'school-outline'}
-                        size={15}
-                        color={isSelected ? '#FFFFFF' : '#475569'}
-                      />
-                      <Text
-                        style={[
-                          styles.fichaChipText,
-                          isSelected && styles.fichaChipTextActive,
-                        ]}
-                      >
-                        Ficha {f.numero}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
-              <Text style={styles.fieldHelper}>
-                {selectedFicha === 'TODAS'
-                  ? 'Este comunicado llegará a todos los aprendices de tus fichas asignadas.'
-                  : `Destinado exclusivamente a los aprendices matriculados en la Ficha ${selectedFicha}.`}
-              </Text>
-            </View>
-
-            {/* Campo Asunto */}
-            <View style={styles.fieldGroup}>
-              <Text style={styles.label}>ASUNTO / TÍTULO</Text>
-              <View style={styles.inputWrapper}>
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="Ej: Recordatorio de entrega fase 3, Cambio de ambiente..."
-                  placeholderTextColor="#94A3B8"
-                  value={asunto}
-                  onChangeText={(val) => {
-                    setAsunto(val);
-                    if (formError) setFormError(null);
-                  }}
-                  maxLength={120}
-                />
-              </View>
-            </View>
-
-            {/* Campo Mensaje */}
-            <View style={styles.fieldGroup}>
-              <Text style={styles.label}>MENSAJE DEL COMUNICADO</Text>
-              <View style={[styles.inputWrapper, { height: 125, alignItems: 'flex-start' }]}>
-                <TextInput
-                  style={[styles.textInput, { height: '100%', textAlignVertical: 'top', paddingTop: 10 }]}
-                  placeholder="Escribe aquí las instrucciones claras, fechas límites o novedades formativas..."
-                  placeholderTextColor="#94A3B8"
-                  multiline
-                  value={mensaje}
-                  onChangeText={(val) => {
-                    setMensaje(val);
-                    if (formError) setFormError(null);
-                  }}
-                />
-              </View>
-            </View>
-
-            {/* Botón de Publicación */}
-            <Pressable
-              style={({ hovered }: any) => [
-                styles.publishBtn,
-                isSubmitting && styles.publishBtnDisabled,
-                hovered && !isSubmitting && styles.publishBtnHover,
-              ]}
-              onPress={handlePublicar}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <>
-                  <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 8 }} />
-                  <Text style={styles.publishBtnText}>Publicando anuncio...</Text>
-                </>
-              ) : (
-                <>
-                  <Ionicons name="paper-plane-outline" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
-                  <Text style={styles.publishBtnText}>Publicar comunicado a aprendices</Text>
-                </>
-              )}
-            </Pressable>
-          </View>
-
-          {/* Columna Derecha: Historial de Comunicados Emitidos */}
-          <View style={styles.historyCard}>
-            <View style={styles.historyHeader}>
-              <View>
-                <Text style={styles.historyCardTitle}>Comunicados emitidos</Text>
-                <Text style={styles.historyCardSubtitle}>Tus publicaciones recientes para aprendices</Text>
-              </View>
-              <View style={styles.historyBadge}>
-                <Text style={styles.historyBadgeText}>{emitidos.length} emitidos</Text>
-              </View>
-            </View>
-
-            {emitidos.length === 0 ? (
-              <View style={styles.emptyHistoryBox}>
-                <Ionicons name="chatbox-ellipses-outline" size={42} color="#CBD5E1" />
-                <Text style={styles.emptyHistoryTitle}>Aún no has emitido comunicados</Text>
-                <Text style={styles.emptyHistoryText}>
-                  Usa el formulario para publicar novedades, recordatorios o avisos a tus fichas.
+                  {emitidos.length}
                 </Text>
               </View>
-            ) : (
-              <View style={styles.historyList}>
-                {emitidos.map((item) => (
-                  <View key={item.id} style={styles.historyItem}>
-                    <View style={styles.itemTopRow}>
-                      <Text style={styles.itemTitle}>{item.titulo}</Text>
-                      <View style={styles.datePill}>
-                        <Text style={styles.datePillText}>{item.fecha}</Text>
-                      </View>
-                    </View>
+            )}
+          </Pressable>
 
-                    <View style={styles.itemTargetRow}>
-                      <Ionicons name="people-outline" size={14} color="#B45309" />
-                      <Text style={styles.itemTargetText}>Para: {item.destinatario}</Text>
-                    </View>
-
-                    <Text style={styles.itemPreview} numberOfLines={3}>
-                      {item.mensaje}
-                    </Text>
-
-                    <View style={styles.itemBottomRow}>
-                      <View style={styles.readCountBadge}>
-                        <Ionicons name="eye-outline" size={13} color="#64748B" />
-                        <Text style={styles.readCountText}>
-                          {item.leidos !== undefined ? item.leidos : 0} lecturas
-                        </Text>
-                      </View>
-                      <View style={styles.statusSuccessDot}>
-                        <View style={styles.dot} />
-                        <Text style={styles.dotLabel}>Transmitido</Text>
-                      </View>
-                    </View>
-                  </View>
-                ))}
+          <Pressable
+            style={[styles.tabButton, activeTab === 'recibidos' && styles.tabButtonActive]}
+            onPress={() => setActiveTab('recibidos')}
+          >
+            <Ionicons
+              name={activeTab === 'recibidos' ? 'mail' : 'mail-outline'}
+              size={18}
+              color={activeTab === 'recibidos' ? '#FFFFFF' : '#475569'}
+            />
+            <Text
+              style={[styles.tabButtonText, activeTab === 'recibidos' && styles.tabButtonTextActive]}
+            >
+              Bandeja de Entrada
+            </Text>
+            {recibidos.length > 0 && (
+              <View
+                style={[
+                  styles.tabCountBadge,
+                  activeTab === 'recibidos' ? styles.tabCountBadgeActive : styles.tabCountBadgeInactive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.tabCountText,
+                    activeTab === 'recibidos' ? styles.tabCountTextActive : styles.tabCountTextInactive,
+                  ]}
+                >
+                  {recibidos.length}
+                </Text>
               </View>
             )}
-          </View>
+          </Pressable>
+        </View>
+      ) : (
+        // Barra Móvil (3 Pestañas dedicadas para máxima ergonomía táctil sin superposición)
+        <View style={styles.tabsWrapper}>
+          <Pressable
+            style={[styles.tabButton, activeTab === 'publicar' && styles.tabButtonActive]}
+            onPress={() => setActiveTab('publicar')}
+          >
+            <Ionicons
+              name={activeTab === 'publicar' ? 'create' : 'create-outline'}
+              size={16}
+              color={activeTab === 'publicar' ? '#FFFFFF' : '#475569'}
+            />
+            <Text
+              style={[styles.tabButtonText, activeTab === 'publicar' && styles.tabButtonTextActive]}
+            >
+              Redactar
+            </Text>
+          </Pressable>
+
+          <Pressable
+            style={[styles.tabButton, activeTab === 'emitidos' && styles.tabButtonActive]}
+            onPress={() => setActiveTab('emitidos')}
+          >
+            <Ionicons
+              name={activeTab === 'emitidos' ? 'paper-plane' : 'paper-plane-outline'}
+              size={16}
+              color={activeTab === 'emitidos' ? '#FFFFFF' : '#475569'}
+            />
+            <Text
+              style={[styles.tabButtonText, activeTab === 'emitidos' && styles.tabButtonTextActive]}
+            >
+              Enviados ({emitidos.length})
+            </Text>
+          </Pressable>
+
+          <Pressable
+            style={[styles.tabButton, activeTab === 'recibidos' && styles.tabButtonActive]}
+            onPress={() => setActiveTab('recibidos')}
+          >
+            <Ionicons
+              name={activeTab === 'recibidos' ? 'mail' : 'mail-outline'}
+              size={16}
+              color={activeTab === 'recibidos' ? '#FFFFFF' : '#475569'}
+            />
+            <Text
+              style={[styles.tabButtonText, activeTab === 'recibidos' && styles.tabButtonTextActive]}
+            >
+              Recibidos ({recibidos.length})
+            </Text>
+          </Pressable>
         </View>
       )}
 
-      {/* CONTENIDO PESTAÑA: BANDEJA DE ENTRADA (RECIBIDOS) */}
-      {activeTab === 'recibidos' && (
+      {/* CONTENEDOR PRINCIPAL: FORMULARIO E HISTORIAL */}
+      {(showForm || showEmitidos) && (
+        <View style={[styles.mainLayout, !isDesktop && styles.mainLayoutMobile]}>
+          {/* SECCIÓN 1: FORMULARIO DE EMISIÓN */}
+          {showForm && (
+            <View style={[styles.formCard, isDesktop ? { flex: 1.2 } : { width: '100%' }]}>
+              <View style={styles.formHeaderRow}>
+                <View style={styles.formIconWrap}>
+                  <Ionicons name="create-outline" size={20} color={NAVY} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.formCardTitle}>NUEVO COMUNICADO A FICHAS</Text>
+                  <Text style={styles.formCardSubtitle}>Emite avisos oficiales a tus aprendices asignados</Text>
+                </View>
+              </View>
+
+              {/* Banner de Éxito */}
+              {formFeedback && (
+                <View style={styles.successBanner}>
+                  <Ionicons name="checkmark-circle" size={18} color="#059669" style={{ marginRight: 8 }} />
+                  <Text style={styles.successText}>{formFeedback}</Text>
+                  {!isDesktop && (
+                    <Pressable
+                      style={styles.viewSentBtn}
+                      onPress={() => setActiveTab('emitidos')}
+                    >
+                      <Text style={styles.viewSentBtnText}>Ver enviados →</Text>
+                    </Pressable>
+                  )}
+                </View>
+              )}
+
+              {/* Banner de Validación / Error */}
+              {formError && (
+                <View style={styles.errorInlineBanner}>
+                  <Ionicons name="alert-circle-outline" size={18} color="#DC2626" style={{ marginRight: 8 }} />
+                  <Text style={styles.errorInlineText}>{formError}</Text>
+                </View>
+              )}
+
+              {/* Selector de Destinatario (Fichas Asignadas) */}
+              <View style={styles.fieldGroup}>
+                <Text style={styles.label}>DESTINATARIO (SELECCIONA LA FICHA)</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.fichasScrollView}
+                  contentContainerStyle={styles.fichasChipsRow}
+                >
+                  <Pressable
+                    style={[
+                      styles.fichaChip,
+                      selectedFicha === 'TODAS' && styles.fichaChipActive,
+                    ]}
+                    onPress={() => setSelectedFicha('TODAS')}
+                  >
+                    <Ionicons
+                      name={selectedFicha === 'TODAS' ? 'people' : 'people-outline'}
+                      size={15}
+                      color={selectedFicha === 'TODAS' ? '#FFFFFF' : '#475569'}
+                    />
+                    <Text
+                      style={[
+                        styles.fichaChipText,
+                        selectedFicha === 'TODAS' && styles.fichaChipTextActive,
+                      ]}
+                    >
+                      Todas mis fichas
+                    </Text>
+                  </Pressable>
+
+                  {fichas.map((f) => {
+                    const isSelected = selectedFicha === f.id || selectedFicha === f.numero;
+                    return (
+                      <Pressable
+                        key={f.id}
+                        style={[styles.fichaChip, isSelected && styles.fichaChipActive]}
+                        onPress={() => setSelectedFicha(f.numero || f.id)}
+                      >
+                        <Ionicons
+                          name={isSelected ? 'school' : 'school-outline'}
+                          size={15}
+                          color={isSelected ? '#FFFFFF' : '#475569'}
+                        />
+                        <Text
+                          style={[
+                            styles.fichaChipText,
+                            isSelected && styles.fichaChipTextActive,
+                          ]}
+                        >
+                          Ficha {f.numero}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+                <Text style={styles.fieldHelper}>
+                  {selectedFicha === 'TODAS'
+                    ? 'Este comunicado llegará a todos los aprendices de tus fichas asignadas.'
+                    : `Destinado exclusivamente a los aprendices matriculados en la Ficha ${selectedFicha}.`}
+                </Text>
+              </View>
+
+              {/* Campo Asunto */}
+              <View style={styles.fieldGroup}>
+                <Text style={styles.label}>ASUNTO / TÍTULO</Text>
+                <View style={styles.inputWrapper}>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Ej: Recordatorio de entrega fase 3, Cambio de ambiente..."
+                    placeholderTextColor="#94A3B8"
+                    value={asunto}
+                    onChangeText={(val) => {
+                      setAsunto(val);
+                      if (formError) setFormError(null);
+                    }}
+                    maxLength={120}
+                  />
+                </View>
+              </View>
+
+              {/* Campo Mensaje */}
+              <View style={styles.fieldGroup}>
+                <Text style={styles.label}>MENSAJE DEL COMUNICADO</Text>
+                <View style={[styles.inputWrapper, { minHeight: 110, paddingVertical: 8, alignItems: 'flex-start' }]}>
+                  <TextInput
+                    style={[styles.textInput, { width: '100%', minHeight: 94, textAlignVertical: 'top' }]}
+                    placeholder="Escribe aquí las instrucciones claras, fechas límites o novedades formativas..."
+                    placeholderTextColor="#94A3B8"
+                    multiline
+                    value={mensaje}
+                    onChangeText={(val) => {
+                      setMensaje(val);
+                      if (formError) setFormError(null);
+                    }}
+                  />
+                </View>
+              </View>
+
+              {/* Botón de Publicación */}
+              <Pressable
+                style={({ hovered }: any) => [
+                  styles.publishBtn,
+                  isSubmitting && styles.publishBtnDisabled,
+                  hovered && !isSubmitting && styles.publishBtnHover,
+                ]}
+                onPress={handlePublicar}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 8 }} />
+                    <Text style={styles.publishBtnText}>Publicando anuncio...</Text>
+                  </>
+                ) : (
+                  <>
+                    <Ionicons name="paper-plane-outline" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+                    <Text style={styles.publishBtnText}>Publicar comunicado a aprendices</Text>
+                  </>
+                )}
+              </Pressable>
+            </View>
+          )}
+
+          {/* SECCIÓN 2: HISTORIAL DE COMUNICADOS EMITIDOS */}
+          {showEmitidos && (
+            <View style={[styles.historyCard, isDesktop ? { flex: 1 } : { width: '100%' }]}>
+              <View style={styles.historyHeader}>
+                <View>
+                  <Text style={styles.historyCardTitle}>Comunicados emitidos</Text>
+                  <Text style={styles.historyCardSubtitle}>Tus publicaciones para aprendices</Text>
+                </View>
+                <View style={styles.historyBadge}>
+                  <Text style={styles.historyBadgeText}>{emitidos.length} emitidos</Text>
+                </View>
+              </View>
+
+              {emitidos.length === 0 ? (
+                <View style={styles.emptyHistoryBox}>
+                  <Ionicons name="chatbox-ellipses-outline" size={42} color="#CBD5E1" />
+                  <Text style={styles.emptyHistoryTitle}>Aún no has emitido comunicados</Text>
+                  <Text style={styles.emptyHistoryText}>
+                    Usa la pestaña Redactar para publicar novedades o recordatorios a tus fichas.
+                  </Text>
+                  {!isDesktop && (
+                    <Pressable
+                      style={styles.createNowBtn}
+                      onPress={() => setActiveTab('publicar')}
+                    >
+                      <Ionicons name="add-circle-outline" size={16} color="#FFFFFF" />
+                      <Text style={styles.createNowBtnText}>Crear mi primer comunicado</Text>
+                    </Pressable>
+                  )}
+                </View>
+              ) : (
+                <View style={styles.historyList}>
+                  {emitidos.map((item) => (
+                    <View key={item.id} style={styles.historyItem}>
+                      <View style={styles.itemTopRow}>
+                        <Text style={styles.itemTitle}>{item.titulo}</Text>
+                        <View style={styles.datePill}>
+                          <Text style={styles.datePillText}>{item.fecha}</Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.itemTargetRow}>
+                        <Ionicons name="people-outline" size={14} color="#B45309" />
+                        <Text style={styles.itemTargetText}>Para: {item.destinatario}</Text>
+                      </View>
+
+                      <Text style={styles.itemPreview} numberOfLines={3}>
+                        {item.mensaje}
+                      </Text>
+
+                      <View style={styles.itemBottomRow}>
+                        <View style={styles.readCountBadge}>
+                          <Ionicons name="eye-outline" size={13} color="#64748B" />
+                          <Text style={styles.readCountText}>
+                            {item.leidos !== undefined ? item.leidos : 0} lecturas
+                          </Text>
+                        </View>
+                        <View style={styles.statusSuccessDot}>
+                          <View style={styles.dot} />
+                          <Text style={styles.dotLabel}>Transmitido</Text>
+                        </View>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* SECCIÓN 3: BANDEJA DE ENTRADA (RECIBIDOS INSTITUCIONALES) */}
+      {showRecibidos && (
         <View style={styles.inboxContainer}>
           <View style={styles.inboxHeader}>
             <View>
@@ -563,7 +647,7 @@ const styles = StyleSheet.create({
     backgroundColor: BG_PAGE,
   },
   contentContainer: {
-    paddingBottom: 48,
+    paddingBottom: 60,
   },
   loadingContainer: {
     flex: 1,
@@ -581,25 +665,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
     gap: 12,
   },
   pageTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '700',
     color: NAVY,
   },
   pageSubtitle: {
     fontSize: 13,
     color: '#64748B',
-    marginTop: 4,
+    marginTop: 3,
   },
   refreshBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
     backgroundColor: '#FFFFFF',
     borderRadius: 10,
     borderWidth: 1,
@@ -609,7 +693,7 @@ const styles = StyleSheet.create({
   refreshBtnText: {
     color: NAVY,
     fontWeight: '600',
-    fontSize: 13,
+    fontSize: 12,
   },
   errorBanner: {
     flexDirection: 'row',
@@ -643,7 +727,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#E2E8F0',
     borderRadius: 12,
     padding: 4,
-    marginBottom: 20,
+    marginBottom: 16,
     gap: 4,
   },
   tabButton: {
@@ -652,9 +736,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
     borderRadius: 9,
-    gap: 8,
+    gap: 6,
   },
   tabButtonActive: {
     backgroundColor: NAVY,
@@ -665,7 +749,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   tabButtonText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
     color: '#475569',
   },
@@ -674,8 +758,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   tabCountBadge: {
-    paddingHorizontal: 7,
-    paddingVertical: 2,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
     borderRadius: 10,
   },
   tabCountBadgeActive: {
@@ -685,7 +769,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#CBD5E1',
   },
   tabCountText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
   },
   tabCountTextActive: {
@@ -701,12 +785,12 @@ const styles = StyleSheet.create({
   },
   mainLayoutMobile: {
     flexDirection: 'column',
+    gap: 16,
   },
   formCard: {
-    flex: 1.25,
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    padding: 22,
+    padding: 20,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     shadowColor: '#0F172A',
@@ -719,11 +803,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    marginBottom: 18,
+    marginBottom: 16,
   },
   formIconWrap: {
-    width: 40,
-    height: 40,
+    width: 38,
+    height: 38,
     borderRadius: 10,
     backgroundColor: GOLD_LIGHT,
     alignItems: 'center',
@@ -733,7 +817,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: NAVY,
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
   },
   formCardSubtitle: {
     fontSize: 12,
@@ -742,6 +826,7 @@ const styles = StyleSheet.create({
   },
   successBanner: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     backgroundColor: '#DEF7EC',
     padding: 12,
@@ -749,12 +834,24 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     borderWidth: 1,
     borderColor: '#BCF0DA',
+    gap: 6,
   },
   successText: {
     fontSize: 13,
     color: '#03543F',
     fontWeight: '600',
     flex: 1,
+  },
+  viewSentBtn: {
+    backgroundColor: '#059669',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  viewSentBtnText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
   },
   errorInlineBanner: {
     flexDirection: 'row',
@@ -773,28 +870,35 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   fieldGroup: {
-    marginBottom: 16,
+    marginBottom: 14,
   },
   label: {
     fontSize: 11,
     fontWeight: '700',
     color: '#475569',
-    letterSpacing: 0.5,
-    marginBottom: 8,
+    letterSpacing: 0.4,
+    marginBottom: 6,
+  },
+  fichasScrollView: {
+    flexGrow: 0,
+    maxHeight: 48,
+    marginVertical: 2,
   },
   fichasChipsRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
     paddingVertical: 2,
   },
   fichaChip: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    height: 38,
+    paddingHorizontal: 14,
     backgroundColor: '#F1F5F9',
-    borderRadius: 8,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: '#CBD5E1',
   },
@@ -814,7 +918,7 @@ const styles = StyleSheet.create({
   fieldHelper: {
     fontSize: 11,
     color: '#64748B',
-    marginTop: 6,
+    marginTop: 5,
     fontStyle: 'italic',
   },
   inputWrapper: {
@@ -828,7 +932,7 @@ const styles = StyleSheet.create({
   textInput: {
     fontSize: 13,
     color: NAVY,
-    paddingVertical: 10,
+    paddingVertical: 9,
   },
   publishBtn: {
     flexDirection: 'row',
@@ -837,7 +941,7 @@ const styles = StyleSheet.create({
     backgroundColor: NAVY,
     paddingVertical: 13,
     borderRadius: 10,
-    marginTop: 6,
+    marginTop: 8,
     shadowColor: NAVY,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
@@ -856,7 +960,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   historyCard: {
-    flex: 1,
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 20,
@@ -887,7 +990,7 @@ const styles = StyleSheet.create({
   historyBadge: {
     backgroundColor: GOLD_LIGHT,
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 3,
     borderRadius: 8,
   },
   historyBadgeText: {
@@ -913,6 +1016,21 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     textAlign: 'center',
     lineHeight: 18,
+  },
+  createNowBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: NAVY,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  createNowBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
   },
   historyList: {
     gap: 12,
