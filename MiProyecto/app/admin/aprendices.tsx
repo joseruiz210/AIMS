@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import ActionModal from '../../components/ActionModal';
 import { adminService } from '../../services/adminService';
 import { fichasService } from '../../services/fichasService';
+import { exportToCsv } from '../../utils/exportUtil';
 
 const NAVY = '#12103C';
 const GOLD = '#cfa235';
@@ -142,6 +143,28 @@ export default function AprendicesScreen() {
 
     return matchesSearch && matchesStatus;
   });
+
+  const handleExportAprendices = async () => {
+    try {
+      const headers = ['ID', 'Nombre Completo', 'Correo Institucional', 'Ficha', 'Programa de Formación', 'Nota Promedio', 'Estado Académico'];
+      const rows = filteredAprendices.map((a) => [
+        a.id,
+        a.nombre,
+        a.email,
+        a.ficha,
+        a.programa,
+        a.nota.toFixed(1),
+        a.estado,
+      ]);
+      await exportToCsv(
+        `Listado_Aprendices_${statusFilter !== 'Todos' ? statusFilter : 'General'}_${new Date().toISOString().split('T')[0]}.csv`,
+        headers,
+        rows
+      );
+    } catch (err) {
+      console.error('Error exportando listado de aprendices:', err);
+    }
+  };
 
   return (
     <ScrollView
@@ -334,6 +357,7 @@ export default function AprendicesScreen() {
       <ActionModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
+        onSubmit={handleExportAprendices}
         title="Exportar Listado de Aprendices"
         subtitle="Generación de reporte Excel / CSV"
         iconName="download-outline"
