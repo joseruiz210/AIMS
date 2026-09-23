@@ -147,7 +147,7 @@ export default function AdminDashboard() {
   ];
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, !isDesktop && styles.mobileContent]}>
       {/* Toast */}
       {toastMsg && (
         <View style={styles.toastBanner}>
@@ -157,16 +157,16 @@ export default function AdminDashboard() {
       )}
 
       {/* Header */}
-      <View style={styles.header}>
-        <View>
+      <View style={[styles.header, !isDesktop && styles.mobileHeader]}>
+        <View style={{ flex: 1 }}>
           <Text style={styles.greeting}>Bienvenido de nuevo</Text>
           <Text style={styles.title}>Panel Administrativo</Text>
         </View>
-        <View style={styles.headerRight}>
+        <View style={[styles.headerRight, !isDesktop && styles.mobileHeaderRight]}>
           <View style={styles.dateBadge}>
             <Ionicons name="calendar-outline" size={16} color={NAVY} />
             <Text style={styles.dateText}>
-              {new Date().toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+              {new Date().toLocaleDateString('es-CO', isDesktop ? { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' } : { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
             </Text>
           </View>
         </View>
@@ -417,11 +417,21 @@ const styles = StyleSheet.create({
     padding: 30,
     paddingBottom: 50,
   },
+  mobileContent: {
+    padding: 16,
+    paddingBottom: 40,
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 28,
+  },
+  mobileHeader: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: 20,
   },
   greeting: {
     fontSize: 14,
@@ -435,6 +445,10 @@ const styles = StyleSheet.create({
   },
   headerRight: {
     alignItems: 'flex-end',
+  },
+  mobileHeaderRight: {
+    alignItems: 'flex-start',
+    width: '100%',
   },
   dateBadge: {
     flexDirection: 'row',
