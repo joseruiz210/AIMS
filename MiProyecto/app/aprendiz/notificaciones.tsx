@@ -76,18 +76,34 @@ export default function NotificacionesAprendizScreen() {
 
       try {
         const data = await comunicadosService.getComunicados();
-        const mapped: NotificacionItem[] = data.map((item: any) => ({
-          id: item.id,
-          titulo: item.titulo || 'Comunicado Institucional',
-          mensaje: item.mensaje || '',
-          hora: item.fecha ? new Date(item.fecha).toLocaleDateString('es-CO') : 'Reciente',
-          leida: item.leidos ? item.leidos > 0 : false,
-          categoria: item.destinatario?.includes('ASISTENCIA')
-            ? 'Asistencia'
-            : item.destinatario?.includes('ACADEMICO')
-            ? 'Académica'
-            : 'Anuncio',
-        }));
+        const mapped: NotificacionItem[] = data.map((item: any) => {
+          let formattedHora = 'Reciente';
+          if (item.fecha) {
+            if (typeof item.fecha === 'string' && (item.fecha === 'Hoy' || !item.fecha.includes('-'))) {
+              formattedHora = item.fecha;
+            } else {
+              try {
+                const d = new Date(item.fecha);
+                formattedHora = isNaN(d.getTime()) ? String(item.fecha) : d.toLocaleDateString('es-CO', { month: 'short', day: 'numeric' });
+              } catch {
+                formattedHora = String(item.fecha);
+              }
+            }
+          }
+
+          return {
+            id: item.id,
+            titulo: item.titulo || (item.autor ? `Aviso de ${item.autor}` : 'Comunicado Institucional'),
+            mensaje: item.mensaje || '',
+            hora: formattedHora,
+            leida: item.leidos ? item.leidos > 0 : false,
+            categoria: item.destinatario?.includes('ASISTENCIA')
+              ? 'Asistencia'
+              : item.destinatario?.includes('ACADEMICO')
+              ? 'Académica'
+              : 'Anuncio',
+          };
+        });
         notifs = [...notifs, ...mapped];
       } catch {}
 
