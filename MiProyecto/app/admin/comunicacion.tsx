@@ -219,13 +219,6 @@ export default function ComunicacionAdminScreen() {
 
           {/* Submit Button */}
           <Pressable
-<<<<<<< HEAD
-            style={({ hovered }: any) => [styles.sendBtn, (hovered || sending) && styles.sendBtnHover]}
-            onPress={handleEnviar}
-            disabled={sending}
-          >
-            {sending ? (
-=======
             style={({ hovered }: any) => [
               styles.sendBtn,
               hovered && styles.sendBtnHover,
@@ -235,18 +228,13 @@ export default function ComunicacionAdminScreen() {
             disabled={isSubmitting}
           >
             {isSubmitting ? (
->>>>>>> origin/main
               <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 8 }} />
             ) : (
               <Ionicons name="paper-plane-outline" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
             )}
-<<<<<<< HEAD
-            <Text style={styles.sendBtnText}>{sending ? 'Enviando...' : 'Enviar comunicado'}</Text>
-=======
             <Text style={styles.sendBtnText}>
               {isSubmitting ? 'Enviando...' : 'Enviar comunicado'}
             </Text>
->>>>>>> origin/main
           </Pressable>
         </View>
 
