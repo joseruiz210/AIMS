@@ -362,7 +362,7 @@ export default function InstructorInicioScreen() {
         {/* Panel Izquierdo: Actividades y Tareas Asignadas */}
         <View style={styles.activitiesPanel}>
           <View style={styles.panelHeaderRow}>
-            <View>
+            <View style={{ flex: 1, minWidth: 160, marginRight: 8 }}>
               <Text style={styles.panelTitle}>Evidencias Académicas en Curso</Text>
               <Text style={styles.panelSubtitle}>Actividades vigentes asignadas a las fichas de formación</Text>
             </View>
@@ -901,6 +901,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
     marginBottom: 18,
     paddingBottom: 12,
     borderBottomWidth: 1,

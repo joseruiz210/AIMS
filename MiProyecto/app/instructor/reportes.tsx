@@ -16,6 +16,7 @@ export default function ReportesScreenPremium() {
   const [loading, setLoading] = useState(true);
   const [downloadingAsistencia, setDownloadingAsistencia] = useState(false);
   const [downloadingNotas, setDownloadingNotas] = useState(false);
+  const [downloadingAlertas, setDownloadingAlertas] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
 
   useEffect(() => {
@@ -83,7 +84,7 @@ export default function ReportesScreenPremium() {
         }
       }
 
-      exportToCsv(`Consolidado_Asistencia_Ficha_${fichaCodigo}.csv`, headers, rows);
+      await exportToCsv(`Consolidado_Asistencia_Ficha_${fichaCodigo}.csv`, headers, rows);
       setFeedbackMsg(`✅ Asistencia exportada exitosamente (Ficha ${fichaCodigo})`);
     } catch (err: any) {
       console.error('Error exportando asistencia:', err);
@@ -133,13 +134,78 @@ export default function ReportesScreenPremium() {
         }
       }
 
-      exportToCsv(`Reporte_Notas_Ficha_${fichaCodigo}.csv`, headers, rows);
+      await exportToCsv(`Reporte_Notas_Ficha_${fichaCodigo}.csv`, headers, rows);
       setFeedbackMsg(`✅ Calificaciones exportadas exitosamente (Ficha ${fichaCodigo})`);
     } catch (err: any) {
       console.error('Error exportando calificaciones:', err);
       setFeedbackMsg(`⚠️ Error al exportar calificaciones: ${err.message || 'Intente nuevamente'}`);
     } finally {
       setDownloadingNotas(false);
+    }
+  };
+
+  const handleDownloadAlertas = async () => {
+    if (!selectedFichaId) return;
+    setDownloadingAlertas(true);
+    setFeedbackMsg(null);
+    try {
+      const fichaCodigo = selectedFicha?.numero || selectedFicha?.codigo || 'General';
+      const competencias = await calificacionesService.getCalificacionesByFicha(selectedFichaId);
+      const asistencias = await asistenciaService.getAsistenciasByFicha(selectedFichaId);
+
+      const headers = ['Ficha', 'Nombre Aprendiz', 'Tipo de Alerta', 'Detalle / Causa', 'Nivel de Riesgo', 'Fecha de Registro'];
+      const rows: (string | number)[][] = [];
+
+      // Detectar bajo rendimiento
+      if (competencias && competencias.length > 0) {
+        competencias.forEach(comp => {
+          (comp.students || []).forEach(st => {
+            if ((st.nota ?? 0) < 3.5) {
+              rows.push([
+                fichaCodigo,
+                st.name,
+                'Bajo Rendimiento Académico',
+                `Calificación ${st.nota ?? 0} en ${comp.title || 'Competencia'}`,
+                (st.nota ?? 0) < 2.5 ? 'CRÍTICO' : 'MEDIO',
+                new Date().toISOString().split('T')[0],
+              ]);
+            }
+          });
+        });
+      }
+
+      // Detectar fallas / inasistencias
+      if (asistencias && asistencias.length > 0) {
+        asistencias.filter(a => a.estado === 'AUSENTE').forEach(a => {
+          rows.push([
+            fichaCodigo,
+            a.aprendizNombre,
+            'Inasistencia no justificada',
+            `Sesión del ${a.fecha || 'N/A'}: ${a.tema || 'Clase'}`,
+            'ALTO',
+            a.fecha || new Date().toISOString().split('T')[0],
+          ]);
+        });
+      }
+
+      if (rows.length === 0) {
+        rows.push([
+          fichaCodigo,
+          'Todos los aprendices',
+          'Sin Alertas Activas',
+          'El grupo presenta buen rendimiento y asistencia al día',
+          'BAJO',
+          new Date().toISOString().split('T')[0],
+        ]);
+      }
+
+      await exportToCsv(`Informe_Alertas_Tempranas_Ficha_${fichaCodigo}.csv`, headers, rows);
+      setFeedbackMsg(`✅ Informe de alertas exportado exitosamente (Ficha ${fichaCodigo})`);
+    } catch (err: any) {
+      console.error('Error exportando alertas:', err);
+      setFeedbackMsg(`⚠️ Error al exportar informe de alertas: ${err.message || 'Intente nuevamente'}`);
+    } finally {
+      setDownloadingAlertas(false);
     }
   };
 
@@ -247,11 +313,18 @@ export default function ReportesScreenPremium() {
             Fichas de alerta temprana para coordinación sobre aprendices en riesgo por bajo rendimiento o inasistencia.
           </Text>
           <Pressable
-            style={styles.btnDownload}
-            onPress={() => handleDownloadAsistencia()}
+            style={[styles.btnDownload, downloadingAlertas && styles.btnDisabled]}
+            disabled={downloadingAlertas || !selectedFichaId}
+            onPress={handleDownloadAlertas}
           >
-            <Ionicons name="share-social-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-            <Text style={styles.btnDownloadText}>Exportar Informe de Alertas</Text>
+            {downloadingAlertas ? (
+              <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 6 }} />
+            ) : (
+              <Ionicons name="share-social-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+            )}
+            <Text style={styles.btnDownloadText}>
+              {downloadingAlertas ? 'Generando Alertas...' : 'Exportar Informe de Alertas'}
+            </Text>
           </Pressable>
         </View>
       </View>
@@ -265,26 +338,27 @@ const styles = StyleSheet.create({
     backgroundColor: BG_PAGE,
   },
   contentContainer: {
-    paddingHorizontal: 28,
-    paddingVertical: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 18,
     paddingBottom: 40,
   },
   pageTitle: {
-    fontSize: 26,
+    fontSize: 22,
     fontWeight: '700',
     color: NAVY,
     marginBottom: 4,
   },
   pageSubtitle: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#64748B',
-    marginBottom: 20,
+    marginBottom: 16,
+    lineHeight: 18,
   },
   selectorCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     shadowColor: '#0F172A',
@@ -333,7 +407,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 12,
     padding: 12,
-    marginBottom: 18,
+    marginBottom: 16,
   },
   feedbackText: {
     color: '#065F46',
@@ -341,23 +415,21 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   grid: {
-    flexDirection: 'row',
-    gap: 18,
-    flexWrap: 'wrap',
+    flexDirection: 'column',
+    gap: 14,
   },
   reportCard: {
-    flex: 1,
-    minWidth: 280,
+    width: '100%',
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 24,
+    borderRadius: 16,
+    padding: 18,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
   iconWrap: {
     width: 44,
@@ -365,10 +437,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: 12,
   },
   cardTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '700',
     color: NAVY,
     marginBottom: 6,
@@ -376,17 +448,18 @@ const styles = StyleSheet.create({
   cardText: {
     fontSize: 13,
     color: '#64748B',
-    lineHeight: 18,
-    marginBottom: 20,
+    lineHeight: 19,
+    marginBottom: 16,
   },
   btnDownload: {
     backgroundColor: GOLD,
-    paddingVertical: 10,
+    paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
+    justifyContent: 'center',
+    alignSelf: 'stretch',
   },
   btnDisabled: {
     opacity: 0.6,

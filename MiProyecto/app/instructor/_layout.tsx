@@ -34,6 +34,7 @@ const menuItems: MenuItemType[] = [
   { name: 'Mis Fichas', path: '/instructor/fichas', icon: 'grid-outline' },
   { name: 'Actividades', path: '/instructor/actividades', icon: 'folder-open-outline' },
   { name: 'Aprendices', path: '/instructor/aprendices', icon: 'people-outline' },
+  { name: 'Matrículas', path: '/instructor/matriculas', icon: 'id-card-outline' },
   { name: 'Asistencia', path: '/instructor/asistencia', icon: 'checkbox-outline' },
   { name: 'Calificaciones', path: '/instructor/calificaciones', icon: 'bar-chart-outline' },
   { name: 'Observaciones', path: '/instructor/observaciones', icon: 'chatbubbles-outline' },

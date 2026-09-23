@@ -1,4 +1,6 @@
 import { Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 
 /**
  * Utilidad para exportar datos en formato CSV / Reportes con soporte Web y Móvil (FileSystem / Sharing)
@@ -34,25 +36,29 @@ export async function exportToCsv(
     URL.revokeObjectURL(url);
   } else {
     try {
-      const FileSystem = require('expo-file-system');
-      const Sharing = require('expo-sharing');
+      const baseDir = FileSystem.cacheDirectory || FileSystem.documentDirectory;
+      if (!baseDir) {
+        throw new Error('No se encontró directorio de almacenamiento accesible en el dispositivo.');
+      }
+      const fileUri = `${baseDir}${safeFilename}`;
 
-      const fileUri = `${FileSystem.documentDirectory}${safeFilename}`;
       await FileSystem.writeAsStringAsync(fileUri, csvContent, {
         encoding: FileSystem.EncodingType.UTF8,
       });
 
-      if (await Sharing.isAvailableAsync()) {
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
         await Sharing.shareAsync(fileUri, {
           mimeType: 'text/csv',
           dialogTitle: `Exportar ${safeFilename}`,
           UTI: 'public.comma-separated-values-text',
         });
       } else {
-        alert(`Reporte generado con éxito (${safeFilename}).`);
+        throw new Error('El sistema no permite compartir ni guardar archivos externamente.');
       }
-    } catch {
-      alert(`Reporte generado con éxito (${safeFilename}).`);
+    } catch (err: any) {
+      console.error('Error exportando CSV en dispositivo móvil:', err);
+      throw err;
     }
   }
 }

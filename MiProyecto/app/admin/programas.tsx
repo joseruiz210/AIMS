@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,11 +8,13 @@ import {
   TextInput,
   useWindowDimensions,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ActionModal from '../../components/ActionModal';
 import { programasService } from '../../services/programasService';
 import { adminService } from '../../services/adminService';
+import { fichasService } from '../../services/fichasService';
 
 const NAVY = '#12103C';
 const GOLD = '#cfa235';
@@ -37,18 +39,15 @@ export default function ProgramasScreen() {
   const [search, setSearch] = useState('');
   const [programas, setProgramas] = useState<ProgramItem[]>([]);
   const [totalAprendicesUnicos, setTotalAprendicesUnicos] = useState(0);
-  const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadProgramas();
-  }, []);
-
-  const loadProgramas = async () => {
-    setLoading(true);
+  const loadProgramas = useCallback(async () => {
     try {
-      const [data, usersRes] = await Promise.all([
+      const [progData, fichasData, usersRes] = await Promise.all([
         programasService.getProgramas(),
+        fichasService.getFichas().catch(() => []),
         adminService.getUsers({ role: 'APRENDIZ', limit: 1 }).catch(() => ({ total: 0 })),
       ]);
 
@@ -56,41 +55,85 @@ export default function ProgramasScreen() {
         setTotalAprendicesUnicos(usersRes.total);
       }
 
-      setProgramas(
-        data.map((p) => ({
-          id: p.id,
-          badge: (p.codigo || 'PRG').slice(0, 4).toUpperCase(),
-          badgeColor: GOLD,
-          title: p.nombre,
-          level: `${p.nivel || 'Tecnólogo'} - ${p.duracionMeses || 24} meses`,
-          status: ((p.estado || 'Activo').toUpperCase() as any),
-          fichas: p.fichasActivasCount || 0,
-          aprendices: p.aprendicesCount || 0,
-          instructores: p.instructoresCount || 0,
-          competencias: p.competenciasCount || 0,
-        }))
-      );
+      if (progData && progData.length > 0) {
+        setProgramas(
+          progData.map((p) => {
+            const pId = String(p.id).toLowerCase();
+            const pNombre = (p.nombre || '').trim().toLowerCase();
+            const pCodigo = (p.codigo || '').trim().toLowerCase();
+
+            const fichasDelPrograma = (fichasData || []).filter((f) => {
+              if (f.programaId && String(f.programaId).toLowerCase() === pId) return true;
+              if (f.programaNombre && pNombre && f.programaNombre.trim().toLowerCase() === pNombre) return true;
+              if (f.codigo && pCodigo && f.codigo.toLowerCase().includes(pCodigo)) return true;
+              return false;
+            });
+
+            const fichasCount = fichasDelPrograma.length > 0 ? fichasDelPrograma.length : (p.fichasActivasCount || 0);
+            const aprendicesCount = p.aprendicesCount !== undefined
+              ? p.aprendicesCount
+              : fichasDelPrograma.reduce((sum, f) => sum + (f.aprendicesCount || 0), 0);
+
+            const instructoresCount = p.instructoresCount !== undefined
+              ? p.instructoresCount
+              : new Set(fichasDelPrograma.map((f) => f.instructorNombre).filter((n) => n && n !== 'Sin asignar')).size;
+
+            return {
+              id: p.id,
+              badge: (p.codigo || 'PRG').slice(0, 4).toUpperCase(),
+              badgeColor: GOLD,
+              title: p.nombre,
+              level: `${p.nivel || 'Tecnólogo'} - ${p.duracionMeses || 24} meses`,
+              status: (p.estado as any) || 'ACTIVO',
+              fichas: fichasCount,
+              aprendices: aprendicesCount,
+              instructores: instructoresCount,
+              competencias: p.competenciasCount || 10,
+              asistenciaPromedio: 90,
+              promedioNotas: 4.2,
+            };
+          })
+        );
+      } else {
+        setProgramas([]);
+      }
     } catch (err) {
-      console.error('Error al cargar programas:', err);
+      console.error('Error cargando programas:', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadProgramas();
+  }, [loadProgramas]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadProgramas();
+    setRefreshing(false);
+  }, [loadProgramas]);
 
   const handleCreatePrograma = async (values: Record<string, string>) => {
-    const nombre = values['Nombre del Programa'] || 'Nuevo Programa Formativo';
-    const codigo = values['Código de Insignia'] || 'PRG-' + Math.floor(Math.random() * 1000);
-    const nivelDuracion = values['Nivel y Duración'] || 'Tecnólogo - 24 meses';
+    const nombre = values['Nombre del Programa']?.trim() || 'Nuevo Programa Formativo';
+    const codigo = values['Código de Insignia']?.trim() || 'PRG-' + Math.floor(Math.random() * 1000);
+    const nivelDuracion = values['Nivel y Duración']?.trim() || 'Tecnólogo - 24 meses';
+    const competencias = parseInt(values['Número de Competencias'] || '10', 10);
+    const duracionMeses = parseInt(nivelDuracion.replace(/[^0-9]/g, '') || '24', 10);
+    const nivel = nivelDuracion.split('-')[0]?.trim() || 'Tecnólogo';
 
     try {
       await programasService.createPrograma({
         codigo,
         nombre,
-        nivel: nivelDuracion.split('-')[0]?.trim() || 'Tecnólogo',
-        duracionMeses: parseInt(nivelDuracion.replace(/[^0-9]/g, '') || '24', 10),
+        nivel,
+        duracionMeses,
+        fichasActivasCount: 1,
+        estado: 'Activo',
       });
-      // Recargar datos reales desde el backend tras crear
+
       await loadProgramas();
+      setModalVisible(false);
     } catch (err) {
       console.error('Error al crear programa:', err);
     }
@@ -107,7 +150,19 @@ export default function ProgramasScreen() {
   const totalAprendices = programas.reduce((acc, p) => acc + p.aprendices, 0);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={true}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.contentContainer}
+      showsVerticalScrollIndicator={true}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={GOLD}
+          colors={[GOLD, NAVY]}
+        />
+      }
+    >
       {/* Top Action Bar */}
       <View style={styles.topHeader}>
         <View>

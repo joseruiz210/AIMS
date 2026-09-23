@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,10 +8,13 @@ import {
   TextInput,
   useWindowDimensions,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ActionModal from '../../components/ActionModal';
 import { adminService } from '../../services/adminService';
+import { fichasService } from '../../services/fichasService';
+import { exportToCsv } from '../../utils/exportUtil';
 
 const NAVY = '#12103C';
 const GOLD = '#cfa235';
@@ -34,27 +37,63 @@ export default function AprendicesScreen() {
   const [statusFilter, setStatusFilter] = useState<'Todos' | 'Activo' | 'En Riesgo' | 'Critico'>('Todos');
   const [aprendices, setAprendices] = useState<AprendizRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
   const [activosCount, setActivosCount] = useState(0);
   const [riesgoCount, setRiesgoCount] = useState(0);
   const [criticosCount, setCriticosCount] = useState(0);
   const [modalVisible, setModalVisible] = useState(false);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       let usersRes: any = { users: [], total: 0 };
       try {
         usersRes = await adminService.getUsers({ role: 'APRENDIZ', limit: 500 });
       } catch {
-        usersRes = await adminService.getUsers({ role: 'APRENDIZ', limit: 100 });
+        usersRes = await adminService.getUsers({ role: 'APRENDIZ', limit: 100 }).catch(() => ({ users: [], total: 0 }));
       }
 
-      const rawUsers = usersRes.users || [];
+      let rawUsers = usersRes.users || [];
+
+      // Si adminService.getUsers viene vacío o falla, cargar aprendices desde las fichas
+      if (rawUsers.length === 0) {
+        try {
+          const fichas = await fichasService.getFichas();
+          const results = await Promise.all(
+            fichas.map(f => fichasService.getAprendicesByFicha(f.id, f.numero).then(aprs => ({ f, aprs })))
+          );
+          const seenEmails = new Set<string>();
+          for (const { f, aprs } of results) {
+            for (const a of aprs) {
+              if (!seenEmails.has(a.email)) {
+                seenEmails.add(a.email);
+                rawUsers.push({
+                  id: a.id,
+                  firstName: a.firstName,
+                  lastName: a.lastName,
+                  email: a.email,
+                  isActive: a.estado !== 'Critico',
+                  matriculas: [
+                    {
+                      ficha: {
+                        numero: f.numero || a.fichaNumero || '2670142',
+                        programa: {
+                          codigo: (f.programaNombre || 'ADSO').slice(0, 4).toUpperCase(),
+                          nombre: f.programaNombre || 'Análisis y Desarrollo de Software',
+                        },
+                      },
+                    },
+                  ],
+                });
+              }
+            }
+          }
+        } catch (fErr) {
+          console.warn('Fallback de fichas para aprendices:', fErr);
+        }
+      }
+
       const mapped: AprendizRow[] = rawUsers.map((u: any) => {
         const fichaObj = u.matriculas?.[0]?.ficha;
         // Mapear estadoAcademico real del usuario
@@ -88,7 +127,17 @@ export default function AprendicesScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  }, [loadData]);
 
   const filteredAprendices = aprendices.filter((a) => {
     const matchesSearch =
@@ -102,8 +151,42 @@ export default function AprendicesScreen() {
     return matchesSearch && matchesStatus;
   });
 
+  const handleExportAprendices = async () => {
+    try {
+      const headers = ['ID', 'Nombre Completo', 'Correo Institucional', 'Ficha', 'Programa de Formación', 'Nota Promedio', 'Estado Académico'];
+      const rows = filteredAprendices.map((a) => [
+        a.id,
+        a.nombre,
+        a.email,
+        a.ficha,
+        a.programa,
+        a.nota.toFixed(1),
+        a.estado,
+      ]);
+      await exportToCsv(
+        `Listado_Aprendices_${statusFilter !== 'Todos' ? statusFilter : 'General'}_${new Date().toISOString().split('T')[0]}.csv`,
+        headers,
+        rows
+      );
+    } catch (err) {
+      console.error('Error exportando listado de aprendices:', err);
+    }
+  };
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={true}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.contentContainer}
+      showsVerticalScrollIndicator={true}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={GOLD}
+          colors={[GOLD, NAVY]}
+        />
+      }
+    >
       {/* Top Header */}
       <View style={styles.topHeader}>
         <View>
@@ -281,6 +364,7 @@ export default function AprendicesScreen() {
       <ActionModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
+        onSubmit={handleExportAprendices}
         title="Exportar Listado de Aprendices"
         subtitle="Generación de reporte Excel / CSV"
         iconName="download-outline"

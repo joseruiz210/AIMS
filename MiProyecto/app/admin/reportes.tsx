@@ -90,7 +90,7 @@ export default function ReportesAdminScreen() {
         }
       }
 
-      exportToCsv(`Consolidado_Asistencia_Ficha_${fichaCodigo}.csv`, headers, rows);
+      await exportToCsv(`Consolidado_Asistencia_Ficha_${fichaCodigo}.csv`, headers, rows);
       setFeedbackMsg(`✅ Asistencia exportada exitosamente (Ficha ${fichaCodigo})`);
     } catch (err: any) {
       console.error('Error exportando asistencia:', err);
@@ -139,7 +139,7 @@ export default function ReportesAdminScreen() {
         }
       }
 
-      exportToCsv(`Reporte_Notas_Ficha_${fichaCodigo}.csv`, headers, rows);
+      await exportToCsv(`Reporte_Notas_Ficha_${fichaCodigo}.csv`, headers, rows);
       setFeedbackMsg(`✅ Calificaciones exportadas exitosamente (Ficha ${fichaCodigo})`);
     } catch (err: any) {
       console.error('Error exportando calificaciones:', err);

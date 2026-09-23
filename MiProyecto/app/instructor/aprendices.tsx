@@ -9,8 +9,10 @@ import {
   ActivityIndicator,
   useWindowDimensions,
   RefreshControl,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import ActionModal from '../../components/ActionModal';
 import { fichasService } from '../../services/fichasService';
 
 const NAVY = '#0F1026';
@@ -38,33 +40,57 @@ export default function AprendicesScreenPremium() {
   const [aprendices, setAprendices] = useState<Apprentice[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedApprentice, setSelectedApprentice] = useState<Apprentice | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
+
+  const handleCreateMatricula = (values: Record<string, string>) => {
+    const name = values['Nombre del Aprendiz']?.trim() || 'Nuevo Aprendiz';
+    const ficha = values['Número de Ficha']?.trim() || '2845671';
+    const doc = values['Documento de Identidad']?.trim() || '1000' + Math.floor(Math.random() * 9000);
+    const correo = values['Correo Electrónico']?.trim() || `${name.toLowerCase().replace(/\s+/g, '')}@sena.edu.co`;
+
+    const newApr: Apprentice = {
+      id: String(Date.now()),
+      name,
+      initials: name.split(' ').map(n => n[0]).join('').slice(0, 2),
+      doc,
+      ficha,
+      nota: 4.0,
+      asistencia: 100,
+      status: 'Activo',
+      telefono: '3001234567',
+      correo,
+    };
+
+    setAprendices(prev => [newApr, ...prev]);
+  };
 
   const loadAprendices = useCallback(async () => {
     try {
       const fichas = await fichasService.getFichas();
       const list: Apprentice[] = [];
+      const seenIds = new Set<string>();
 
-      for (const f of fichas) {
-        const detail = await fichasService.getFichaById(f.id);
-        if (detail && detail.matriculas) {
-          for (const m of detail.matriculas) {
-            if (m.aprendiz) {
-              const a = m.aprendiz;
-              const fullName = `${a.firstName} ${a.lastName || ''}`.trim();
-              const initials = `${a.firstName?.[0] || 'A'}${a.lastName?.[0] || 'P'}`.toUpperCase();
-              list.push({
-                id: a.id,
-                name: fullName,
-                initials,
-                doc: a.phone || a.id.slice(0, 8),
-                ficha: f.numero,
-                nota: 4.5,
-                asistencia: 90,
-                status: a.estadoAcademico === 'EN_RIESGO' ? 'En Riesgo' : 'En Formación',
-                telefono: a.phone || '311-000-0000',
-                correo: a.email,
-              });
-            }
+      const results = await Promise.all(
+        fichas.map(f => fichasService.getAprendicesByFicha(f.id, f.numero).then(aprs => ({ f, aprs })))
+      );
+
+      for (const { f, aprs } of results) {
+        for (const a of aprs) {
+          if (!seenIds.has(a.id)) {
+            seenIds.add(a.id);
+            const initials = `${a.firstName?.[0] || 'A'}${a.lastName?.[0] || 'P'}`.toUpperCase();
+            list.push({
+              id: a.id,
+              name: a.fullName,
+              initials,
+              doc: a.documentNumber || a.phone || a.id.slice(0, 8),
+              ficha: f.numero || a.fichaNumero || '2670142',
+              nota: 4.5,
+              asistencia: 92,
+              status: a.estadoAcademico === 'EN_RIESGO' ? 'En Riesgo' : 'En Formación',
+              telefono: a.phone || '311-000-0000',
+              correo: a.email,
+            });
           }
         }
       }
@@ -112,11 +138,20 @@ export default function AprendicesScreenPremium() {
     >
       {/* Title */}
       <View style={styles.headerRow}>
-        <View>
-          <Text style={styles.pageTitle}>Directorio de Aprendices</Text>
-          <Text style={styles.pageSubtitle}>
-            {aprendices.length} aprendices matriculados en tus fichas de formación
-          </Text>
+        <View style={styles.headerTop}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.pageTitle}>Directorio de Aprendices</Text>
+            <Text style={styles.pageSubtitle}>
+              {aprendices.length} aprendices matriculados en tus fichas de formación
+            </Text>
+          </View>
+          <Pressable
+            style={({ hovered }: any) => [styles.newBtn, hovered && styles.newBtnHover]}
+            onPress={() => setModalVisible(true)}
+          >
+            <Ionicons name="add-circle-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+            <Text style={styles.newBtnText}>+ Nueva Matrícula</Text>
+          </Pressable>
         </View>
 
         {/* Buscador */}
@@ -241,6 +276,22 @@ export default function AprendicesScreenPremium() {
           )}
         </View>
       )}
+
+      <ActionModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        title="Crear Nueva Matrícula"
+        subtitle="Registro Académico del Aprendiz"
+        iconName="document-text-outline"
+        confirmText="Registrar Matrícula"
+        onSubmit={handleCreateMatricula}
+        fields={[
+          { label: 'Nombre del Aprendiz', placeholder: 'Ej: Valentina Torres' },
+          { label: 'Documento de Identidad', placeholder: 'Ej: 1001234567' },
+          { label: 'Número de Ficha', placeholder: 'Ej: 2845671' },
+          { label: 'Correo Electrónico', placeholder: 'Ej: aprendiz@sena.edu.co' },
+        ]}
+      />
     </ScrollView>
   );
 }
@@ -258,6 +309,35 @@ const styles = StyleSheet.create({
   headerRow: {
     marginBottom: 24,
     gap: 14,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+    flexWrap: 'wrap',
+  },
+  newBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: GOLD,
+    paddingVertical: 9,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    shadowColor: GOLD,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : {}),
+  },
+  newBtnHover: {
+    backgroundColor: '#b88d2a',
+  },
+  newBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 13,
   },
   pageTitle: {
     fontSize: 26,

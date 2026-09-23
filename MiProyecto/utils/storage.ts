@@ -175,3 +175,56 @@ export async function removeRememberedAuth(): Promise<void> {
   }
 }
 
+/**
+ * Guarda un valor string genérico de forma multiplataforma (Web y Móvil)
+ */
+export async function setStorageItem(key: string, value: string): Promise<void> {
+  try {
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(key, value);
+      }
+    } else {
+      await SecureStore.setItemAsync(key, value);
+    }
+  } catch (error) {
+    console.error(`Error al guardar storage item [${key}]:`, error);
+  }
+}
+
+/**
+ * Obtiene un valor string genérico de forma multiplataforma (Web y Móvil)
+ */
+export async function getStorageItem(key: string): Promise<string | null> {
+  try {
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined') {
+        return localStorage.getItem(key);
+      }
+      return null;
+    } else {
+      return await SecureStore.getItemAsync(key);
+    }
+  } catch (error) {
+    console.error(`Error al obtener storage item [${key}]:`, error);
+    return null;
+  }
+}
+
+/**
+ * Elimina un valor string genérico de forma multiplataforma (Web y Móvil)
+ */
+export async function removeStorageItem(key: string): Promise<void> {
+  try {
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(key);
+      }
+    } else {
+      await SecureStore.deleteItemAsync(key);
+    }
+  } catch (error) {
+    console.error(`Error al eliminar storage item [${key}]:`, error);
+  }
+}
+

@@ -1,15 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   Pressable,
-  Platform,
+  ActivityIndicator,
   useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ActionModal from '../../components/ActionModal';
+import { exportPdfDocument, DocumentLearnerInfo } from '../../utils/pdfExportUtil';
+import { getUserData } from '../../utils/storage';
 
 const NAVY = '#12103C';
 const GOLD = '#cfa235';
@@ -26,29 +28,29 @@ const DOCUMENTOS: DocumentoItem[] = [
   {
     id: '1',
     nombre: 'Certificado de Matrícula Oficial',
-    tipo: 'PDF (1.2 MB)',
-    fechaEmision: '2024-02-10',
+    tipo: 'PDF Oficial SENA',
+    fechaEmision: '2026-02-10',
     estado: 'Disponible',
   },
   {
     id: '2',
     nombre: 'Carné Digital Institucional SENA',
-    tipo: 'PNG / PDF',
-    fechaEmision: '2024-02-05',
+    tipo: 'Carné Digital (PDF)',
+    fechaEmision: '2026-02-05',
     estado: 'Disponible',
   },
   {
     id: '3',
     nombre: 'Constancia de Calificaciones y Asistencia',
-    tipo: 'PDF (850 KB)',
+    tipo: 'Constancia Académica (PDF)',
     fechaEmision: '2026-08-20',
     estado: 'Disponible',
   },
   {
     id: '4',
     nombre: 'Paz y Salvo Académico de Trimestre',
-    tipo: 'PDF',
-    fechaEmision: '2026-08-01',
+    tipo: 'Certificación Final',
+    fechaEmision: '2026-09-01',
     estado: 'En Trámite',
   },
 ];
@@ -58,26 +60,55 @@ export default function DocumentosAprendizScreen() {
   const isDesktop = width >= 1024;
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<DocumentoItem | null>(null);
+  const [downloadingDocId, setDownloadingDocId] = useState<string | null>(null);
+  const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
-  const downloadFile = (docName: string, tipo: string) => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      const content = `SERVICIO NACIONAL DE APRENDIZAJE - SENA\nSISTEMA INTELIGENTE DE GESTIÓN ACADÉMICA (AIMS)\n======================================================\n\nDOCUMENTO OFICIAL: ${docName.toUpperCase()}\nFORMATO: ${tipo}\nFECHA DE EMISIÓN: ${new Date().toLocaleDateString('es-CO')}\nCÓDIGO DE VERIFICACIÓN QR: SENA-VERIF-9982412\nESTADO: VÁLIDO Y VERIFICADO EN SISTEMA AIMS\n\n------------------------------------------------------\nEste documento es una constancia digital expedida oficialmente por el Centro de Formación SENA AIMS.`;
-      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${docName.replace(/\s+/g, '_')}_SENA.txt`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+  useEffect(() => {
+    loadUserData();
+  }, []);
+
+  const loadUserData = async () => {
+    try {
+      const data = await getUserData();
+      if (data) {
+        setCurrentUser(data);
+      }
+    } catch (err) {
+      console.error('Error cargando datos de usuario:', err);
     }
   };
 
-  const handleDownload = (doc: DocumentoItem) => {
+  const executeDocumentDownload = async (doc: DocumentoItem) => {
+    if (doc.estado === 'En Trámite') return;
+    setDownloadingDocId(doc.id);
+    setFeedbackMsg(null);
+
+    try {
+      const learnerInfo: DocumentLearnerInfo = {
+        nombre: currentUser?.nombre || currentUser?.name || 'Aprendiz SENA',
+        correo: currentUser?.correo || currentUser?.email || 'aprendiz@sena.edu.co',
+        documento: currentUser?.documento || currentUser?.numeroDocumento || 'CC. 1.094.821.390',
+        tipoDocumento: currentUser?.tipoDocumento || 'Cédula de Ciudadanía',
+        ficha: currentUser?.ficha || currentUser?.academicData?.fichaNumero || '2758392',
+        programa: currentUser?.programa || 'Tecnólogo en Análisis y Desarrollo de Software (ADSO)',
+        fechaEmision: doc.fechaEmision,
+        codigoVerificacion: `SENA-VERIF-${Math.floor(1000000 + Math.random() * 9000000)}`,
+      };
+
+      await exportPdfDocument(doc.nombre, learnerInfo);
+      setFeedbackMsg(`✅ Documento descargado exitosamente: ${doc.nombre}`);
+    } catch (err: any) {
+      console.error('Error descargando documento:', err);
+      setFeedbackMsg(`⚠️ Error al generar documento: ${err.message || 'Intente nuevamente'}`);
+    } finally {
+      setDownloadingDocId(null);
+    }
+  };
+
+  const handleOpenModal = (doc: DocumentoItem) => {
     setSelectedDoc(doc);
     setModalVisible(true);
-    downloadFile(doc.nombre, doc.tipo);
   };
 
   const pad = isDesktop ? 24 : 14;
@@ -88,56 +119,86 @@ export default function DocumentosAprendizScreen() {
       <View style={styles.topHeader}>
         <Text style={styles.pageTitle}>Documentos y Certificados</Text>
         <Text style={styles.pageSubtitle}>
-          Descarga tus certificados oficiales, carné digital e informes académicos.
+          Descarga tus certificados oficiales, carné digital e informes académicos con validación digital.
         </Text>
       </View>
 
+      {/* Banner de Feedback */}
+      {feedbackMsg && (
+        <View style={styles.feedbackBanner}>
+          <Text style={styles.feedbackText}>{feedbackMsg}</Text>
+        </View>
+      )}
+
       {/* Documents Grid */}
       <View style={styles.gridContainer}>
-        {DOCUMENTOS.map((doc) => (
-          <View key={doc.id} style={styles.docCard}>
-            <View style={styles.cardTop}>
-              <View style={styles.fileIconBox}>
-                <Ionicons name="document-text" size={26} color={GOLD} />
-              </View>
-              <View
-                style={[
-                  styles.statusTag,
-                  doc.estado === 'Disponible' ? styles.tagDisp : styles.tagTramite,
-                ]}
-              >
-                <Text
+        {DOCUMENTOS.map((doc) => {
+          const isDownloading = downloadingDocId === doc.id;
+          return (
+            <View key={doc.id} style={styles.docCard}>
+              <View style={styles.cardTop}>
+                <View style={styles.fileIconBox}>
+                  <Ionicons name="document-text" size={26} color={GOLD} />
+                </View>
+                <View
                   style={[
-                    styles.statusTagText,
-                    doc.estado === 'Disponible' ? styles.tagTextDisp : styles.tagTextTramite,
+                    styles.statusTag,
+                    doc.estado === 'Disponible' ? styles.tagDisp : styles.tagTramite,
                   ]}
                 >
-                  {doc.estado}
-                </Text>
+                  <Text
+                    style={[
+                      styles.statusTagText,
+                      doc.estado === 'Disponible' ? styles.tagTextDisp : styles.tagTextTramite,
+                    ]}
+                  >
+                    {doc.estado}
+                  </Text>
+                </View>
+              </View>
+
+              <Text style={styles.docName}>{doc.nombre}</Text>
+              <Text style={styles.docMeta}>
+                Formato: {doc.tipo} • Emitido: {doc.fechaEmision}
+              </Text>
+
+              <View style={styles.cardActionsRow}>
+                <Pressable
+                  style={({ hovered }: any) => [
+                    styles.downloadBtn,
+                    doc.estado === 'En Trámite' && styles.downloadBtnDisabled,
+                    isDownloading && styles.downloadBtnDisabled,
+                    hovered && doc.estado === 'Disponible' && !isDownloading && styles.downloadBtnHover,
+                  ]}
+                  disabled={doc.estado === 'En Trámite' || isDownloading}
+                  onPress={() => executeDocumentDownload(doc)}
+                >
+                  {isDownloading ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 6 }} />
+                  ) : (
+                    <Ionicons name="download-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                  )}
+                  <Text style={styles.downloadBtnText}>
+                    {doc.estado === 'En Trámite'
+                      ? 'En generación...'
+                      : isDownloading
+                      ? 'Generando PDF...'
+                      : 'Descargar Documento'}
+                  </Text>
+                </Pressable>
+
+                {doc.estado === 'Disponible' && (
+                  <Pressable
+                    style={styles.infoBtn}
+                    onPress={() => handleOpenModal(doc)}
+                  >
+                    <Ionicons name="information-circle-outline" size={20} color={NAVY} />
+                  </Pressable>
+                )}
               </View>
             </View>
-
-            <Text style={styles.docName}>{doc.nombre}</Text>
-            <Text style={styles.docMeta}>
-              Formato: {doc.tipo} • Emitido: {doc.fechaEmision}
-            </Text>
-
-            <Pressable
-              style={({ hovered }: any) => [
-                styles.downloadBtn,
-                doc.estado === 'En Trámite' && styles.downloadBtnDisabled,
-                hovered && doc.estado === 'Disponible' && styles.downloadBtnHover,
-              ]}
-              disabled={doc.estado === 'En Trámite'}
-              onPress={() => handleDownload(doc)}
-            >
-              <Ionicons name="download-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-              <Text style={styles.downloadBtnText}>
-                {doc.estado === 'Disponible' ? 'Descargar Documento' : 'En generación...'}
-              </Text>
-            </Pressable>
-          </View>
-        ))}
+          );
+        })}
       </View>
 
       {/* Download Action Modal */}
@@ -145,13 +206,15 @@ export default function DocumentosAprendizScreen() {
         <ActionModal
           visible={modalVisible}
           onClose={() => setModalVisible(false)}
+          onSubmit={() => executeDocumentDownload(selectedDoc)}
           title={`Descarga: ${selectedDoc.nombre}`}
           subtitle={`Formato: ${selectedDoc.tipo}`}
           iconName="cloud-download-outline"
-          confirmText="Descargar Ahora"
+          confirmText="Descargar Ahora (PDF)"
           fields={[
             { label: 'Documento', placeholder: selectedDoc.nombre },
-            { label: 'Código de Verificación QR', placeholder: 'SENA-VERIF-9982412' },
+            { label: 'Código de Verificación QR', placeholder: 'SENA-VERIF-OFICIAL-AIMS' },
+            { label: 'Aprendiz', placeholder: currentUser?.nombre || 'Aprendiz SENA' },
           ]}
         />
       )}
@@ -245,7 +308,13 @@ const styles = StyleSheet.create({
     color: '#64748B',
     marginBottom: 18,
   },
+  cardActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   downloadBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -263,6 +332,29 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '700',
     fontSize: 14,
+  },
+  infoBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 10,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  feedbackBanner: {
+    backgroundColor: '#D1FAE5',
+    borderColor: '#10B981',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 20,
+  },
+  feedbackText: {
+    color: '#065F46',
+    fontSize: 13,
+    fontWeight: '600',
   },
 });
 

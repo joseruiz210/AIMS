@@ -165,7 +165,7 @@ export default function ObservacionesScreen() {
       }
     >
       <View style={styles.header}>
-        <View>
+        <View style={styles.headerTextWrap}>
           <Text style={styles.title}>Observaciones</Text>
           <Text style={styles.subtitle}>Seguimiento académico y formativo</Text>
         </View>
@@ -203,7 +203,7 @@ export default function ObservacionesScreen() {
         <View key={item.id} style={styles.card}>
           <View style={styles.cardTop}>
             <Text style={styles.student}>{item.aprendizNombre || 'Aprendiz'}</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 }}>
               <Text style={styles.date}>{item.fecha}</Text>
               <Pressable
                 style={styles.cardDeleteBtn}
@@ -353,34 +353,47 @@ export default function ObservacionesScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8FAFC' },
-  content: { padding: 28, gap: 16, paddingBottom: 40 },
+  content: { paddingHorizontal: 16, paddingTop: 16, gap: 12, paddingBottom: 40 },
   loading: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12, backgroundColor: '#F8FAFC' },
   loadingText: { color: '#64748B', marginTop: 8 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  title: { fontSize: 24, fontWeight: '700', color: '#0F172A' },
-  subtitle: { color: '#64748B', marginTop: 4 },
-  addButton: { flexDirection: 'row', gap: 5, alignItems: 'center', backgroundColor: NAVY, padding: 10, paddingHorizontal: 14, borderRadius: 10 },
-  addText: { color: '#FFFFFF', fontWeight: '700' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
+  headerTextWrap: { flex: 1 },
+  title: { fontSize: 22, fontWeight: '700', color: '#0F172A' },
+  subtitle: { color: '#64748B', marginTop: 3, fontSize: 13 },
+  addButton: { flexDirection: 'row', gap: 5, alignItems: 'center', backgroundColor: NAVY, paddingVertical: 8, paddingHorizontal: 14, borderRadius: 10, flexShrink: 0 },
+  addText: { color: '#FFFFFF', fontWeight: '700', fontSize: 13 },
   toastWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FEF3C7', padding: 12, borderRadius: 10 },
   toastText: { color: '#92400E', fontWeight: '600', flex: 1 },
   errorWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#FEF2F2', padding: 14, borderRadius: 12, borderWidth: 1, borderColor: '#FECACA' },
   errorText: { color: '#DC2626', flex: 1, fontSize: 13 },
   retryBtn: { backgroundColor: '#DC2626', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
   retryText: { color: '#FFFFFF', fontWeight: '700', fontSize: 12 },
-  empty: { alignItems: 'center', padding: 40, backgroundColor: '#FFFFFF', borderRadius: 20, gap: 10, borderWidth: 1, borderColor: '#E2E8F0' },
-  emptyIconWrap: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
-  emptyTitle: { color: '#0F172A', fontWeight: '700', fontSize: 17 },
-  emptySubtitle: { color: '#64748B', textAlign: 'center', lineHeight: 20, paddingHorizontal: 10 },
-  emptyAction: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: NAVY, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 10, marginTop: 6 },
-  emptyActionText: { color: '#FFFFFF', fontWeight: '700' },
-  card: { backgroundColor: '#FFFFFF', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#E2E8F0', gap: 6 },
-  cardTop: { flexDirection: 'row', justifyContent: 'space-between' },
-  student: { color: '#0F172A', fontWeight: '700' },
-  date: { color: '#94A3B8', fontSize: 12 },
-  cardDeleteBtn: { padding: 4, borderRadius: 6, backgroundColor: '#FEE2E2', justifyContent: 'center', alignItems: 'center' },
+  empty: { alignItems: 'center', padding: 36, backgroundColor: '#FFFFFF', borderRadius: 20, gap: 10, borderWidth: 1, borderColor: '#E2E8F0' },
+  emptyIconWrap: { width: 68, height: 68, borderRadius: 34, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  emptyTitle: { color: '#0F172A', fontWeight: '700', fontSize: 16 },
+  emptySubtitle: { color: '#64748B', textAlign: 'center', lineHeight: 20, paddingHorizontal: 10, fontSize: 13 },
+  emptyAction: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: NAVY, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10, marginTop: 6 },
+  emptyActionText: { color: '#FFFFFF', fontWeight: '700', fontSize: 13 },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 6,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 },
+  student: { flex: 1, color: '#0F172A', fontWeight: '700', fontSize: 15, lineHeight: 20 },
+  date: { color: '#94A3B8', fontSize: 12, flexShrink: 0, marginTop: 2 },
+  cardDeleteBtn: { padding: 5, borderRadius: 6, backgroundColor: '#FEE2E2', justifyContent: 'center', alignItems: 'center' },
   type: { color: '#B45309', fontSize: 12, fontWeight: '700' },
   subject: { color: '#64748B', fontSize: 12 },
-  description: { color: '#334155' },
+  description: { color: '#334155', fontSize: 13, lineHeight: 19 },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 20 },
   modal: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 20, maxHeight: '90%', width: '100%', maxWidth: 540, alignSelf: 'center' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14 },

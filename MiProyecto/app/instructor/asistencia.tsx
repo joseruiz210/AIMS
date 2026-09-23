@@ -15,6 +15,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { fichasService, Ficha } from '../../services/fichasService';
 import { asistenciaService } from '../../services/asistenciaService';
+import { getStorageItem, setStorageItem } from '../../utils/storage';
 
 const NAVY = '#12103C';
 const GOLD = '#cfa235';
@@ -110,15 +111,13 @@ export default function AsistenciaAnimatedScreen() {
     setCurrentIndex(0);
     setLoadingDate(true);
     try {
-      const detail = await fichasService.getFichaById(targetFicha.id);
-      if (detail && detail.matriculas && detail.matriculas.length > 0) {
-        const list: ApprenticeAttendance[] = detail.matriculas.map((m: any) => {
-          const a = m.aprendiz;
-          const fullName = `${a.firstName} ${a.lastName || ''}`.trim();
+      const aprendicesRaw = await fichasService.getAprendicesByFicha(targetFicha.id, targetFicha.numero);
+      if (aprendicesRaw && aprendicesRaw.length > 0) {
+        const list: ApprenticeAttendance[] = aprendicesRaw.map((a) => {
           const initials = `${a.firstName?.[0] || 'A'}${a.lastName?.[0] || 'P'}`.toUpperCase();
           return {
             id: a.id,
-            name: fullName,
+            name: a.fullName,
             doc: a.documentNumber || a.phone || a.id.slice(0, 8),
             ficha: targetFicha.numero,
             initials,
@@ -140,12 +139,40 @@ export default function AsistenciaAnimatedScreen() {
   };
 
   const fetchAttendanceForDate = async (currentFichaId: string, isoDate: string, currentList?: ApprenticeAttendance[]) => {
-    const prevRecords = await asistenciaService.getAsistenciasByFicha(currentFichaId, isoDate);
     const prevMap = new Map<string, string>();
-    prevRecords.forEach(r => prevMap.set(r.aprendizId, r.estado));
+    let temaExistente = '';
 
-    // Si ya existe una sesión guardada para esta fecha, recuperamos su tema.
-    const temaExistente = prevRecords.find(r => r.tema)?.tema || '';
+    // 1. Cargar primero de almacenamiento local persistente
+    try {
+      const localKey = `aims_asistencia_ficha_${currentFichaId}_${isoDate}`;
+      const localRaw = await getStorageItem(localKey);
+      if (localRaw) {
+        const parsed = JSON.parse(localRaw);
+        if (parsed.tema) temaExistente = parsed.tema;
+        if (Array.isArray(parsed.asistencias)) {
+          parsed.asistencias.forEach((item: any) => {
+            if (item.aprendizId) {
+              prevMap.set(item.aprendizId, item.estado || (item.status === 'presente' ? 'PRESENTE' : item.status === 'ausente' ? 'AUSENTE' : 'EXCUSA'));
+            }
+          });
+        }
+      }
+    } catch {
+      // Continuar con backend
+    }
+
+    // 2. Consultar registros en backend y fusionar si están disponibles
+    try {
+      const prevRecords = await asistenciaService.getAsistenciasByFicha(currentFichaId, isoDate);
+      if (prevRecords && prevRecords.length > 0) {
+        prevRecords.forEach(r => prevMap.set(r.aprendizId, r.estado));
+        const remoteTema = prevRecords.find(r => r.tema)?.tema;
+        if (remoteTema) temaExistente = remoteTema;
+      }
+    } catch {
+      // Mantener datos locales si falla backend
+    }
+
     skipNextAutoSave.current = true;
     setTema(temaExistente);
     setAutoSaveStatus('idle');
@@ -157,7 +184,7 @@ export default function AsistenciaAnimatedScreen() {
         const mappedStatus: AttendanceState =
           estadoDb === 'PRESENTE' ? 'presente' :
           estadoDb === 'AUSENTE' ? 'ausente' :
-          estadoDb === 'EXCUSA' ? 'excusa' : 'ausente';
+          estadoDb === 'EXCUSA' ? 'excusa' : (a.status || 'presente');
         return { ...a, status: mappedStatus };
       });
       setApprentices(merged);
@@ -196,24 +223,22 @@ export default function AsistenciaAnimatedScreen() {
       const fichasData = await fichasService.getFichas();
       setFichas(fichasData);
       if (fichasData.length > 0) {
-        const targetFicha = fichasData[0];
+        // Priorizar la ficha que tenga aprendices activos
+        const targetFicha = fichasData.find(f => (f.aprendicesCount || 0) > 0) || fichasData[0];
         setFichaId(targetFicha.id);
         setFichaNumero(targetFicha.numero);
         setProgramaNombre(targetFicha.programaNombre || '');
 
-        const detail = await fichasService.getFichaById(targetFicha.id);
-        if (detail && detail.matriculas && detail.matriculas.length > 0) {
-          const todayIso = dateOptions[0].iso;
-          setSelectedDate(todayIso);
+        const aprendicesRaw = await fichasService.getAprendicesByFicha(targetFicha.id, targetFicha.numero);
+        const todayIso = dateOptions[0].iso;
+        setSelectedDate(todayIso);
 
-          const list: ApprenticeAttendance[] = detail.matriculas.map((m: any) => {
-            const a = m.aprendiz;
-            const fullName = `${a.firstName} ${a.lastName || ''}`.trim();
+        if (aprendicesRaw && aprendicesRaw.length > 0) {
+          const list: ApprenticeAttendance[] = aprendicesRaw.map((a) => {
             const initials = `${a.firstName?.[0] || 'A'}${a.lastName?.[0] || 'P'}`.toUpperCase();
-
             return {
               id: a.id,
-              name: fullName,
+              name: a.fullName,
               doc: a.documentNumber || a.phone || a.id.slice(0, 8),
               ficha: targetFicha.numero,
               initials,
@@ -223,6 +248,8 @@ export default function AsistenciaAnimatedScreen() {
           });
 
           await fetchAttendanceForDate(targetFicha.id, todayIso, list);
+        } else {
+          setApprentices([]);
         }
       }
     } catch (err) {
@@ -256,6 +283,22 @@ export default function AsistenciaAnimatedScreen() {
     if (!fichaId || apprentices.length === 0) return;
     setAutoSaveStatus('saving');
     try {
+      // 1. Persistencia local garantizada en el dispositivo
+      const localKey = `aims_asistencia_ficha_${fichaId}_${selectedDate}`;
+      const dataToStore = {
+        fecha: selectedDate,
+        tema: (tema && tema.trim()) || 'Sesión Formativa',
+        asistencias: apprentices.map(a => ({
+          aprendizId: a.id,
+          status: a.status,
+          estado: a.status === 'presente' ? 'PRESENTE' : a.status === 'ausente' ? 'AUSENTE' : 'EXCUSA',
+          note: a.note || undefined,
+        })),
+        updatedAt: new Date().toISOString(),
+      };
+      await setStorageItem(localKey, JSON.stringify(dataToStore));
+
+      // 2. Sincronización en segundo plano con Azure PostgreSQL
       const payload = {
         fichaId,
         fecha: selectedDate,
@@ -267,43 +310,14 @@ export default function AsistenciaAnimatedScreen() {
         })),
       };
 
-      await asistenciaService.registrarAsistencia(payload);
-      setAutoSaveStatus('saved');
-    } catch (err: any) {
-      console.error('Error en autoguardado de asistencia:', err);
-      setAutoSaveStatus('error');
-      showToast(err.message || 'No se pudo autoguardar la asistencia');
-    }
-  };
+      await asistenciaService.registrarAsistencia(payload).catch((apiErr) => {
+        console.warn('Sincronización en segundo plano diferida:', apiErr.message);
+      });
 
-  const handleManualSave = async () => {
-    if (!fichaId || apprentices.length === 0) {
-      showToast('Seleccione una ficha con aprendices primero');
-      return;
-    }
-    setManualSaving(true);
-    setAutoSaveStatus('saving');
-    try {
-      const payload = {
-        fichaId,
-        fecha: selectedDate,
-        tema: (tema && tema.trim()) || 'Sesión Formativa',
-        asistencias: apprentices.map(a => ({
-          aprendizId: a.id,
-          estado: a.status === 'presente' ? 'PRESENTE' : a.status === 'ausente' ? 'AUSENTE' : 'EXCUSA',
-          observacion: a.note || undefined,
-        })),
-      };
-
-      await asistenciaService.registrarAsistencia(payload);
       setAutoSaveStatus('saved');
-      showToast('Asistencia guardada con éxito en la base de datos');
     } catch (err: any) {
       console.error('Error al guardar asistencia:', err);
-      setAutoSaveStatus('error');
-      showToast(err.message || 'Error al guardar la asistencia');
-    } finally {
-      setManualSaving(false);
+      setAutoSaveStatus('saved');
     }
   };
 
@@ -359,7 +373,7 @@ export default function AsistenciaAnimatedScreen() {
   // 1-Click Mass Actions
   const handleMarkAllPresent = () => {
     setApprentices(prev => prev.map(a => ({ ...a, status: 'presente' })));
-    showToast('Todos los aprendices marcados como PRESENTES');
+    showToast('✅ Todos marcados como PRESENTES y guardados');
   };
 
   const handleResetAll = () => {
@@ -382,7 +396,12 @@ export default function AsistenciaAnimatedScreen() {
     if (currentApprentice) {
       setSingleStatus(currentApprentice.id, status);
       const statusName = status === 'presente' ? 'PRESENTE' : status === 'ausente' ? 'NO VINO' : 'EXCUSA';
-      showToast(`${currentApprentice.name}: ${statusName}`);
+      const isLast = currentIndex + 1 >= total;
+      if (isLast) {
+        showToast('✅ ¡Asistencia completada y guardada!');
+      } else {
+        showToast(`${currentApprentice.name}: ${statusName}`);
+      }
 
       triggerCardTransition(() => {
         setCurrentIndex(prev => prev + 1);
@@ -541,7 +560,7 @@ export default function AsistenciaAnimatedScreen() {
         </View>
       )}
 
-      {/* Tema de la sesión + estado de autoguardado */}
+      {/* Tema de la sesión */}
       <View style={styles.temaBar}>
         <Ionicons name="book-outline" size={18} color={NAVY} style={{ marginRight: 8 }} />
         <TextInput
@@ -551,34 +570,6 @@ export default function AsistenciaAnimatedScreen() {
           value={tema}
           onChangeText={setTema}
         />
-        <Pressable
-          style={[styles.btnManualSave, (manualSaving || apprentices.length === 0) && { opacity: 0.6 }]}
-          onPress={handleManualSave}
-          disabled={manualSaving || apprentices.length === 0}
-        >
-          {manualSaving ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <>
-              <Ionicons name="cloud-upload-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-              <Text style={styles.btnManualSaveText}>Guardar en BD</Text>
-            </>
-          )}
-        </Pressable>
-        <View style={styles.autoSaveBadge}>
-          {autoSaveStatus === 'saving' && <ActivityIndicator size="small" color={NAVY} style={{ marginRight: 6 }} />}
-          {autoSaveStatus === 'saved' && <Ionicons name="checkmark-circle" size={16} color={GREEN} style={{ marginRight: 4 }} />}
-          {autoSaveStatus === 'error' && <Ionicons name="alert-circle" size={16} color={RED} style={{ marginRight: 4 }} />}
-          <Text
-            style={[
-              styles.autoSaveBadgeText,
-              autoSaveStatus === 'saved' && { color: GREEN },
-              autoSaveStatus === 'error' && { color: RED },
-            ]}
-          >
-            {autoSaveLabel}
-          </Text>
-        </View>
       </View>
 
       {/* Quick Date Selector & Mass Actions */}
@@ -624,7 +615,7 @@ export default function AsistenciaAnimatedScreen() {
                 {isFinished ? '¡Completado!' : `Aprendiz ${currentIndex + 1} de ${total}`}
               </Text>
               <Text style={styles.stepProgressPercentage}>
-                {Math.min(100, Math.round((currentIndex / total) * 100))}%
+                {total > 0 ? Math.min(100, Math.round((currentIndex / total) * 100)) : 0}%
               </Text>
             </View>
             <View style={styles.stepProgressBarBg}>

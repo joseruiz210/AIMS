@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable, Modal, TextInput, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Modal, TextInput, ScrollView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 const NAVY = '#12103C';
@@ -52,7 +52,7 @@ export default function ActionModal({
 
   return (
     <Modal
-      animationType="slide"
+      animationType="fade"
       transparent={true}
       visible={visible}
       onRequestClose={onClose}
@@ -138,6 +138,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+    ...(Platform.OS === 'web'
+      ? {
+          position: 'fixed' as any,
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 99999,
+        }
+      : {}),
   },
   modalCard: {
     width: '92%',
@@ -189,6 +199,7 @@ const styles = StyleSheet.create({
   closeBtn: {
     padding: 6,
     borderRadius: 8,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : {}),
   },
   body: {
     padding: 20,
@@ -254,6 +265,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     borderRadius: 8,
     backgroundColor: '#E2E8F0',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : {}),
   },
   cancelText: {
     color: '#475569',
@@ -265,6 +277,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 8,
     backgroundColor: GOLD,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : {}),
   },
   submitText: {
     color: '#FFFFFF',

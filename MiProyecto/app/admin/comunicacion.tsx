@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,11 +8,11 @@ import {
   TextInput,
   useWindowDimensions,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { comunicadosService, ComunicadoItem } from '../../services/comunicadosService';
-import { authService } from '../../services/authService';
-import { getApiBaseUrl } from '../../services/api';
+import { comunicadosService } from '../../services/comunicadosService';
+import { adminService } from '../../services/adminService';
 
 const NAVY = '#12103C';
 const GOLD = '#cfa235';
@@ -33,59 +33,120 @@ export default function ComunicacionAdminScreen() {
   const [asunto, setAsunto] = useState('');
   const [mensaje, setMensaje] = useState('');
   const [enviados, setEnviados] = useState<ComunicadoEnviado[]>([]);
-  const [loadingHistory, setLoadingHistory] = useState(true);
   const [feedback, setFeedback] = useState(false);
-  const [sending, setSending] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    loadComunicados();
-  }, []);
-
-  const loadComunicados = async () => {
-    setLoadingHistory(true);
+  const loadEnviados = useCallback(async () => {
     try {
-      const data = await comunicadosService.getComunicados();
-      setEnviados(
-        data.map((c: ComunicadoItem) => ({
-          id: c.id,
-          titulo: c.titulo,
-          destinatario: c.destinatario || 'Todos los usuarios',
-          fecha: c.fecha || 'Sin fecha',
-          leidos: c.leidos || 0,
-        }))
-      );
-    } catch (err) {
-      console.error('Error al cargar comunicados:', err);
-    } finally {
-      setLoadingHistory(false);
-    }
-  };
-
-  const handleEnviar = async () => {
-    if (!asunto || !mensaje) return;
-    setSending(true);
-    try {
-      const API_BASE_URL = getApiBaseUrl();
-      const response = await authService.fetchWithAuth(`${API_BASE_URL}/comunicados`, {
-        method: 'POST',
-        body: JSON.stringify({ titulo: asunto, mensaje }),
-      });
-      if (response.ok) {
-        setAsunto('');
-        setMensaje('');
-        setFeedback(true);
-        setTimeout(() => setFeedback(false), 3000);
-        await loadComunicados();
+      const list = await comunicadosService.getComunicados();
+      if (Array.isArray(list)) {
+        setEnviados(
+          list.map((c) => ({
+            id: c.id,
+            titulo: c.titulo,
+            destinatario: c.destinatario || 'General',
+            fecha: c.fecha || 'Reciente',
+            leidos: c.leidos || 0,
+          }))
+        );
+      } else {
+        setEnviados([]);
       }
     } catch (err) {
-      console.error('Error al enviar comunicado:', err);
+      console.error('Error cargando historial de comunicados:', err);
     } finally {
-      setSending(false);
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadEnviados();
+  }, [loadEnviados]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadEnviados();
+  }, [loadEnviados]);
+
+  const handleEnviar = async () => {
+    setErrorMessage(null);
+    if (!asunto.trim()) {
+      setErrorMessage('Por favor escribe el asunto del comunicado.');
+      return;
+    }
+    if (!mensaje.trim()) {
+      setErrorMessage('Por favor escribe el mensaje a transmitir.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // 1. Guardar comunicado oficial en el backend
+      const nuevo = await comunicadosService.crearComunicado({
+        titulo: asunto.trim(),
+        mensaje: mensaje.trim(),
+        destinatario: destinatario.trim() || 'Todos los usuarios',
+        autor: 'Administración',
+        tipo: 'INSTITUCIONAL',
+      });
+
+      // 2. Despachar notificación Push e interna a los destinatarios objetivo
+      const targetRole = destinatario.toLowerCase().includes('aprendiz')
+        ? 'APRENDIZ'
+        : destinatario.toLowerCase().includes('instructor')
+        ? 'INSTRUCTOR'
+        : null;
+
+      try {
+        await adminService.sendGlobalNotification({
+          title: asunto.trim(),
+          body: mensaje.trim(),
+          tipo: 'COMUNICADO',
+          targetRole,
+        });
+      } catch (pushErr) {
+        console.warn('Advertencia al enviar notificación push global:', pushErr);
+      }
+
+      setEnviados((prev) => [
+        {
+          id: nuevo.id,
+          titulo: nuevo.titulo,
+          destinatario: nuevo.destinatario,
+          fecha: nuevo.fecha,
+          leidos: 0,
+        },
+        ...prev,
+      ]);
+
+      setAsunto('');
+      setMensaje('');
+      setFeedback(true);
+      setTimeout(() => setFeedback(false), 3500);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Error al enviar el comunicado. Inténtalo de nuevo.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.contentContainer}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={GOLD}
+          colors={[GOLD, NAVY]}
+        />
+      }
+    >
       {/* Top Header */}
       <View style={styles.topHeader}>
         <Text style={styles.pageTitle}>Comunicación</Text>
@@ -101,13 +162,21 @@ export default function ComunicacionAdminScreen() {
           {feedback && (
             <View style={styles.successBanner}>
               <Ionicons name="checkmark-circle" size={18} color="#10B981" style={{ marginRight: 6 }} />
-              <Text style={styles.successText}>¡Comunicado enviado con éxito!</Text>
+              <Text style={styles.successText}>¡Comunicado enviado con éxito a los aprendices y usuarios!</Text>
+            </View>
+          )}
+
+          {/* Error banner */}
+          {errorMessage && (
+            <View style={styles.errorBanner}>
+              <Ionicons name="alert-circle" size={18} color="#EF4444" style={{ marginRight: 6 }} />
+              <Text style={styles.errorText}>{errorMessage}</Text>
             </View>
           )}
 
           {/* Destinatario */}
           <View style={styles.fieldGroup}>
-            <Text style={styles.label}>DESTINARIO</Text>
+            <Text style={styles.label}>DESTINATARIO</Text>
             <View style={styles.inputWrapper}>
               <TextInput
                 style={styles.input}
@@ -150,49 +219,75 @@ export default function ComunicacionAdminScreen() {
 
           {/* Submit Button */}
           <Pressable
+<<<<<<< HEAD
             style={({ hovered }: any) => [styles.sendBtn, (hovered || sending) && styles.sendBtnHover]}
             onPress={handleEnviar}
             disabled={sending}
           >
             {sending ? (
+=======
+            style={({ hovered }: any) => [
+              styles.sendBtn,
+              hovered && styles.sendBtnHover,
+              isSubmitting && { opacity: 0.7 },
+            ]}
+            onPress={handleEnviar}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+>>>>>>> origin/main
               <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 8 }} />
             ) : (
               <Ionicons name="paper-plane-outline" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
             )}
+<<<<<<< HEAD
             <Text style={styles.sendBtnText}>{sending ? 'Enviando...' : 'Enviar comunicado'}</Text>
+=======
+            <Text style={styles.sendBtnText}>
+              {isSubmitting ? 'Enviando...' : 'Enviar comunicado'}
+            </Text>
+>>>>>>> origin/main
           </Pressable>
         </View>
 
         {/* Right History Box */}
         <View style={styles.historyCard}>
-          <Text style={styles.cardHeaderTitleDark}>Comunicados enviados</Text>
+          <View style={styles.historyHeaderRow}>
+            <Text style={styles.cardHeaderTitleDark}>Comunicados enviados</Text>
+            <Pressable onPress={loadEnviados}>
+              <Ionicons name="refresh-outline" size={18} color="#64748B" />
+            </Pressable>
+          </View>
 
-          {loadingHistory ? (
-            <ActivityIndicator size="small" color="#cfa235" style={{ marginVertical: 20 }} />
+          {loading ? (
+            <View style={{ paddingVertical: 30, alignItems: 'center' }}>
+              <ActivityIndicator size="small" color={GOLD} />
+              <Text style={{ marginTop: 8, color: '#64748B', fontSize: 13 }}>Cargando enviados...</Text>
+            </View>
           ) : enviados.length === 0 ? (
-            <View style={{ padding: 20, alignItems: 'center' }}>
-              <Ionicons name="chatbubble-outline" size={36} color="#94A3B8" />
-              <Text style={{ color: '#64748B', marginTop: 8, fontSize: 13 }}>No hay comunicados enviados</Text>
+            <View style={{ paddingVertical: 30, alignItems: 'center' }}>
+              <Ionicons name="chatbubbles-outline" size={36} color="#94A3B8" />
+              <Text style={{ marginTop: 8, color: '#64748B', fontSize: 14 }}>No hay comunicados enviados aún</Text>
             </View>
           ) : (
-          <View style={styles.historyList}>
-            {enviados.map((item) => (
-              <View key={item.id} style={styles.historyItem}>
-                <View style={styles.itemHeader}>
-                  <Text style={styles.itemTitle}>{item.titulo}</Text>
-                  <Text style={styles.itemDate}>{item.fecha}</Text>
-                </View>
+            <View style={styles.historyList}>
+              {enviados.map((item) => (
+                <View key={item.id} style={styles.historyItem}>
+                  <View style={styles.itemHeader}>
+                    <Text style={styles.itemTitle}>{item.titulo}</Text>
+                    <Text style={styles.itemDate}>{item.fecha}</Text>
+                  </View>
 
-                <View style={styles.itemFooter}>
-                  <Text style={styles.itemDest}>Para: {item.destinatario}</Text>
-                  <View style={styles.readBadge}>
-                    <Ionicons name="eye-outline" size={14} color="#64748B" style={{ marginRight: 4 }} />
-                    <Text style={styles.readText}>{item.leidos} leídos</Text>
+                  <View style={styles.itemFooter}>
+                    <Text style={styles.itemDest}>Para: {item.destinatario}</Text>
+                    <View style={styles.readBadge}>
+                      <Ionicons name="eye-outline" size={14} color="#64748B" style={{ marginRight: 4 }} />
+                      <Text style={styles.readText}>{item.leidos} leídos</Text>
+                    </View>
                   </View>
                 </View>
-              </View>
-            ))}
-          </View>
+              ))}
+            </View>
           )}
         </View>
       </View>
@@ -227,110 +322,136 @@ const styles = StyleSheet.create({
   },
   formCard: {
     flex: 1.2,
-    backgroundColor: '#D9D9D9',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 22,
     borderWidth: 1,
-    borderColor: '#CCCCCC',
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   historyCard: {
     flex: 1,
-    backgroundColor: '#EAEAEA',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 22,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  historyHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
   },
   cardHeaderTitle: {
     fontSize: 13,
-    fontWeight: '700',
-    color: '#475569',
-    letterSpacing: 0.8,
-    textAlign: 'center',
+    fontWeight: '800',
+    color: '#0284C7',
+    letterSpacing: 1.2,
     marginBottom: 18,
   },
   cardHeaderTitleDark: {
     fontSize: 15,
     fontWeight: '700',
     color: NAVY,
-    marginBottom: 18,
   },
   successBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#DEF7EC',
+    backgroundColor: '#DCFCE7',
     padding: 10,
     borderRadius: 8,
-    marginBottom: 14,
+    marginBottom: 16,
   },
   successText: {
+    color: '#15803D',
     fontSize: 13,
-    color: '#03543F',
     fontWeight: '600',
+    flex: 1,
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEE2E2',
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  errorText: {
+    color: '#B91C1C',
+    fontSize: 13,
+    fontWeight: '600',
+    flex: 1,
   },
   fieldGroup: {
     marginBottom: 16,
   },
   label: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
-    color: '#4B5563',
-    letterSpacing: 0.5,
+    color: '#64748B',
     marginBottom: 6,
+    letterSpacing: 0.5,
   },
   inputWrapper: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#E2E8F0',
+    paddingHorizontal: 12,
+    justifyContent: 'center',
+    height: 44,
   },
   input: {
     fontSize: 14,
-    color: NAVY,
-    flex: 1,
+    color: '#0F172A',
   },
   sendBtn: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
     backgroundColor: GOLD,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: 12,
-    borderRadius: 10,
+    borderRadius: 8,
     marginTop: 8,
-    shadowColor: GOLD,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
   },
   sendBtnHover: {
-    backgroundColor: '#b88d2a',
+    opacity: 0.9,
   },
   sendBtnText: {
     color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 15,
+    fontWeight: '600',
+    fontSize: 14,
   },
   historyList: {
     gap: 12,
   },
   historyItem: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    padding: 14,
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
   itemHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    alignItems: 'flex-start',
+    marginBottom: 8,
   },
   itemTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: NAVY,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#0F172A',
     flex: 1,
     marginRight: 8,
   },
@@ -342,18 +463,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 4,
   },
   itemDest: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#64748B',
   },
   readBadge: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
   },
   readText: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#64748B',
   },
 });

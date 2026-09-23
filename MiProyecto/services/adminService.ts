@@ -1,7 +1,7 @@
 import { authService } from './authService';
 import { getApiBaseUrl } from './api';
 
-const API_BASE_URL = getApiBaseUrl();
+const getBaseUrl = () => getApiBaseUrl();
 
 export interface AdminUser {
   id: string;
@@ -43,7 +43,7 @@ export interface RecentActivityItem {
 export const adminService = {
   async getDashboardStats(): Promise<DashboardStatsResult | null> {
     try {
-      const response = await authService.fetchWithAuth(`${API_BASE_URL}/admin/stats`);
+      const response = await authService.fetchWithAuth(`${getBaseUrl()}/admin/stats`);
       const data = await response.json();
       if (!response.ok || !data.data) {
         return null;
@@ -56,7 +56,7 @@ export const adminService = {
 
   async getRecentActivity(limit = 10): Promise<RecentActivityItem[]> {
     try {
-      const response = await authService.fetchWithAuth(`${API_BASE_URL}/admin/recent-activity?limit=${limit}`);
+      const response = await authService.fetchWithAuth(`${getBaseUrl()}/admin/recent-activity?limit=${limit}`);
       const data = await response.json();
       if (!response.ok || !data.data) {
         return [];
@@ -73,7 +73,7 @@ export const adminService = {
     if (params.search) query.append('search', params.search);
     query.append('limit', String(params.limit ?? 50));
 
-    const response = await authService.fetchWithAuth(`${API_BASE_URL}/users?${query.toString()}`);
+    const response = await authService.fetchWithAuth(`${getBaseUrl()}/users?${query.toString()}`);
     const data = await response.json();
 
     if (!response.ok) {
@@ -86,7 +86,7 @@ export const adminService = {
   async countByRole(role: 'ADMIN' | 'INSTRUCTOR' | 'APRENDIZ'): Promise<number> {
     try {
       const query = new URLSearchParams({ role, limit: '1' });
-      const response = await authService.fetchWithAuth(`${API_BASE_URL}/users?${query.toString()}`);
+      const response = await authService.fetchWithAuth(`${getBaseUrl()}/users?${query.toString()}`);
       const data = await response.json();
 
       if (!response.ok) {
@@ -100,7 +100,7 @@ export const adminService = {
   },
 
   async createUser(userData: { firstName: string; lastName: string; email: string; role: 'ADMIN' | 'INSTRUCTOR' | 'APRENDIZ'; password?: string }) {
-    const response = await authService.fetchWithAuth(`${API_BASE_URL}/users`, {
+    const response = await authService.fetchWithAuth(`${getBaseUrl()}/users`, {
       method: 'POST',
       body: JSON.stringify({
         ...userData,
@@ -113,7 +113,7 @@ export const adminService = {
   },
 
   async sendGlobalNotification(payload: { title: string; body: string; tipo?: string; targetRole?: string | null }) {
-    const response = await authService.fetchWithAuth(`${API_BASE_URL}/notificaciones/global`, {
+    const response = await authService.fetchWithAuth(`${getBaseUrl()}/notificaciones/global`, {
       method: 'POST',
       body: JSON.stringify(payload),
     });

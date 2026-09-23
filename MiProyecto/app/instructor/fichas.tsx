@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as DocumentPicker from 'expo-document-picker';
 import { fichasService, Ficha } from '../../services/fichasService';
 
 const NAVY = '#0F1026';
@@ -30,7 +31,7 @@ export default function FichasScreenInstructor() {
   // State para modal de carga CSV
   const [uploadFicha, setUploadFicha] = useState<Ficha | null>(null);
   const [isGeneralUpload, setIsGeneralUpload] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFile, setSelectedFile] = useState<any>(null);
   const [uploadFileName, setUploadFileName] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [feedback, setFeedback] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
@@ -73,22 +74,57 @@ export default function FichasScreenInstructor() {
     setFeedback(null);
   };
 
-  const handleTriggerFilePicker = () => {
-    if (Platform.OS === 'web' && typeof document !== 'undefined') {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = '.csv, .xls, .xlsx';
-      input.onchange = (e: any) => {
-        const file = e.target?.files?.[0];
-        if (file) {
-          setSelectedFile(file);
-          setUploadFileName(file.name);
-          setFeedback(null);
+  const handleTriggerFilePicker = async () => {
+    try {
+      if (Platform.OS === 'web' && typeof document !== 'undefined') {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.csv, .xls, .xlsx';
+        input.onchange = (e: any) => {
+          const file = e.target?.files?.[0];
+          if (file) {
+            setSelectedFile(file);
+            setUploadFileName(file.name);
+            setFeedback(null);
+          }
+        };
+        input.click();
+        return;
+      }
+
+      // Soporte móvil nativo con DocumentPicker
+      const result = await DocumentPicker.getDocumentAsync({
+        type: [
+          'text/csv',
+          'text/comma-separated-values',
+          'application/vnd.ms-excel',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          '*/*',
+        ],
+        copyToCacheDirectory: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const fileAsset = result.assets[0];
+        const fileName = fileAsset.name || '';
+        const ext = fileName.split('.').pop()?.toLowerCase();
+        if (ext && ext !== 'csv' && ext !== 'xlsx' && ext !== 'xls') {
+          setFeedback({
+            text: 'Por favor selecciona un archivo válido (.csv o .xlsx).',
+            type: 'error',
+          });
+          return;
         }
-      };
-      input.click();
-    } else {
-      alert('Por favor usa la versión web para seleccionar archivos localmente.');
+        setSelectedFile(fileAsset);
+        setUploadFileName(fileName);
+        setFeedback(null);
+      }
+    } catch (err: any) {
+      console.error('Error seleccionando archivo:', err);
+      setFeedback({
+        text: 'Error al abrir el selector de archivos.',
+        type: 'error',
+      });
     }
   };
 
@@ -104,8 +140,9 @@ export default function FichasScreenInstructor() {
     try {
       if (isGeneralUpload) {
         const res = await fichasService.importAprendicesGeneral(selectedFile);
+        const rowsCount = res?.totalRows ?? res?.count ?? res?.total ?? 0;
         setFeedback({
-          text: `¡Carga exitosa! Se procesaron ${res.totalRows || 0} filas correctamente.`,
+          text: `¡Carga exitosa! Se procesaron ${rowsCount} filas correctamente.`,
           type: 'success',
         });
       } else if (uploadFicha) {
