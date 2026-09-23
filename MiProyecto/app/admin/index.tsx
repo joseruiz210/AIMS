@@ -134,10 +134,10 @@ export default function AdminDashboard() {
   const totalDoughnut = activosCount + enRiesgoCount + criticosCount || counts.aprendices;
 
   // Métricas reales para el gráfico de barras de asistencia
-  const presentesCount = stats?.asistenciasRecientes?.find(a => a.estado === 'PRESENTE')?._count?.id || 24;
-  const ausentesCount = stats?.asistenciasRecientes?.find(a => a.estado === 'AUSENTE')?._count?.id || 3;
+  const presentesCount = stats?.asistenciasRecientes?.find(a => a.estado === 'PRESENTE')?._count?.id || 0;
+  const ausentesCount = stats?.asistenciasRecientes?.find(a => a.estado === 'AUSENTE')?._count?.id || 0;
   const totalAsist = presentesCount + ausentesCount;
-  const pctPres = totalAsist > 0 ? presentesCount / totalAsist : 0.88;
+  const pctPres = totalAsist > 0 ? presentesCount / totalAsist : 0;
 
   const barHeights = [
     Math.round(pctPres * 85),

@@ -10,6 +10,9 @@ export interface Programa {
   nivel: string;
   duracionMeses: number;
   fichasActivasCount?: number;
+  aprendicesCount?: number;
+  instructoresCount?: number;
+  competenciasCount?: number;
   estado?: 'Activo' | 'Inactivo';
 }
 
@@ -29,12 +32,16 @@ export const programasService = {
         nivel: item.nivel || 'Tecnólogo',
         duracionMeses: item.duracionMeses || 24,
         fichasActivasCount: item._count?.fichas || item.fichasActivasCount || 0,
+        aprendicesCount: item.aprendicesCount || 0,
+        instructoresCount: item.instructoresCount || 0,
+        competenciasCount: item._count?.competencias || item.competenciasCount || 0,
         estado: item.estado || 'Activo',
       }));
     } catch {
       return [];
     }
   },
+
 
   async createPrograma(programaData: Omit<Programa, 'id'>) {
     const response = await authService.fetchWithAuth(`${API_BASE_URL}/programas`, {

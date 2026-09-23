@@ -55,16 +55,23 @@ export default function AprendicesScreen() {
       }
 
       const rawUsers = usersRes.users || [];
-      const mapped: AprendizRow[] = rawUsers.map((u: any, idx: number) => {
+      const mapped: AprendizRow[] = rawUsers.map((u: any) => {
         const fichaObj = u.matriculas?.[0]?.ficha;
-        const statusStr: AprendizRow['estado'] = !u.isActive ? 'Critico' : (idx % 7 === 0 ? 'En Riesgo' : 'Activo');
+        // Mapear estadoAcademico real del usuario
+        const estadoAcademico = u.estadoAcademico || 'EN_FORMACION';
+        let statusStr: AprendizRow['estado'] = 'Activo';
+        if (!u.isActive || estadoAcademico === 'CONDICIONADO') statusStr = 'Critico';
+        else if (estadoAcademico === 'EN_RIESGO') statusStr = 'En Riesgo';
+        else if (estadoAcademico === 'EN_FORMACION' || estadoAcademico === 'CERTIFICADO') statusStr = 'Activo';
+        else statusStr = 'Activo';
+
         return {
           id: u.id,
           nombre: `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'Aprendiz SENA',
           email: u.email,
-          ficha: fichaObj?.numero || '2845671',
-          programa: fichaObj?.programa?.codigo || fichaObj?.programa?.nombre || 'ADSO',
-          nota: statusStr === 'Activo' ? 4.2 + (idx % 8) * 0.1 : (statusStr === 'En Riesgo' ? 3.1 : 2.7),
+          ficha: fichaObj?.numero || 'Sin ficha',
+          programa: fichaObj?.programa?.codigo || fichaObj?.programa?.nombre || 'Sin programa',
+          nota: 0,
           estado: statusStr,
         };
       });
