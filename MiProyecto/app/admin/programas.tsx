@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import ActionModal from '../../components/ActionModal';
 import { programasService } from '../../services/programasService';
+import { adminService } from '../../services/adminService';
 
 const NAVY = '#12103C';
 const GOLD = '#cfa235';
@@ -35,6 +36,7 @@ export default function ProgramasScreen() {
 
   const [search, setSearch] = useState('');
   const [programas, setProgramas] = useState<ProgramItem[]>([]);
+  const [totalAprendicesUnicos, setTotalAprendicesUnicos] = useState(0);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
 
@@ -45,14 +47,22 @@ export default function ProgramasScreen() {
   const loadProgramas = async () => {
     setLoading(true);
     try {
-      const data = await programasService.getProgramas();
+      const [data, usersRes] = await Promise.all([
+        programasService.getProgramas(),
+        adminService.getUsers({ role: 'APRENDIZ', limit: 1 }).catch(() => ({ total: 0 })),
+      ]);
+
+      if (usersRes?.total) {
+        setTotalAprendicesUnicos(usersRes.total);
+      }
+
       setProgramas(
         data.map((p) => ({
           id: p.id,
           badge: (p.codigo || 'PRG').slice(0, 4).toUpperCase(),
           badgeColor: GOLD,
           title: p.nombre,
-          level: `${p.nivel || 'Tecn\u00f3logo'} - ${p.duracionMeses || 24} meses`,
+          level: `${p.nivel || 'Tecnólogo'} - ${p.duracionMeses || 24} meses`,
           status: ((p.estado || 'Activo').toUpperCase() as any),
           fichas: p.fichasActivasCount || 0,
           aprendices: p.aprendicesCount || 0,
@@ -126,7 +136,7 @@ export default function ProgramasScreen() {
         </View>
         <View style={styles.metricCard}>
           <Text style={styles.metricLabel}>APRENDICES</Text>
-          <Text style={styles.metricValueGold}>{loading ? '-' : totalAprendices}</Text>
+          <Text style={styles.metricValueGold}>{loading ? '-' : (totalAprendicesUnicos || totalAprendices)}</Text>
         </View>
       </View>
 
