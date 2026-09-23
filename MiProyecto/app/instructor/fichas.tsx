@@ -140,8 +140,9 @@ export default function FichasScreenInstructor() {
     try {
       if (isGeneralUpload) {
         const res = await fichasService.importAprendicesGeneral(selectedFile);
+        const rowsCount = res?.totalRows ?? res?.count ?? res?.total ?? 0;
         setFeedback({
-          text: `¡Carga exitosa! Se procesaron ${res.totalRows || 0} filas correctamente.`,
+          text: `¡Carga exitosa! Se procesaron ${rowsCount} filas correctamente.`,
           type: 'success',
         });
       } else if (uploadFicha) {

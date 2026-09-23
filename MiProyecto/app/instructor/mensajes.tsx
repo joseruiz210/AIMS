@@ -116,13 +116,22 @@ export default function MensajesInstructorScreen() {
     try {
       let destinatarioTexto = 'Todas mis fichas';
       let fichaIdTarget: string | undefined = undefined;
+      let fichaIdsTarget: string[] | undefined = undefined;
 
       if (selectedFicha !== 'TODAS') {
         const targetFicha = fichas.find((f) => f.id === selectedFicha || f.numero === selectedFicha);
         destinatarioTexto = targetFicha
           ? `Ficha ${targetFicha.numero} (${targetFicha.programaNombre || 'Formación'})`
           : `Ficha ${selectedFicha}`;
-        fichaIdTarget = selectedFicha;
+        fichaIdTarget = targetFicha ? targetFicha.id : selectedFicha;
+      } else {
+        const validIds = fichas.map((f) => f.id).filter(Boolean);
+        if (validIds.length === 0) {
+          setFormError('No tienes fichas asignadas en el sistema para publicar este comunicado.');
+          setIsSubmitting(false);
+          return;
+        }
+        fichaIdsTarget = validIds;
       }
 
       const nuevo = await comunicadosService.crearComunicado({
@@ -130,6 +139,7 @@ export default function MensajesInstructorScreen() {
         mensaje: mensaje.trim(),
         destinatario: destinatarioTexto,
         fichaId: fichaIdTarget,
+        fichaIds: fichaIdsTarget,
         autor: `Instructor ${userName}`,
         tipo: 'FICHA',
       });

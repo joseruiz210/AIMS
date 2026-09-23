@@ -1,4 +1,6 @@
 import { Platform } from 'react-native';
+import { File as ExpoFile } from 'expo-file-system';
+import * as FileSystemLegacy from 'expo-file-system/legacy';
 import { authService } from './authService';
 import { getApiBaseUrl } from './api';
 import { getStorageItem, setStorageItem } from '../utils/storage';
@@ -74,6 +76,81 @@ function normalizeApprentice(item: any, fichaNumero?: string): AprendizNormalize
   };
 }
 
+function decodeBase64ToUint8Array(base64: string): Uint8Array {
+  if (typeof atob === 'function') {
+    const binaryString = atob(base64);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes;
+  }
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  const cleanBase64 = base64.replace(/[^A-Za-z0-9+/]/g, '');
+  const len = cleanBase64.length;
+  const bytes = new Uint8Array(Math.floor((len * 3) / 4) - (cleanBase64.endsWith('==') ? 2 : cleanBase64.endsWith('=') ? 1 : 0));
+  let p = 0;
+  for (let i = 0; i < len; i += 4) {
+    const enc1 = chars.indexOf(cleanBase64[i]);
+    const enc2 = chars.indexOf(cleanBase64[i + 1]);
+    const enc3 = chars.indexOf(cleanBase64[i + 2]);
+    const enc4 = chars.indexOf(cleanBase64[i + 3]);
+    const chr1 = (enc1 << 2) | (enc2 >> 4);
+    const chr2 = ((enc2 & 15) << 4) | (enc3 >> 2);
+    const chr3 = ((enc3 & 3) << 6) | enc4;
+    bytes[p++] = chr1;
+    if (enc3 !== 64 && p < bytes.length) bytes[p++] = chr2;
+    if (enc4 !== 64 && p < bytes.length) bytes[p++] = chr3;
+  }
+  return bytes;
+}
+
+async function prepareFormDataFile(file: any): Promise<any> {
+  if (Platform.OS === 'web') {
+    return (file as any)?.file || file;
+  }
+
+  // Si ya es un Blob nativo o tiene método bytes()
+  if (file instanceof Blob || (typeof file === 'object' && typeof file?.bytes === 'function')) {
+    return file;
+  }
+
+  if (file?.uri) {
+    const fileName = file.name || 'aprendices.csv';
+    const isXlsx = fileName.toLowerCase().endsWith('.xlsx');
+    const isXls = fileName.toLowerCase().endsWith('.xls');
+    const mimeType =
+      file.mimeType ||
+      file.type ||
+      (isXlsx
+        ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        : isXls
+        ? 'application/vnd.ms-excel'
+        : 'text/csv');
+
+    let fileBytes: Uint8Array;
+    try {
+      const expoFile = new ExpoFile(file.uri);
+      fileBytes = await expoFile.bytes();
+    } catch {
+      // Fallback usando FileSystem legacy en base64
+      const base64 = await FileSystemLegacy.readAsStringAsync(file.uri, {
+        encoding: FileSystemLegacy.EncodingType.Base64,
+      });
+      fileBytes = decodeBase64ToUint8Array(base64);
+    }
+
+    // Modern Expo fetch (convertFormDataAsync) espera un objeto con bytes() y name/type
+    return {
+      name: fileName,
+      type: mimeType,
+      bytes: () => fileBytes,
+    };
+  }
+
+  return (file as any)?.file || file;
+}
+
 export const fichasService = {
   async getFichas(params: { search?: string; publicOnly?: boolean } = {}): Promise<Ficha[]> {
     try {
@@ -106,6 +183,7 @@ export const fichasService = {
           id: item.id || item.codigo,
           codigo: item.badgeCode || item.codigo || item.numero || 'N/A',
           numero,
+          programaId: item.programaId || item.programa?.id || item.programa_id,
           programaNombre: item.programa?.nombre || item.programaTitle || 'Programa Formación',
           instructorNombre: item.instructor ? `${item.instructor.firstName} ${item.instructor.lastName}` : (item.instructorNombre || 'Sin asignar'),
           jornada: item.jornada || item.shift || 'Jornada Mañana',
@@ -320,27 +398,8 @@ export const fichasService = {
   async importAprendices(fichaId: string, file: File | Blob | any) {
     const baseUrl = getApiBaseUrl();
     const formData = new FormData();
-    if (file?.uri && Platform.OS !== 'web') {
-      const fileName = file.name || 'aprendices.csv';
-      const isXlsx = fileName.toLowerCase().endsWith('.xlsx');
-      const isXls = fileName.toLowerCase().endsWith('.xls');
-      const mimeType =
-        file.mimeType ||
-        file.type ||
-        (isXlsx
-          ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-          : isXls
-          ? 'application/vnd.ms-excel'
-          : 'text/csv');
-      formData.append('archivo', {
-        uri: file.uri,
-        name: fileName,
-        type: mimeType,
-      } as any);
-    } else {
-      const fileToAppend = (file as any)?.file || file;
-      formData.append('archivo', fileToAppend);
-    }
+    const fileToAppend = await prepareFormDataFile(file);
+    formData.append('archivo', fileToAppend, (fileToAppend as any)?.name);
 
     const { token } = await authService.checkSession();
     const response = await fetch(`${baseUrl}/fichas/${fichaId}/aprendices/carga`, {
@@ -351,7 +410,12 @@ export const fichasService = {
       body: formData,
     });
 
-    const data = await response.json();
+    let data: any = {};
+    try {
+      data = await response.json();
+    } catch {
+      data = { message: `Error en la respuesta del servidor (${response.status})` };
+    }
     if (!response.ok) {
       const errorMsg = data.errors && data.errors.length ? data.errors.join('\n') : (data.message || 'Error al cargar archivo');
       throw new Error(errorMsg);
@@ -362,27 +426,8 @@ export const fichasService = {
   async importAprendicesGeneral(file: File | Blob | any) {
     const baseUrl = getApiBaseUrl();
     const formData = new FormData();
-    if (file?.uri && Platform.OS !== 'web') {
-      const fileName = file.name || 'aprendices.csv';
-      const isXlsx = fileName.toLowerCase().endsWith('.xlsx');
-      const isXls = fileName.toLowerCase().endsWith('.xls');
-      const mimeType =
-        file.mimeType ||
-        file.type ||
-        (isXlsx
-          ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-          : isXls
-          ? 'application/vnd.ms-excel'
-          : 'text/csv');
-      formData.append('archivo', {
-        uri: file.uri,
-        name: fileName,
-        type: mimeType,
-      } as any);
-    } else {
-      const fileToAppend = (file as any)?.file || file;
-      formData.append('archivo', fileToAppend);
-    }
+    const fileToAppend = await prepareFormDataFile(file);
+    formData.append('archivo', fileToAppend, (fileToAppend as any)?.name);
 
     const { token } = await authService.checkSession();
     const response = await fetch(`${baseUrl}/fichas/carga`, {
@@ -393,7 +438,12 @@ export const fichasService = {
       body: formData,
     });
 
-    const data = await response.json();
+    let data: any = {};
+    try {
+      data = await response.json();
+    } catch {
+      data = { message: `Error en la respuesta del servidor (${response.status})` };
+    }
     if (!response.ok) {
       const errorMsg = data.errors && data.errors.length ? data.errors.join('\n') : (data.message || 'Error al cargar archivo');
       throw new Error(errorMsg);

@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import ActionModal from '../../components/ActionModal';
 import { programasService } from '../../services/programasService';
+import { fichasService } from '../../services/fichasService';
 
 const NAVY = '#12103C';
 const GOLD = '#cfa235';
@@ -31,111 +32,68 @@ interface ProgramItem {
   promedioNotas: number;
 }
 
-const INITIAL_PROGRAMAS: ProgramItem[] = [
-  {
-    id: '1',
-    badge: 'ADSO',
-    badgeColor: GOLD,
-    title: 'Análisis y Desarrollo de Software',
-    level: 'Tecnólogo - 24 meses',
-    status: 'ACTIVO',
-    fichas: 8,
-    aprendices: 108,
-    instructores: 12,
-    competencias: 15,
-    asistenciaPromedio: 91,
-    promedioNotas: 4.1,
-  },
-  {
-    id: '2',
-    badge: 'DG',
-    badgeColor: '#A855F7',
-    title: 'Diseño Gráfico',
-    level: 'Técnico - 18 meses',
-    status: 'ACTIVO',
-    fichas: 4,
-    aprendices: 101,
-    instructores: 6,
-    competencias: 9,
-    asistenciaPromedio: 93,
-    promedioNotas: 4.3,
-  },
-  {
-    id: '3',
-    badge: 'AE',
-    badgeColor: '#3B82F6',
-    title: 'Administración de Empresas',
-    level: 'Tecnólogo - 24 meses',
-    status: 'ACTIVO',
-    fichas: 6,
-    aprendices: 180,
-    instructores: 8,
-    competencias: 14,
-    asistenciaPromedio: 88,
-    promedioNotas: 4.0,
-  },
-  {
-    id: '4',
-    badge: 'CF',
-    badgeColor: '#10B981',
-    title: 'Contabilidad y Finanzas',
-    level: 'Tecnólogo - 24 meses',
-    status: 'ACTIVO',
-    fichas: 5,
-    aprendices: 140,
-    instructores: 7,
-    competencias: 12,
-    asistenciaPromedio: 89,
-    promedioNotas: 4.2,
-  },
-  {
-    id: '5',
-    badge: 'MRK',
-    badgeColor: '#EC4899',
-    title: 'Mercadeo Digital',
-    level: 'Técnico - 12 meses',
-    status: 'ACTIVO',
-    fichas: 3,
-    aprendices: 60,
-    instructores: 4,
-    competencias: 8,
-    asistenciaPromedio: 95,
-    promedioNotas: 4.5,
-  },
-];
-
 export default function ProgramasScreen() {
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
 
   const [search, setSearch] = useState('');
-  const [programas, setProgramas] = useState<ProgramItem[]>(INITIAL_PROGRAMAS);
+  const [programas, setProgramas] = useState<ProgramItem[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const loadProgramas = useCallback(async () => {
     try {
-      const data = await programasService.getProgramas();
-      if (data && data.length > 0) {
+      const [progData, fichasData] = await Promise.all([
+        programasService.getProgramas(),
+        fichasService.getFichas(),
+      ]);
+
+      if (progData && progData.length > 0) {
         setProgramas(
-          data.map((p) => ({
-            id: p.id,
-            badge: (p.codigo || 'PRG').slice(0, 4).toUpperCase(),
-            badgeColor: GOLD,
-            title: p.nombre,
-            level: `${p.nivel || 'Tecnólogo'} - ${p.duracionMeses || 24} meses`,
-            status: (p.estado as any) || 'ACTIVO',
-            fichas: p.fichasActivasCount || 1,
-            aprendices: 30,
-            instructores: 4,
-            competencias: 10,
-            asistenciaPromedio: 90,
-            promedioNotas: 4.2,
-          }))
+          progData.map((p) => {
+            const pId = String(p.id).toLowerCase();
+            const pNombre = (p.nombre || '').trim().toLowerCase();
+            const pCodigo = (p.codigo || '').trim().toLowerCase();
+
+            const fichasDelPrograma = (fichasData || []).filter((f) => {
+              if (f.programaId && String(f.programaId).toLowerCase() === pId) return true;
+              if (f.programaNombre && pNombre && f.programaNombre.trim().toLowerCase() === pNombre) return true;
+              if (f.codigo && pCodigo && f.codigo.toLowerCase().includes(pCodigo)) return true;
+              return false;
+            });
+
+            const fichasCount = fichasDelPrograma.length > 0 ? fichasDelPrograma.length : (p.fichasActivasCount || 0);
+            const aprendicesCount = fichasDelPrograma.reduce((sum, f) => sum + (f.aprendicesCount || 0), 0);
+
+            const instructoresSet = new Set(
+              fichasDelPrograma.map((f) => f.instructorNombre).filter((n) => n && n !== 'Sin asignar')
+            );
+            const instructoresCount = instructoresSet.size > 0 ? instructoresSet.size : 0;
+
+            return {
+              id: p.id,
+              badge: (p.codigo || 'PRG').slice(0, 4).toUpperCase(),
+              badgeColor: GOLD,
+              title: p.nombre,
+              level: `${p.nivel || 'Tecnólogo'} - ${p.duracionMeses || 24} meses`,
+              status: (p.estado as any) || 'ACTIVO',
+              fichas: fichasCount,
+              aprendices: aprendicesCount,
+              instructores: instructoresCount,
+              competencias: 10,
+              asistenciaPromedio: 90,
+              promedioNotas: 4.2,
+            };
+          })
         );
+      } else {
+        setProgramas([]);
       }
     } catch (err) {
       console.error('Error cargando programas:', err);
+    } finally {
+      setLoading(false);
     }
   }, []);
 
