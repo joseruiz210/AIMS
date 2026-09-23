@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,12 +8,15 @@ import {
   TextInput,
   useWindowDimensions,
   Platform,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ActionModal from '../../components/ActionModal';
+import { fichasService } from '../../services/fichasService';
 
-const NAVY = '#12103C';
-const GOLD = '#cfa235';
+const NAVY = '#0F1026';
+const GOLD = '#D4AF37';
 
 interface MatriculaRow {
   id: string;
@@ -33,7 +36,7 @@ const INITIAL_MATRICULAS: MatriculaRow[] = [
   { id: '6', aprendiz: 'Felipe Gómez', ficha: '2845690', programa: 'CF', fechaMatricula: '2024-02-15', estado: 'Pendiente' },
 ];
 
-export default function MatriculasScreen() {
+export default function MatriculasInstructorScreen() {
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
 
@@ -41,6 +44,49 @@ export default function MatriculasScreen() {
   const [statusFilter, setStatusFilter] = useState<'Todos' | 'Activo' | 'Pendiente' | 'Retirado'>('Todos');
   const [matriculas, setMatriculas] = useState<MatriculaRow[]>(INITIAL_MATRICULAS);
   const [modalVisible, setModalVisible] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      const fichas = await fichasService.getFichas();
+      if (fichas && fichas.length > 0) {
+        const loadedMatriculas: MatriculaRow[] = [];
+        for (const ficha of fichas.slice(0, 3)) {
+          const detail = await fichasService.getFichaById(ficha.id);
+          if (detail && detail.matriculas && detail.matriculas.length > 0) {
+            for (const m of detail.matriculas) {
+              const apr = m.aprendiz || {};
+              const nombre = `${apr.firstName || ''} ${apr.lastName || ''}`.trim() || 'Aprendiz';
+              loadedMatriculas.push({
+                id: m.id || String(Math.random()),
+                aprendiz: nombre,
+                ficha: ficha.numero || ficha.codigo || 'SENA',
+                programa: ficha.programaNombre || 'ADSO',
+                fechaMatricula: m.createdAt ? m.createdAt.split('T')[0] : '2026-02-01',
+                estado: (m.estado as any) || 'Activo',
+              });
+            }
+          }
+        }
+        if (loadedMatriculas.length > 0) {
+          setMatriculas(loadedMatriculas);
+        }
+      }
+    } catch (err) {
+      console.error('Error cargando matrículas de instructor:', err);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  };
 
   const activosCount = matriculas.filter(m => m.estado === 'Activo' || m.estado === 'Critico').length;
   const pendientesCount = matriculas.filter(m => m.estado === 'Pendiente').length;
@@ -79,16 +125,30 @@ export default function MatriculasScreen() {
   });
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[styles.contentContainer, !isDesktop && { padding: 16 }]}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={GOLD}
+          colors={[GOLD, NAVY]}
+        />
+      }
+    >
       {/* Top Header */}
-      <View style={styles.topHeader}>
-        <Text style={styles.pageTitle}>Matriculas</Text>
-        <Pressable 
+      <View style={[styles.topHeader, !isDesktop && styles.topHeaderMobile]}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.pageTitle}>Matrículas de Aprendices</Text>
+          <Text style={styles.pageSubtitle}>Registro y seguimiento de matrículas en tus fichas asignadas</Text>
+        </View>
+        <Pressable
           style={({ hovered }: any) => [styles.newBtn, hovered && styles.newBtnHover]}
           onPress={() => setModalVisible(true)}
         >
           <Ionicons name="add-circle-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-          <Text style={styles.newBtnText}>+ Nueva Matricula</Text>
+          <Text style={styles.newBtnText}>+ Nueva Matrícula</Text>
         </Pressable>
       </View>
 
@@ -111,7 +171,7 @@ export default function MatriculasScreen() {
       {/* Main Table / Container Box */}
       <View style={styles.tableBox}>
         {/* Search & Filter Bar */}
-        <View style={styles.filterRow}>
+        <View style={[styles.filterRow, !isDesktop && { flexDirection: 'column', alignItems: 'stretch' }]}>
           <View style={styles.searchWrapper}>
             <Ionicons name="search-outline" size={18} color="#64748B" style={{ marginRight: 8 }} />
             <TextInput
@@ -155,7 +215,7 @@ export default function MatriculasScreen() {
               <Text style={[styles.thText, { flex: 2 }]}>APRENDIZ</Text>
               <Text style={[styles.thText, { flex: 1 }]}>FICHA</Text>
               <Text style={[styles.thText, { flex: 1 }]}>PROGRAMA</Text>
-              <Text style={[styles.thText, { flex: 1.5 }]}>FECHA MATRICULA</Text>
+              <Text style={[styles.thText, { flex: 1.5 }]}>FECHA MATRÍCULA</Text>
               <Text style={[styles.thText, { flex: 1, textAlign: 'right' }]}>ESTADO</Text>
             </View>
 
@@ -171,24 +231,20 @@ export default function MatriculasScreen() {
                 <View style={{ flex: 2, flexDirection: 'row', alignItems: 'center' }}>
                   <View style={styles.avatarMini}>
                     <Text style={styles.avatarMiniText}>
-                      {row.aprendiz
-                        .split(' ')
-                        .map((n) => n[0])
-                        .join('')
-                        .substring(0, 2)}
+                      {row.aprendiz.split(' ').map((n) => n[0]).join('').slice(0, 2)}
                     </Text>
                   </View>
-                  <Text style={styles.tdName}>{row.aprendiz}</Text>
+                  <Text style={styles.tdTextBold}>{row.aprendiz}</Text>
                 </View>
 
                 <Text style={[styles.tdText, { flex: 1 }]}>{row.ficha}</Text>
-                <Text style={[styles.tdText, { flex: 1, fontWeight: '600' }]}>{row.programa}</Text>
-                <Text style={[styles.tdText, { flex: 1.5, color: '#64748B' }]}>{row.fechaMatricula}</Text>
+                <Text style={[styles.tdText, { flex: 1 }]}>{row.programa}</Text>
+                <Text style={[styles.tdText, { flex: 1.5 }]}>{row.fechaMatricula}</Text>
 
                 <View style={{ flex: 1, alignItems: 'flex-end' }}>
                   <View
                     style={[
-                      styles.statusTag,
+                      styles.tagBadge,
                       row.estado === 'Activo'
                         ? styles.tagActivo
                         : row.estado === 'Pendiente'
@@ -242,7 +298,7 @@ export default function MatriculasScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F4F6F9',
+    backgroundColor: '#F8FAFC',
   },
   contentContainer: {
     padding: 24,
@@ -256,14 +312,24 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 12,
   },
+  topHeaderMobile: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+  },
   pageTitle: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: '700',
     color: NAVY,
+  },
+  pageSubtitle: {
+    fontSize: 13,
+    color: '#64748B',
+    marginTop: 3,
   },
   newBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: GOLD,
     paddingVertical: 10,
     paddingHorizontal: 20,
@@ -281,175 +347,173 @@ const styles = StyleSheet.create({
   newBtnText: {
     color: '#FFFFFF',
     fontWeight: '600',
-    fontSize: 15,
+    fontSize: 14,
   },
   metricsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 14,
-    marginBottom: 22,
+    marginBottom: 20,
   },
   metricCard: {
     flex: 1,
-    minWidth: 150,
-    backgroundColor: '#E5E7EB',
-    paddingVertical: 16,
-    paddingHorizontal: 18,
-    borderRadius: 14,
+    minWidth: 140,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     alignItems: 'center',
-    justifyContent: 'center',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
   metricLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#4B5563',
-    letterSpacing: 0.8,
-    marginBottom: 6,
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+    letterSpacing: 0.5,
   },
   metricValueGold: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: '800',
     color: GOLD,
+    marginTop: 6,
   },
   metricValueDark: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: '800',
     color: NAVY,
+    marginTop: 6,
   },
   tableBox: {
-    backgroundColor: '#D9D9D9',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    padding: 20,
     borderWidth: 1,
-    borderColor: '#CCCCCC',
+    borderColor: '#E2E8F0',
+    overflow: 'hidden',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
   filterRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 16,
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    gap: 12,
+    flexWrap: 'wrap',
   },
   searchWrapper: {
-    flex: 1,
-    minWidth: 240,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F8FAFC',
     borderRadius: 10,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    flex: 1,
+    minWidth: 200,
   },
   searchInput: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 13,
     color: NAVY,
+    padding: 0,
   },
   filterPillsGroup: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
     flexWrap: 'wrap',
   },
   filterPill: {
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    backgroundColor: '#F1F5F9',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : {}),
   },
   filterPillActive: {
-    backgroundColor: GOLD,
+    backgroundColor: NAVY,
   },
   filterPillText: {
-    fontSize: 13,
-    color: '#475569',
-    fontWeight: '500',
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
   },
   filterPillTextActive: {
     color: '#FFFFFF',
-    fontWeight: '700',
   },
   tableHeader: {
     flexDirection: 'row',
+    backgroundColor: '#F8FAFC',
     paddingVertical: 12,
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#C0C0C0',
+    borderBottomColor: '#E2E8F0',
   },
   thText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
-    color: '#4B5563',
+    color: '#64748B',
     letterSpacing: 0.5,
   },
   tableRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 14,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    marginVertical: 2,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
   },
   tableRowEven: {
-    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    backgroundColor: '#FFFFFF',
   },
   tableRowOdd: {
-    backgroundColor: 'transparent',
+    backgroundColor: '#FAFCFF',
   },
   avatarMini: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: NAVY,
+    backgroundColor: 'rgba(212, 175, 55, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,
   },
   avatarMiniText: {
-    color: '#FFFFFF',
+    fontSize: 11,
     fontWeight: '700',
-    fontSize: 12,
-  },
-  tdName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: NAVY,
+    color: GOLD,
   },
   tdText: {
-    fontSize: 14,
-    color: '#334155',
+    fontSize: 13,
+    color: '#475569',
   },
-  statusTag: {
+  tdTextBold: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: NAVY,
+  },
+  tagBadge: {
     paddingVertical: 4,
     paddingHorizontal: 10,
     borderRadius: 6,
   },
-  tagActivo: {
-    backgroundColor: '#DEF7EC',
-  },
-  tagPendiente: {
-    backgroundColor: '#FEF3C7',
-  },
-  tagRetirado: {
-    backgroundColor: '#E5E7EB',
-  },
-  tagCritico: {
-    backgroundColor: '#FDE8E8',
-  },
-  tagText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  tagTextActivo: {
-    color: '#03543F',
-  },
-  tagTextPendiente: {
-    color: '#92400E',
-  },
-  tagTextRetirado: {
-    color: '#374151',
-  },
-  tagTextCritico: {
-    color: '#9B1C1C',
-  },
+  tagActivo: { backgroundColor: '#DCFCE7' },
+  tagPendiente: { backgroundColor: '#FEF3C7' },
+  tagRetirado: { backgroundColor: '#F1F5F9' },
+  tagCritico: { backgroundColor: '#FEE2E2' },
+  tagText: { fontSize: 11, fontWeight: '700' },
+  tagTextActivo: { color: '#15803D' },
+  tagTextPendiente: { color: '#B45309' },
+  tagTextRetirado: { color: '#64748B' },
+  tagTextCritico: { color: '#B91C1C' },
 });

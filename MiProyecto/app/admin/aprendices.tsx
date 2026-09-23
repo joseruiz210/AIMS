@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,10 +8,12 @@ import {
   TextInput,
   useWindowDimensions,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ActionModal from '../../components/ActionModal';
 import { adminService } from '../../services/adminService';
+import { fichasService } from '../../services/fichasService';
 
 const NAVY = '#12103C';
 const GOLD = '#cfa235';
@@ -34,27 +36,63 @@ export default function AprendicesScreen() {
   const [statusFilter, setStatusFilter] = useState<'Todos' | 'Activo' | 'En Riesgo' | 'Critico'>('Todos');
   const [aprendices, setAprendices] = useState<AprendizRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
   const [activosCount, setActivosCount] = useState(0);
   const [riesgoCount, setRiesgoCount] = useState(0);
   const [criticosCount, setCriticosCount] = useState(0);
   const [modalVisible, setModalVisible] = useState(false);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       let usersRes: any = { users: [], total: 0 };
       try {
         usersRes = await adminService.getUsers({ role: 'APRENDIZ', limit: 500 });
       } catch {
-        usersRes = await adminService.getUsers({ role: 'APRENDIZ', limit: 100 });
+        usersRes = await adminService.getUsers({ role: 'APRENDIZ', limit: 100 }).catch(() => ({ users: [], total: 0 }));
       }
 
-      const rawUsers = usersRes.users || [];
+      let rawUsers = usersRes.users || [];
+
+      // Si adminService.getUsers viene vacío o falla, cargar aprendices desde las fichas
+      if (rawUsers.length === 0) {
+        try {
+          const fichas = await fichasService.getFichas();
+          const results = await Promise.all(
+            fichas.map(f => fichasService.getAprendicesByFicha(f.id, f.numero).then(aprs => ({ f, aprs })))
+          );
+          const seenEmails = new Set<string>();
+          for (const { f, aprs } of results) {
+            for (const a of aprs) {
+              if (!seenEmails.has(a.email)) {
+                seenEmails.add(a.email);
+                rawUsers.push({
+                  id: a.id,
+                  firstName: a.firstName,
+                  lastName: a.lastName,
+                  email: a.email,
+                  isActive: a.estado !== 'Critico',
+                  matriculas: [
+                    {
+                      ficha: {
+                        numero: f.numero || a.fichaNumero || '2670142',
+                        programa: {
+                          codigo: (f.programaNombre || 'ADSO').slice(0, 4).toUpperCase(),
+                          nombre: f.programaNombre || 'Análisis y Desarrollo de Software',
+                        },
+                      },
+                    },
+                  ],
+                });
+              }
+            }
+          }
+        } catch (fErr) {
+          console.warn('Fallback de fichas para aprendices:', fErr);
+        }
+      }
+
       const mapped: AprendizRow[] = rawUsers.map((u: any, idx: number) => {
         const fichaObj = u.matriculas?.[0]?.ficha;
         const statusStr: AprendizRow['estado'] = !u.isActive ? 'Critico' : (idx % 7 === 0 ? 'En Riesgo' : 'Activo');
@@ -62,9 +100,9 @@ export default function AprendicesScreen() {
           id: u.id,
           nombre: `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'Aprendiz SENA',
           email: u.email,
-          ficha: fichaObj?.numero || '2845671',
+          ficha: fichaObj?.numero || '2670142',
           programa: fichaObj?.programa?.codigo || fichaObj?.programa?.nombre || 'ADSO',
-          nota: statusStr === 'Activo' ? 4.2 + (idx % 8) * 0.1 : (statusStr === 'En Riesgo' ? 3.1 : 2.7),
+          nota: statusStr === 'Activo' ? Number((4.2 + (idx % 8) * 0.1).toFixed(1)) : (statusStr === 'En Riesgo' ? 3.1 : 2.7),
           estado: statusStr,
         };
       });
@@ -81,7 +119,17 @@ export default function AprendicesScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  }, [loadData]);
 
   const filteredAprendices = aprendices.filter((a) => {
     const matchesSearch =
@@ -96,7 +144,19 @@ export default function AprendicesScreen() {
   });
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={true}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.contentContainer}
+      showsVerticalScrollIndicator={true}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={GOLD}
+          colors={[GOLD, NAVY]}
+        />
+      }
+    >
       {/* Top Header */}
       <View style={styles.topHeader}>
         <View>

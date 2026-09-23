@@ -103,7 +103,9 @@ export default function NotificacionesScreen() {
                   <Text style={styles.notifTitle}>{item.titulo}</Text>
                   <Text style={styles.notifDate}>{item.fecha}</Text>
                 </View>
-                <Text style={styles.notifDest}>Para: {item.destinatario}</Text>
+                <View style={styles.notifDestBadge}>
+                  <Text style={styles.notifDest}>Para: {item.destinatario}</Text>
+                </View>
                 <Text style={styles.notifBody}>{item.mensaje}</Text>
               </View>
             </View>
@@ -120,18 +122,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
   },
   contentContainer: {
-    paddingHorizontal: 28,
-    paddingVertical: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 18,
     paddingBottom: 40,
-    gap: 14,
+    gap: 12,
   },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 12,
+    marginBottom: 4,
   },
   pageTitle: {
-    fontSize: 26,
+    flex: 1,
+    fontSize: 22,
     fontWeight: '700',
     color: NAVY,
   },
@@ -141,10 +146,11 @@ const styles = StyleSheet.create({
     gap: 6,
     backgroundColor: '#FFFFFF',
     paddingVertical: 8,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: '#E2E8F0',
+    flexShrink: 0,
   },
   refreshBtnText: {
     color: NAVY,
@@ -169,16 +175,16 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
-    padding: 40,
+    padding: 36,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#E2E8F0',
     gap: 8,
   },
   emptyIconWrap: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
     backgroundColor: '#FEF3C7',
     alignItems: 'center',
     justifyContent: 'center',
@@ -205,12 +211,17 @@ const styles = StyleSheet.create({
   },
   notifCard: {
     flexDirection: 'row',
-    gap: 14,
+    gap: 12,
     backgroundColor: '#FFFFFF',
     borderRadius: 14,
     padding: 16,
     borderWidth: 1,
     borderColor: '#E2E8F0',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
   iconCircle: {
     width: 40,
@@ -219,31 +230,46 @@ const styles = StyleSheet.create({
     backgroundColor: NAVY,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   notifHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginBottom: 2,
   },
   notifTitle: {
+    flex: 1,
     fontSize: 15,
     fontWeight: '700',
     color: NAVY,
+    lineHeight: 20,
   },
   notifDate: {
     fontSize: 12,
-    color: '#94A3B8',
+    color: '#64748B',
+    flexShrink: 0,
+    marginTop: 2,
+  },
+  notifDestBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(212, 175, 55, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginTop: 4,
+    marginBottom: 4,
   },
   notifDest: {
-    fontSize: 12,
-    color: GOLD,
-    marginTop: 2,
+    fontSize: 11,
+    color: '#B45309',
     fontWeight: '600',
   },
   notifBody: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#334155',
-    marginTop: 6,
+    marginTop: 4,
     lineHeight: 20,
   },
 });

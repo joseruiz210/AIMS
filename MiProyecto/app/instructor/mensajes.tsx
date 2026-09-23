@@ -76,12 +76,12 @@ export default function MensajesScreen() {
       }
     >
       <View style={styles.headerRow}>
-        <View>
+        <View style={styles.headerTextWrap}>
           <Text style={styles.title}>Mensajería y comunicados</Text>
           <Text style={styles.subtitle}>Avisos y notificaciones institucionales</Text>
         </View>
         <Pressable style={styles.refreshButton} onPress={loadData}>
-          <Ionicons name="reload-outline" size={18} color={NAVY} />
+          <Ionicons name="reload-outline" size={16} color={NAVY} />
           <Text style={styles.refreshText}>Actualizar</Text>
         </Pressable>
       </View>
@@ -113,9 +113,11 @@ export default function MensajesScreen() {
           <View style={styles.flexOne}>
             <View style={styles.messageHeader}>
               <Text style={styles.cardTitle}>{message.titulo}</Text>
-              <Text style={styles.mutedText}>{message.fecha}</Text>
+              <Text style={styles.dateText}>{message.fecha}</Text>
             </View>
-            <Text style={styles.destination}>Destinatario: {message.destinatario}</Text>
+            <View style={styles.destinationBadge}>
+              <Text style={styles.destinationText}>Destinatario: {message.destinatario}</Text>
+            </View>
             <Text style={styles.messageText}>{message.mensaje}</Text>
           </View>
         </Pressable>
@@ -126,26 +128,60 @@ export default function MensajesScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG_PAGE },
-  content: { padding: 28, paddingBottom: 48, gap: 12 },
+  content: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 48, gap: 12 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12, backgroundColor: BG_PAGE },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 16, marginBottom: 8 },
-  title: { color: NAVY, fontSize: 25, fontWeight: '700' },
-  subtitle: { color: '#64748B', marginTop: 5 },
-  refreshButton: { flexDirection: 'row', alignItems: 'center', gap: 6, padding: 10, backgroundColor: '#FFFFFF', borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0' },
-  refreshText: { color: NAVY, fontWeight: '600' },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 8 },
+  headerTextWrap: { flex: 1 },
+  title: { color: NAVY, fontSize: 22, fontWeight: '700' },
+  subtitle: { color: '#64748B', marginTop: 3, fontSize: 13 },
+  refreshButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    flexShrink: 0,
+  },
+  refreshText: { color: NAVY, fontWeight: '600', fontSize: 13 },
   errorWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#FEF2F2', padding: 14, borderRadius: 12, borderWidth: 1, borderColor: '#FECACA' },
   errorText: { color: '#DC2626', flex: 1, fontSize: 13 },
   retryBtn: { backgroundColor: '#DC2626', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
   retryText: { color: '#FFFFFF', fontWeight: '700', fontSize: 12 },
-  messageCard: { flexDirection: 'row', gap: 14, backgroundColor: '#FFFFFF', borderRadius: 14, padding: 18, borderWidth: 1, borderColor: '#E2E8F0' },
-  avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: NAVY, alignItems: 'center', justifyContent: 'center' },
-  messageHeader: { flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
-  messageText: { color: '#334155', marginTop: 8, lineHeight: 21 },
-  destination: { color: GOLD, fontSize: 12, marginTop: 5, fontWeight: '600' },
+  messageCard: {
+    flexDirection: 'row',
+    gap: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: NAVY, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  messageHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 2 },
+  messageText: { color: '#334155', marginTop: 6, lineHeight: 20, fontSize: 13 },
+  destinationBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(212, 175, 55, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginTop: 4,
+  },
+  destinationText: { color: '#B45309', fontSize: 11, fontWeight: '600' },
   flexOne: { flex: 1 },
-  cardTitle: { color: NAVY, fontSize: 16, fontWeight: '700' },
+  cardTitle: { flex: 1, color: NAVY, fontSize: 15, fontWeight: '700', lineHeight: 20 },
+  dateText: { color: '#64748B', fontSize: 12, flexShrink: 0, marginTop: 2 },
   mutedText: { color: '#64748B', fontSize: 14 },
-  emptyCard: { alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 20, padding: 40, gap: 10, borderWidth: 1, borderColor: '#E2E8F0' },
-  emptyIconWrap: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  emptyCard: { alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 20, padding: 36, gap: 10, borderWidth: 1, borderColor: '#E2E8F0' },
+  emptyIconWrap: { width: 68, height: 68, borderRadius: 34, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   emptyHint: { color: '#94A3B8', fontSize: 12, marginTop: 4, fontStyle: 'italic' },
 });

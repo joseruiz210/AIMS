@@ -110,15 +110,13 @@ export default function AsistenciaAnimatedScreen() {
     setCurrentIndex(0);
     setLoadingDate(true);
     try {
-      const detail = await fichasService.getFichaById(targetFicha.id);
-      if (detail && detail.matriculas && detail.matriculas.length > 0) {
-        const list: ApprenticeAttendance[] = detail.matriculas.map((m: any) => {
-          const a = m.aprendiz;
-          const fullName = `${a.firstName} ${a.lastName || ''}`.trim();
+      const aprendicesRaw = await fichasService.getAprendicesByFicha(targetFicha.id, targetFicha.numero);
+      if (aprendicesRaw && aprendicesRaw.length > 0) {
+        const list: ApprenticeAttendance[] = aprendicesRaw.map((a) => {
           const initials = `${a.firstName?.[0] || 'A'}${a.lastName?.[0] || 'P'}`.toUpperCase();
           return {
             id: a.id,
-            name: fullName,
+            name: a.fullName,
             doc: a.documentNumber || a.phone || a.id.slice(0, 8),
             ficha: targetFicha.numero,
             initials,
@@ -196,24 +194,22 @@ export default function AsistenciaAnimatedScreen() {
       const fichasData = await fichasService.getFichas();
       setFichas(fichasData);
       if (fichasData.length > 0) {
-        const targetFicha = fichasData[0];
+        // Priorizar la ficha que tenga aprendices activos
+        const targetFicha = fichasData.find(f => (f.aprendicesCount || 0) > 0) || fichasData[0];
         setFichaId(targetFicha.id);
         setFichaNumero(targetFicha.numero);
         setProgramaNombre(targetFicha.programaNombre || '');
 
-        const detail = await fichasService.getFichaById(targetFicha.id);
-        if (detail && detail.matriculas && detail.matriculas.length > 0) {
-          const todayIso = dateOptions[0].iso;
-          setSelectedDate(todayIso);
+        const aprendicesRaw = await fichasService.getAprendicesByFicha(targetFicha.id, targetFicha.numero);
+        const todayIso = dateOptions[0].iso;
+        setSelectedDate(todayIso);
 
-          const list: ApprenticeAttendance[] = detail.matriculas.map((m: any) => {
-            const a = m.aprendiz;
-            const fullName = `${a.firstName} ${a.lastName || ''}`.trim();
+        if (aprendicesRaw && aprendicesRaw.length > 0) {
+          const list: ApprenticeAttendance[] = aprendicesRaw.map((a) => {
             const initials = `${a.firstName?.[0] || 'A'}${a.lastName?.[0] || 'P'}`.toUpperCase();
-
             return {
               id: a.id,
-              name: fullName,
+              name: a.fullName,
               doc: a.documentNumber || a.phone || a.id.slice(0, 8),
               ficha: targetFicha.numero,
               initials,
@@ -223,6 +219,8 @@ export default function AsistenciaAnimatedScreen() {
           });
 
           await fetchAttendanceForDate(targetFicha.id, todayIso, list);
+        } else {
+          setApprentices([]);
         }
       }
     } catch (err) {
@@ -624,7 +622,7 @@ export default function AsistenciaAnimatedScreen() {
                 {isFinished ? '¡Completado!' : `Aprendiz ${currentIndex + 1} de ${total}`}
               </Text>
               <Text style={styles.stepProgressPercentage}>
-                {Math.min(100, Math.round((currentIndex / total) * 100))}%
+                {total > 0 ? Math.min(100, Math.round((currentIndex / total) * 100)) : 0}%
               </Text>
             </View>
             <View style={styles.stepProgressBarBg}>
